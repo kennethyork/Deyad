@@ -296,8 +296,14 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
   });
 
   it('defaults to MySQL when dbProvider is omitted', () => {
-    const mysqlOpts = { ...opts, dbProvider: undefined };
-    const files = generateFullStackScaffold(mysqlOpts);
+    const defaultOpts = {
+      appName: opts.appName,
+      description: opts.description,
+      dbName: opts.dbName,
+      dbUser: opts.dbUser,
+      dbPassword: opts.dbPassword,
+    };
+    const files = generateFullStackScaffold(defaultOpts);
     expect(files['docker-compose.yml']).toContain('mysql:8.0');
     expect(files['backend/prisma/schema.prisma']).toContain('provider = "mysql"');
     expect(files['backend/.env']).toContain('mysql://');
