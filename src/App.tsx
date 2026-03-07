@@ -12,6 +12,7 @@ export interface AppProject {
   description: string;
   createdAt: string;
   isFullStack: boolean;
+  dbProvider?: 'mysql' | 'postgresql';
 }
 
 type RightTab = 'editor' | 'preview';
@@ -87,8 +88,8 @@ export default function App() {
     setAppFiles((prev) => ({ ...prev, [filePath]: content }));
   }, [selectedApp]);
 
-  const handleCreateApp = async (name: string, description: string, isFullStack: boolean) => {
-    const app = await window.deyad.createApp(name, description, isFullStack);
+  const handleCreateApp = async (name: string, description: string, isFullStack: boolean, dbProvider?: 'mysql' | 'postgresql') => {
+    const app = await window.deyad.createApp(name, description, isFullStack, dbProvider);
     setShowNewAppModal(false);
     await loadApps();
 
@@ -103,6 +104,7 @@ export default function App() {
         dbUser: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_user',
         dbPassword: generatePassword(24),
         dbRootPassword: generatePassword(24),
+        dbProvider: dbProvider ?? 'mysql',
       });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {

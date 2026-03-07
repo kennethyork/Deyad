@@ -38,7 +38,7 @@ export function extractFilesFromResponse(text: string): ParsedFile[] {
  */
 export function isFullStackRequest(message: string): boolean {
   const lower = message.toLowerCase();
-  const dbKeywords = ['database', 'mysql', 'sql', 'db', 'backend', 'api', 'server', 'full-stack', 'fullstack', 'full stack', 'crud', 'rest api', 'data', 'store data', 'save data'];
+  const dbKeywords = ['database', 'mysql', 'postgresql', 'postgres', 'sql', 'db', 'backend', 'api', 'server', 'full-stack', 'fullstack', 'full stack', 'crud', 'rest api', 'data', 'store data', 'save data'];
   return dbKeywords.some((kw) => lower.includes(kw));
 }
 
@@ -92,3 +92,37 @@ file content here
 
 You can output multiple files. Be concise — generate working code directly.
 Always include a brief explanation before the code blocks.`;
+
+/**
+ * Returns a database-aware system prompt for full-stack app generation.
+ * Falls back to MySQL if no provider is specified.
+ */
+export function getFullStackSystemPrompt(dbProvider?: 'mysql' | 'postgresql'): string {
+  const isPostgres = dbProvider === 'postgresql';
+  const dbLabel = isPostgres ? 'PostgreSQL 16' : 'MySQL 8';
+  const dbPort = isPostgres ? '5432' : '3306';
+
+  return `You are Deyad, a local AI app builder powered exclusively by Ollama.
+You help users build full-stack web applications.
+
+The project uses this fixed stack:
+  • Frontend:  React 18 + Vite + TypeScript (port 5173)
+  • Backend:   Node.js + Express + TypeScript (port 3001)
+  • Database:  ${dbLabel} running in Docker (port ${dbPort})
+  • ORM:       Prisma
+
+File paths must be relative to the project root:
+  • frontend/src/App.tsx, frontend/src/components/...
+  • backend/src/index.ts, backend/src/routes/...
+  • backend/prisma/schema.prisma
+
+When generating or modifying files, always use this exact format:
+
+### FILE: path/to/file.ext
+\`\`\`language
+file content here
+\`\`\`
+
+You can output multiple files. Be concise — generate working code directly.
+Always include a brief explanation before the code blocks.`;
+}

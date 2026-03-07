@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 
+type DbProvider = 'mysql' | 'postgresql';
+
 interface Props {
   onClose: () => void;
-  onCreate: (name: string, description: string, isFullStack: boolean) => void;
+  onCreate: (name: string, description: string, isFullStack: boolean, dbProvider?: DbProvider) => void;
 }
 
 interface Template {
@@ -27,6 +29,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isFullStack, setIsFullStack] = useState(false);
+  const [dbProvider, setDbProvider] = useState<DbProvider>('postgresql');
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
@@ -37,7 +40,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onCreate(name.trim(), description.trim(), isFullStack);
+    onCreate(name.trim(), description.trim(), isFullStack, isFullStack ? dbProvider : undefined);
   };
 
   const selectTemplate = (template: Template) => {
@@ -120,7 +123,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
               >
                 <span className="type-card-icon">🗄️</span>
                 <span className="type-card-title">Full Stack</span>
-                <span className="type-card-desc">React + Express + MySQL + Prisma</span>
+                <span className="type-card-desc">React + Express + DB + Prisma</span>
                 {dockerAvailable === false && (
                   <span className="type-card-warning">⚠️ Docker required</span>
                 )}
@@ -129,10 +132,37 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
           </div>
 
           {isFullStack && (
+            <div className="form-field">
+              <label>Database</label>
+              <div className="type-cards">
+                <button
+                  type="button"
+                  className={`type-card ${dbProvider === 'postgresql' ? 'selected' : ''}`}
+                  onClick={() => setDbProvider('postgresql')}
+                >
+                  <span className="type-card-icon">🐘</span>
+                  <span className="type-card-title">PostgreSQL 16</span>
+                  <span className="type-card-desc">Recommended · Feature-rich</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`type-card ${dbProvider === 'mysql' ? 'selected' : ''}`}
+                  onClick={() => setDbProvider('mysql')}
+                >
+                  <span className="type-card-icon">🐬</span>
+                  <span className="type-card-title">MySQL 8</span>
+                  <span className="type-card-desc">Widely used · Battle-tested</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isFullStack && (
             <div className="stack-info">
               <p className="stack-info-title">🚀 What gets scaffolded automatically:</p>
               <ul>
-                <li><strong>docker-compose.yml</strong> — MySQL 8 database</li>
+                <li><strong>docker-compose.yml</strong> — {dbProvider === 'postgresql' ? 'PostgreSQL 16' : 'MySQL 8'} database</li>
                 <li><strong>backend/</strong> — Express API + Prisma ORM</li>
                 <li><strong>frontend/</strong> — React + Vite app (proxies to backend)</li>
                 <li><strong>README.md</strong> — Setup &amp; run instructions</li>

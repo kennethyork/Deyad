@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AppProject } from '../App';
-import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, FULLSTACK_SYSTEM_PROMPT } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -94,7 +94,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   };
 
   const buildHistory = useCallback((): ChatMessage[] => {
-    const systemPrompt = app.isFullStack ? FULLSTACK_SYSTEM_PROMPT : FRONTEND_SYSTEM_PROMPT;
+    const systemPrompt = app.isFullStack ? getFullStackSystemPrompt(app.dbProvider) : FRONTEND_SYSTEM_PROMPT;
     const history: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
 
     // Inject current files as context (truncated for large codebases)
@@ -135,7 +135,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       const hint: UiMessage = {
         id: `hint-${Date.now()}`,
         role: 'assistant',
-        content: '💡 **Tip:** This sounds like a full-stack request. Create a new app with "Full Stack (React + Express + MySQL)" enabled to get Docker Compose, Prisma, and a complete backend scaffold automatically.',
+        content: '💡 **Tip:** This sounds like a full-stack request. Create a new app with **Full Stack** mode enabled to get Docker Compose, Prisma, and a complete backend scaffold with your choice of PostgreSQL or MySQL.',
       };
       const msgsWithHint = [...msgsWithUser, hint];
       setMessages(msgsWithHint);
@@ -241,7 +241,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
               )}
               <span className={`db-indicator ${dbStatus}`}>
                 {dbStatus === 'running' ? '🟢' : dbStatus === 'stopped' ? '🔴' : '⚪'}
-                {' MySQL'}
+                {app.dbProvider === 'postgresql' ? ' PostgreSQL' : ' MySQL'}
               </span>
               <button
                 className={`btn-db ${dbStatus === 'running' ? 'running' : ''}`}
@@ -285,18 +285,34 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
           <div className="chat-welcome">
             <p className="chat-welcome-title">
               {app.isFullStack
-                ? '🗄️ Full-Stack App — React + Express + MySQL'
+                ? `🗄️ Full-Stack App — React + Express + ${app.dbProvider === 'postgresql' ? 'PostgreSQL' : 'MySQL'}`
                 : '⚡ Frontend App — React + Vite'}
             </p>
             <p className="chat-welcome-sub">Describe what you want to build and I'll generate the code.</p>
             {app.isFullStack && (
-              <div className="stack-badge-row">
-                <span className="stack-badge">React</span>
-                <span className="stack-badge">Express</span>
-                <span className="stack-badge stack-badge-db">MySQL 8</span>
-                <span className="stack-badge">Prisma</span>
-                <span className="stack-badge">Docker</span>
-              </div>
+              <>
+                <div className="stack-badge-row">
+                  <span className="stack-badge">React</span>
+                  <span className="stack-badge">Express</span>
+                  <span className="stack-badge stack-badge-db">{app.dbProvider === 'postgresql' ? 'PostgreSQL 16' : 'MySQL 8'}</span>
+                  <span className="stack-badge">Prisma</span>
+                  <span className="stack-badge">Docker</span>
+                </div>
+                <div className="chat-guide">
+                  <p className="chat-guide-title">📖 Quick-start guide</p>
+                  <ol className="chat-guide-steps">
+                    <li>Click <strong>▶ Start DB</strong> above to spin up {app.dbProvider === 'postgresql' ? 'PostgreSQL' : 'MySQL'} via Docker</li>
+                    <li>Chat with the AI to add models, routes &amp; UI</li>
+                    <li>Open a terminal in <code>backend/</code> and run:<br />
+                      <code>npm install &amp;&amp; npx prisma db push &amp;&amp; npm run dev</code></li>
+                    <li>Open a terminal in <code>frontend/</code> and run:<br />
+                      <code>npm install &amp;&amp; npm run dev</code></li>
+                  </ol>
+                  <p className="chat-guide-hint">
+                    💡 DB credentials are in <code>backend/.env</code> · Prisma schema is at <code>backend/prisma/schema.prisma</code>
+                  </p>
+                </div>
+              </>
             )}
             <div className="chat-suggestions">
               {app.isFullStack ? (

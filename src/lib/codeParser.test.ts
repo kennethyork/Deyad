@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractFilesFromResponse, isFullStackRequest } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, getFullStackSystemPrompt } from '../lib/codeParser';
 
 describe('extractFilesFromResponse', () => {
   it('extracts a single file block', () => {
@@ -50,11 +50,34 @@ describe('isFullStackRequest', () => {
     expect(isFullStackRequest('Create a backend server')).toBe(true);
     expect(isFullStackRequest('I want to store data')).toBe(true);
     expect(isFullStackRequest('Full stack app with CRUD')).toBe(true);
+    expect(isFullStackRequest('Use PostgreSQL for the database')).toBe(true);
+    expect(isFullStackRequest('Set up a postgres instance')).toBe(true);
   });
 
   it('returns false for frontend-only requests', () => {
     expect(isFullStackRequest('Make a landing page')).toBe(false);
     expect(isFullStackRequest('Add a button to my form')).toBe(false);
     expect(isFullStackRequest('Style the navbar with blue')).toBe(false);
+  });
+});
+
+describe('getFullStackSystemPrompt', () => {
+  it('returns MySQL prompt by default', () => {
+    const prompt = getFullStackSystemPrompt();
+    expect(prompt).toContain('MySQL 8');
+    expect(prompt).toContain('port 3306');
+  });
+
+  it('returns MySQL prompt when mysql is specified', () => {
+    const prompt = getFullStackSystemPrompt('mysql');
+    expect(prompt).toContain('MySQL 8');
+    expect(prompt).toContain('port 3306');
+  });
+
+  it('returns PostgreSQL prompt when postgresql is specified', () => {
+    const prompt = getFullStackSystemPrompt('postgresql');
+    expect(prompt).toContain('PostgreSQL 16');
+    expect(prompt).toContain('port 5432');
+    expect(prompt).not.toContain('MySQL');
   });
 });

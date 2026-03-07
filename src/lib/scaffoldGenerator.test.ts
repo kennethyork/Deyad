@@ -147,7 +147,7 @@ describe('generateFullStackScaffold', () => {
   });
 });
 
-describe('generateFullStackScaffold', () => {
+describe('generateFullStackScaffold (MySQL — simple password)', () => {
   const opts = {
     appName: 'My App',
     description: 'Test app',
@@ -216,5 +216,96 @@ describe('generateFullStackScaffold', () => {
     });
     expect(files['docker-compose.yml']).toContain('my_app_db_');
     expect(files['docker-compose.yml']).toContain('user_name');
+  });
+});
+
+describe('generateFullStackScaffold (PostgreSQL)', () => {
+  const opts = {
+    appName: 'My PG App',
+    description: 'Test pg app',
+    dbName: 'mypgapp_db',
+    dbUser: 'mypgapp_user',
+    dbPassword: 'PgP@ss!456',
+    dbProvider: 'postgresql' as const,
+  };
+
+  it('generates docker-compose.yml with PostgreSQL', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('postgres:16');
+    expect(files['docker-compose.yml']).toContain('mypgapp_db');
+    expect(files['docker-compose.yml']).toContain('mypgapp_user');
+    expect(files['docker-compose.yml']).toContain('PgP@ss!456');
+    expect(files['docker-compose.yml']).toContain("'5432:5432'");
+  });
+
+  it('uses pg_isready for healthcheck', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('pg_isready');
+    expect(files['docker-compose.yml']).toContain('-U mypgapp_user');
+  });
+
+  it('does not include MySQL-specific config', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).not.toContain('mysql');
+    expect(files['docker-compose.yml']).not.toContain('MYSQL_');
+    expect(files['docker-compose.yml']).not.toContain('3306');
+  });
+
+  it('generates Prisma schema with PostgreSQL provider', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['backend/prisma/schema.prisma']).toContain('provider = "postgresql"');
+    expect(files['backend/prisma/schema.prisma']).toContain('DATABASE_URL');
+  });
+
+  it('generates backend .env with correct PostgreSQL DATABASE_URL', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['backend/.env']).toContain(
+      'postgresql://mypgapp_user:PgP@ss!456@localhost:5432/mypgapp_db',
+    );
+  });
+
+  it('generates backend package.json with Express and Prisma', () => {
+    const files = generateFullStackScaffold(opts);
+    const pkg = JSON.parse(files['backend/package.json']);
+    expect(pkg.dependencies.express).toBeDefined();
+    expect(pkg.dependencies['@prisma/client']).toBeDefined();
+    expect(pkg.dependencies.cors).toBeDefined();
+    expect(pkg.devDependencies.prisma).toBeDefined();
+  });
+
+  it('generates frontend with React + Vite', () => {
+    const files = generateFullStackScaffold(opts);
+    const pkg = JSON.parse(files['frontend/package.json']);
+    expect(pkg.dependencies.react).toBeDefined();
+    expect(pkg.devDependencies['@vitejs/plugin-react']).toBeDefined();
+    expect(files['frontend/vite.config.ts']).toContain("target: 'http://localhost:3001'");
+  });
+
+  it('generates README with PostgreSQL stack info', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['README.md']).toContain('React');
+    expect(files['README.md']).toContain('Express');
+    expect(files['README.md']).toContain('PostgreSQL');
+    expect(files['README.md']).toContain('Prisma');
+    expect(files['README.md']).toContain('docker compose up');
+  });
+
+  it('uses postgres_data volume name', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('postgres_data');
+  });
+
+  it('defaults to MySQL when dbProvider is omitted', () => {
+    const defaultOpts = {
+      appName: opts.appName,
+      description: opts.description,
+      dbName: opts.dbName,
+      dbUser: opts.dbUser,
+      dbPassword: opts.dbPassword,
+    };
+    const files = generateFullStackScaffold(defaultOpts);
+    expect(files['docker-compose.yml']).toContain('mysql:8.0');
+    expect(files['backend/prisma/schema.prisma']).toContain('provider = "mysql"');
+    expect(files['backend/.env']).toContain('mysql://');
   });
 });
