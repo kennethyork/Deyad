@@ -924,3 +924,105 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── File Search ────────────────────────────────────────────────────────── */
+.file-search {
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.file-search-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.file-search-input:focus {
+  border-color: var(--border-focus);
+}
+.file-search-input::placeholder {
+  color: var(--text-muted);
+}
+.file-search-count {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ─── Settings Modal ─────────────────────────────────────────────────────── */
+.settings-modal {
+  max-width: 480px;
+}
+.settings-host-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.settings-host-row input {
+  flex: 1;
+}
+.btn-test {
+  white-space: nowrap;
+  padding: 6px 12px !important;
+  font-size: 12px;
+}
+.settings-model-select {
+  width: 100%;
+}
+.form-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ─── Sidebar Settings Button ────────────────────────────────────────────── */
+.sidebar-settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 0;
+  transition: color 0.15s;
+  text-align: left;
+}
+.sidebar-settings-btn:hover {
+  color: var(--text-primary);
+}
+
+/* ─── Sidebar Export Button ──────────────────────────────────────────────── */
+.sidebar-export {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.sidebar-item:hover .sidebar-export { opacity: 1; }
+.sidebar-export:hover { color: var(--accent-light); }
+
+/* ─── Revert Button ──────────────────────────────────────────────────────── */
+.btn-revert {
+  background: var(--bg-elevated);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-revert:hover {
+  background: rgba(245, 158, 11, 0.15);
+}

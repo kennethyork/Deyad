@@ -4,6 +4,7 @@ import ChatPanel from './components/ChatPanel';
 import EditorPanel from './components/EditorPanel';
 import PreviewPanel from './components/PreviewPanel';
 import NewAppModal from './components/NewAppModal';
+import SettingsModal from './components/SettingsModal';
 
 export interface AppProject {
   id: string;
@@ -21,8 +22,10 @@ export default function App() {
   const [appFiles, setAppFiles] = useState<Record<string, string>>({});
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [showNewAppModal, setShowNewAppModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [dbStatus, setDbStatus] = useState<'none' | 'running' | 'stopped'>('none');
   const [rightTab, setRightTab] = useState<RightTab>('editor');
+  const [canRevert, setCanRevert] = useState(false);
 
   // Load app list on mount
   useEffect(() => {
@@ -53,6 +56,10 @@ export default function App() {
     const files = await window.deyad.readFiles(app.id);
     setAppFiles(files);
 
+    // Check undo availability
+    const hasSnap = await window.deyad.hasSnapshot(app.id);
+    setCanRevert(hasSnap);
+
     // Check DB status for full-stack apps
     if (app.isFullStack) {
       const { status } = await window.deyad.dbStatus(app.id);
@@ -64,12 +71,15 @@ export default function App() {
 
   const handleFilesUpdated = useCallback(async (newFiles: Record<string, string>) => {
     if (!selectedApp) return;
+    // Snapshot current files before AI overwrites them (for undo)
+    await window.deyad.snapshotFiles(selectedApp.id, appFiles);
     await window.deyad.writeFiles(selectedApp.id, newFiles);
     setAppFiles((prev) => ({ ...prev, ...newFiles }));
+    setCanRevert(true);
     // Select the first new file
     const firstKey = Object.keys(newFiles)[0];
     if (firstKey) setSelectedFile(firstKey);
-  }, [selectedApp]);
+  }, [selectedApp, appFiles]);
 
   const handleFileEdit = useCallback(async (filePath: string, content: string) => {
     if (!selectedApp) return;
@@ -141,6 +151,24 @@ export default function App() {
     }
   };
 
+  const handleRevert = async () => {
+    if (!selectedApp) return;
+    const result = await window.deyad.revertFiles(selectedApp.id);
+    if (result.success) {
+      const files = await window.deyad.readFiles(selectedApp.id);
+      setAppFiles(files);
+      setSelectedFile(null);
+      setCanRevert(false);
+    }
+  };
+
+  const handleExportApp = async (appId: string) => {
+    const result = await window.deyad.exportApp(appId);
+    if (!result.success && result.error !== 'Cancelled') {
+      alert(`Export failed: ${result.error}`);
+    }
+  };
+
   return (
     <div className="app-layout">
       {/* Left sidebar: app list */}
@@ -151,6 +179,8 @@ export default function App() {
         onNewApp={() => setShowNewAppModal(true)}
         onDeleteApp={handleDeleteApp}
         onRenameApp={handleRenameApp}
+        onExportApp={handleExportApp}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       {selectedApp ? (
@@ -162,6 +192,8 @@ export default function App() {
             dbStatus={dbStatus}
             onFilesUpdated={handleFilesUpdated}
             onDbToggle={handleDbToggle}
+            onRevert={handleRevert}
+            canRevert={canRevert}
           />
 
           {/* Right: file editor + preview tabs */}
@@ -213,6 +245,10 @@ export default function App() {
           onClose={() => setShowNewAppModal(false)}
           onCreate={handleCreateApp}
         />
+      )}
+
+      {showSettings && (
+        <SettingsModal onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

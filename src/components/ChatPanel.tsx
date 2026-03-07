@@ -27,9 +27,11 @@ interface Props {
   dbStatus: 'none' | 'running' | 'stopped';
   onFilesUpdated: (files: Record<string, string>) => void;
   onDbToggle: () => void;
+  onRevert: () => void;
+  canRevert: boolean;
 }
 
-export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onDbToggle }: Props) {
+export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onDbToggle, onRevert, canRevert }: Props) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [models, setModels] = useState<string[]>([]);
@@ -60,7 +62,17 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       const names = list.map((m) => m.name);
       setModels(names);
       if (names.length > 0 && !selectedModel) {
-        setSelectedModel(names[0]);
+        // Use default model from settings if available
+        try {
+          const settings = await window.deyad.getSettings();
+          if (settings.defaultModel && names.includes(settings.defaultModel)) {
+            setSelectedModel(settings.defaultModel);
+          } else {
+            setSelectedModel(names[0]);
+          }
+        } catch {
+          setSelectedModel(names[0]);
+        }
       }
       setOllamaError('');
     } catch {
@@ -214,6 +226,17 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
           {app.description && <span className="chat-app-desc">{app.description}</span>}
         </div>
         <div className="chat-header-right">
+          {/* Revert button */}
+          {canRevert && (
+            <button
+              className="btn-revert"
+              onClick={onRevert}
+              title="Undo last AI changes — restore files to their state before the most recent generation"
+            >
+              ↩ Undo
+            </button>
+          )}
+
           {/* DB controls for full-stack apps */}
           {app.isFullStack && (
             <div className="db-status">
