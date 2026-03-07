@@ -1026,3 +1026,124 @@ body {
 .btn-revert:hover {
   background: rgba(245, 158, 11, 0.15);
 }
+
+/* ── Provider Cards (Settings) ──────────────────────────────────────────── */
+
+.provider-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.provider-card {
+  padding: 10px 12px;
+  background: var(--bg-base);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.provider-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.provider-card.selected {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* ── Template Grid (New App Modal) ──────────────────────────────────────── */
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: var(--bg-base);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.template-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.template-card.selected {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.template-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.template-icon {
+  font-size: 24px;
+}
+
+.template-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.template-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent);
+}
+
+/* ── Sidebar header actions ─────────────────────────────────────────────── */
+
+.sidebar-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-import-app {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-import-app:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.sidebar-footer-powered {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  display: block;
+  padding: 2px 0;
+}

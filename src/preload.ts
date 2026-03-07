@@ -131,10 +131,31 @@ contextBridge.exposeInMainWorld('deyad', {
   },
 
   // ── Settings ────────────────────────────────────────────────────────────
-  getSettings: (): Promise<{ ollamaHost: string; defaultModel: string }> =>
+  getSettings: (): Promise<{
+    ollamaHost: string;
+    defaultModel: string;
+    aiProvider: string;
+    openaiApiKey: string;
+    anthropicApiKey: string;
+    googleApiKey: string;
+  }> =>
     ipcRenderer.invoke('settings:get'),
 
-  setSettings: (settings: { ollamaHost?: string; defaultModel?: string }): Promise<{ ollamaHost: string; defaultModel: string }> =>
+  setSettings: (settings: {
+    ollamaHost?: string;
+    defaultModel?: string;
+    aiProvider?: string;
+    openaiApiKey?: string;
+    anthropicApiKey?: string;
+    googleApiKey?: string;
+  }): Promise<{
+    ollamaHost: string;
+    defaultModel: string;
+    aiProvider: string;
+    openaiApiKey: string;
+    anthropicApiKey: string;
+    googleApiKey: string;
+  }> =>
     ipcRenderer.invoke('settings:set', settings),
 
   // ── Export ──────────────────────────────────────────────────────────────
@@ -150,4 +171,12 @@ contextBridge.exposeInMainWorld('deyad', {
 
   revertFiles: (appId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('apps:revert', appId),
+
+  // ── Import ──────────────────────────────────────────────────────────────
+  importApp: (name: string): Promise<AppProject | null> =>
+    ipcRenderer.invoke('apps:import', name),
+
+  // ── Git ────────────────────────────────────────────────────────────────
+  gitLog: (appId: string): Promise<{ hash: string; message: string; date: string }[]> =>
+    ipcRenderer.invoke('git:log', appId),
 });

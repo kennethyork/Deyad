@@ -12,10 +12,11 @@ interface Props {
   onDeleteApp: (id: string) => void;
   onRenameApp: (id: string, newName: string) => void;
   onExportApp: (id: string) => void;
+  onImportApp: () => void;
   onOpenSettings: () => void;
 }
 
-export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onExportApp, onOpenSettings }: Props) {
+export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onExportApp, onImportApp, onOpenSettings }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -56,9 +57,14 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
     <aside className="sidebar">
       <div className="sidebar-header">
         <span className="sidebar-logo">🤖 Deyad</span>
-        <button className="btn-new-app" onClick={onNewApp} title="New App">
-          +
-        </button>
+        <div className="sidebar-header-actions">
+          <button className="btn-import-app" onClick={onImportApp} title="Import existing project">
+            📂
+          </button>
+          <button className="btn-new-app" onClick={onNewApp} title="New App">
+            +
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-section-label">APPS</div>
@@ -117,14 +123,9 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
         <button className="sidebar-settings-btn" onClick={onOpenSettings} title="Settings">
           ⚙️ Settings
         </button>
-        <a
-          className="sidebar-footer-link"
-          href="https://ollama.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by Ollama
-        </a>
+        <span className="sidebar-footer-link sidebar-footer-powered">
+          Ollama · OpenAI · Anthropic · Google
+        </span>
       </div>
     </aside>
   );

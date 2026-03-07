@@ -115,6 +115,16 @@ export default function App() {
     await selectApp({ ...app });
   };
 
+  const handleImportApp = async () => {
+    const name = prompt('Name for the imported project:');
+    if (!name?.trim()) return;
+    const app = await window.deyad.importApp(name.trim());
+    if (app) {
+      await loadApps();
+      await selectApp(app);
+    }
+  };
+
   const handleDeleteApp = async (appId: string) => {
     // Stop dev server if running before deleting
     await window.deyad.appDevStop(appId).catch(() => {});
@@ -180,6 +190,7 @@ export default function App() {
         onDeleteApp={handleDeleteApp}
         onRenameApp={handleRenameApp}
         onExportApp={handleExportApp}
+        onImportApp={handleImportApp}
         onOpenSettings={() => setShowSettings(true)}
       />
 

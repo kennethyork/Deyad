@@ -2,6 +2,8 @@
  * Global type augmentation for the contextBridge API exposed by preload.ts
  */
 
+type AiProvider = 'ollama' | 'openai' | 'anthropic' | 'google';
+
 interface OllamaModel {
   name: string;
   modified_at: string;
@@ -33,8 +35,23 @@ interface UiMessage {
   filesGenerated?: string[];
 }
 
+interface DeyadSettings {
+  ollamaHost: string;
+  defaultModel: string;
+  aiProvider: AiProvider;
+  openaiApiKey: string;
+  anthropicApiKey: string;
+  googleApiKey: string;
+}
+
+interface GitLogEntry {
+  hash: string;
+  message: string;
+  date: string;
+}
+
 interface DeyadAPI {
-  // Ollama
+  // AI (provider-agnostic)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[]): Promise<void>;
   onStreamToken(cb: (token: string) => void): () => void;
@@ -52,6 +69,7 @@ interface DeyadAPI {
   renameApp(appId: string, newName: string): Promise<boolean>;
   saveMessages(appId: string, messages: UiMessage[]): Promise<boolean>;
   loadMessages(appId: string): Promise<UiMessage[]>;
+  importApp(name: string): Promise<AppProject | null>;
 
   // Dev server (Preview)
   appDevStart(appId: string): Promise<{ success: boolean; error?: string }>;
@@ -68,8 +86,8 @@ interface DeyadAPI {
   onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
   // Settings
-  getSettings(): Promise<{ ollamaHost: string; defaultModel: string }>;
-  setSettings(settings: { ollamaHost?: string; defaultModel?: string }): Promise<{ ollamaHost: string; defaultModel: string }>;
+  getSettings(): Promise<DeyadSettings>;
+  setSettings(settings: Partial<DeyadSettings>): Promise<DeyadSettings>;
 
   // Export
   exportApp(appId: string): Promise<{ success: boolean; error?: string; path?: string }>;
@@ -78,6 +96,9 @@ interface DeyadAPI {
   snapshotFiles(appId: string, files: Record<string, string>): Promise<boolean>;
   hasSnapshot(appId: string): Promise<boolean>;
   revertFiles(appId: string): Promise<{ success: boolean; error?: string }>;
+
+  // Git
+  gitLog(appId: string): Promise<GitLogEntry[]>;
 }
 
 declare global {
