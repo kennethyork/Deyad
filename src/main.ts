@@ -5,6 +5,7 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
 import started from 'electron-squirrel-startup';
+import { crc32 } from './lib/crc32';
 
 const execFileAsync = promisify(execFile);
 
@@ -511,18 +512,6 @@ async function buildZipBuffer(baseDir: string, prefix: string): Promise<Buffer> 
   endRecord.writeUInt16LE(0, 20);
 
   return Buffer.concat([...parts, centralDirBuffer, endRecord]);
-}
-
-/** CRC-32 (ISO 3309) — used for ZIP file entries. */
-function crc32(buf: Buffer): number {
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < buf.length; i++) {
-    crc ^= buf[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
-    }
-  }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
 }
 
 // ── Undo / Revert ───────────────────────────────────────────────────────────
