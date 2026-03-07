@@ -642,16 +642,7 @@ ipcMain.handle('apps:import', async (_event, name: string) => {
 
   // Detect if it's a full-stack project (has backend/ and frontend/ dirs)
   const isFullStack = fs.existsSync(path.join(srcDir, 'backend')) && fs.existsSync(path.join(srcDir, 'frontend'));
-  // Detect if it's a mobile project (has app.json with expo key)
-  let isMobile = false;
-  const appJsonPath = path.join(srcDir, 'app.json');
-  if (fs.existsSync(appJsonPath)) {
-    try {
-      const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
-      if (appJson.expo) isMobile = true;
-    } catch { /* ignore */ }
-  }
-  const appType = isMobile ? 'mobile' : isFullStack ? 'fullstack' : 'frontend';
+  const appType = isFullStack ? 'fullstack' : 'frontend';
 
   // Copy files recursively (skip node_modules and .git)
   const copyDir = (src: string, dest: string) => {

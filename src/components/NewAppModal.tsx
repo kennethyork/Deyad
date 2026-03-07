@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 type DbProvider = 'mysql' | 'postgresql';
-type AppType = 'frontend' | 'fullstack' | 'mobile';
+type AppType = 'frontend' | 'fullstack';
 
 interface Props {
   onClose: () => void;
@@ -24,9 +24,6 @@ const TEMPLATES: Template[] = [
   { name: 'Chat UI', description: 'Real-time chat interface', icon: '💬', appType: 'frontend', prompt: 'Build a chat interface with message bubbles, a text input, and a sidebar with conversation list.' },
   { name: 'Blog', description: 'Blog with posts, categories & comments', icon: '📝', appType: 'fullstack', prompt: 'Create a blog with posts, categories, and comments. Include CRUD for posts and a clean reading UI.' },
   { name: 'E-commerce', description: 'Product catalog with cart & checkout', icon: '🛒', appType: 'fullstack', prompt: 'Build an e-commerce app with product listings, shopping cart, and a checkout flow.' },
-  { name: 'Mobile Blank', description: 'Start from scratch', icon: '📱', appType: 'mobile', prompt: '' },
-  { name: 'Social Feed', description: 'Social media feed with posts & likes', icon: '📲', appType: 'mobile', prompt: 'Create a social media feed with posts, likes, and a profile screen' },
-  { name: 'Fitness Tracker', description: 'Workout logging & progress stats', icon: '💪', appType: 'mobile', prompt: 'Build a fitness tracker with workout logging, stats, and a progress chart' },
 ];
 
 export default function NewAppModal({ onClose, onCreate }: Props) {
@@ -49,7 +46,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
 
   const selectTemplate = (template: Template) => {
     setSelectedTemplate(template);
-    if (!name) setName(template.name === 'Blank App' || template.name === 'Mobile Blank' ? '' : template.name);
+    if (!name) setName(template.name === 'Blank App' ? '' : template.name);
     if (!description) setDescription(template.prompt || template.description);
     setAppType(template.appType);
   };
@@ -78,7 +75,6 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                   <span className="template-icon">{t.icon}</span>
                   <span className="template-name">{t.name}</span>
                   {t.appType === 'fullstack' && <span className="template-badge">Full Stack</span>}
-                  {t.appType === 'mobile' && <span className="template-badge template-badge-mobile">Mobile</span>}
                 </button>
               ))}
             </div>
@@ -133,16 +129,6 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                   <span className="type-card-warning">⚠️ Docker required</span>
                 )}
               </button>
-
-              <button
-                type="button"
-                className={`type-card ${appType === 'mobile' ? 'selected' : ''}`}
-                onClick={() => setAppType('mobile')}
-              >
-                <span className="type-card-icon">📱</span>
-                <span className="type-card-title">Mobile App</span>
-                <span className="type-card-desc">Expo + React Native</span>
-              </button>
             </div>
           </div>
 
@@ -184,22 +170,6 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
               </ul>
               <p className="stack-info-db">
                 🔑 DB credentials will be randomly generated when you create the app. Check <code>backend/.env</code> after creation.
-              </p>
-            </div>
-          )}
-
-          {appType === 'mobile' && (
-            <div className="stack-info">
-              <p className="stack-info-title">📱 What gets scaffolded automatically:</p>
-              <ul>
-                <li><strong>App.tsx</strong> — Root component</li>
-                <li><strong>app/</strong> — Expo Router pages (tab navigation)</li>
-                <li><strong>app.json</strong> — Expo config (SDK 52)</li>
-                <li><strong>package.json</strong> — Expo + React Native dependencies</li>
-                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
-              </ul>
-              <p className="stack-info-db">
-                📲 Run <code>npx expo install</code> then <code>npx expo start</code> to launch the dev server.
               </p>
             </div>
           )}

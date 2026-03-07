@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractFilesFromResponse, isFullStackRequest, isMobileRequest, MOBILE_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, getFullStackSystemPrompt } from '../lib/codeParser';
 
 describe('extractFilesFromResponse', () => {
   it('extracts a single file block', () => {
@@ -82,38 +82,3 @@ describe('getFullStackSystemPrompt', () => {
   });
 });
 
-describe('isMobileRequest', () => {
-  it('detects mobile keywords', () => {
-    expect(isMobileRequest('I want to build a mobile app')).toBe(true);
-    expect(isMobileRequest('Create an Expo app')).toBe(true);
-    expect(isMobileRequest('Build a React Native component')).toBe(true);
-    expect(isMobileRequest('Make it work on iOS')).toBe(true);
-    expect(isMobileRequest('Target Android devices')).toBe(true);
-    expect(isMobileRequest('Deploy to phone')).toBe(true);
-    expect(isMobileRequest('Tablet-friendly layout')).toBe(true);
-    expect(isMobileRequest('Build a native app')).toBe(true);
-  });
-
-  it('returns false for non-mobile requests', () => {
-    expect(isMobileRequest('Add a button to my form')).toBe(false);
-    expect(isMobileRequest('Style the navbar with blue')).toBe(false);
-    expect(isMobileRequest('Create a landing page')).toBe(false);
-  });
-});
-
-describe('MOBILE_SYSTEM_PROMPT', () => {
-  it('exists and mentions React Native and Expo', () => {
-    expect(MOBILE_SYSTEM_PROMPT).toBeDefined();
-    expect(MOBILE_SYSTEM_PROMPT).toContain('React Native');
-    expect(MOBILE_SYSTEM_PROMPT).toContain('Expo');
-  });
-
-  it('instructs to use StyleSheet not CSS', () => {
-    expect(MOBILE_SYSTEM_PROMPT).toContain('StyleSheet.create()');
-    expect(MOBILE_SYSTEM_PROMPT).toContain('NOT CSS');
-  });
-
-  it('includes the file format instructions', () => {
-    expect(MOBILE_SYSTEM_PROMPT).toContain('### FILE:');
-  });
-});

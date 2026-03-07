@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AppProject } from '../App';
-import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, MOBILE_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -97,8 +97,6 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
     let systemPrompt: string;
     if (app.appType === 'fullstack') {
       systemPrompt = getFullStackSystemPrompt(app.dbProvider);
-    } else if (app.appType === 'mobile') {
-      systemPrompt = MOBILE_SYSTEM_PROMPT;
     } else {
       systemPrompt = FRONTEND_SYSTEM_PROMPT;
     }
@@ -226,7 +224,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       <div className="chat-header">
         <div className="chat-header-left">
           <span className="chat-app-name">
-            {app.appType === 'mobile' ? '📱' : app.appType === 'fullstack' ? '🗄️' : '⚡'} {app.name}
+            {app.appType === 'fullstack' ? '🗄️' : '⚡'} {app.name}
           </span>
           {app.description && <span className="chat-app-desc">{app.description}</span>}
         </div>
@@ -293,9 +291,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
         {messages.length === 0 && (
           <div className="chat-welcome">
             <p className="chat-welcome-title">
-              {app.appType === 'mobile'
-                ? '📱 Mobile App — React Native + Expo'
-                : app.appType === 'fullstack'
+              {app.appType === 'fullstack'
                 ? `🗄️ Full-Stack App — React + Express + ${app.dbProvider === 'postgresql' ? 'PostgreSQL' : 'MySQL'}`
                 : '⚡ Frontend App — React + Vite'}
             </p>
@@ -325,28 +321,6 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
                 </div>
               </>
             )}
-            {app.appType === 'mobile' && (
-              <>
-                <div className="stack-badge-row">
-                  <span className="stack-badge">React Native</span>
-                  <span className="stack-badge">Expo</span>
-                  <span className="stack-badge">TypeScript</span>
-                </div>
-                <div className="chat-guide">
-                  <p className="chat-guide-title">📖 Quick-start guide</p>
-                  <ol className="chat-guide-steps">
-                    <li>Open a terminal in the project folder and run:<br />
-                      <code>npx expo install</code></li>
-                    <li>Start the dev server:<br />
-                      <code>npx expo start</code></li>
-                    <li>Scan the QR code with <strong>Expo Go</strong> on your phone, or press <code>i</code> for iOS / <code>a</code> for Android simulator</li>
-                  </ol>
-                  <p className="chat-guide-hint">
-                    💡 Use React Native components (View, Text, etc.) — not HTML · Use StyleSheet.create() — not CSS
-                  </p>
-                </div>
-              </>
-            )}
             <div className="chat-suggestions">
               {app.appType === 'fullstack' ? (
                 <>
@@ -358,18 +332,6 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
                   </button>
                   <button className="suggestion" onClick={() => setInput('Update the Prisma schema to add a todo list with title, completed boolean, and due date')}>
                     Todo list schema
-                  </button>
-                </>
-              ) : app.appType === 'mobile' ? (
-                <>
-                  <button className="suggestion" onClick={() => setInput('Create a tab-based navigation with Home, Search, and Profile screens')}>
-                    Tab navigation with 3 screens
-                  </button>
-                  <button className="suggestion" onClick={() => setInput('Build a list with pull-to-refresh and swipe-to-delete')}>
-                    List with pull-to-refresh
-                  </button>
-                  <button className="suggestion" onClick={() => setInput('Add a settings screen with toggles and a dark mode switch')}>
-                    Settings screen with toggles
                   </button>
                 </>
               ) : (

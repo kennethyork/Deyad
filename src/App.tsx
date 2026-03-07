@@ -11,7 +11,7 @@ export interface AppProject {
   name: string;
   description: string;
   createdAt: string;
-  appType: 'frontend' | 'fullstack' | 'mobile';
+  appType: 'frontend' | 'fullstack';
   dbProvider?: 'mysql' | 'postgresql';
 }
 
@@ -88,7 +88,7 @@ export default function App() {
     setAppFiles((prev) => ({ ...prev, [filePath]: content }));
   }, [selectedApp]);
 
-  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack' | 'mobile', dbProvider?: 'mysql' | 'postgresql') => {
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', dbProvider?: 'mysql' | 'postgresql') => {
     const app = await window.deyad.createApp(name, description, appType, dbProvider);
     setShowNewAppModal(false);
     await loadApps();
@@ -106,11 +106,6 @@ export default function App() {
         dbRootPassword: generatePassword(24),
         dbProvider: dbProvider ?? 'mysql',
       });
-      await window.deyad.writeFiles(app.id, scaffold);
-    } else if (appType === 'mobile') {
-      // Write a minimal runnable Expo scaffold
-      const { generateMobileScaffold } = await import('./lib/scaffoldGenerator');
-      const scaffold = generateMobileScaffold({ appName: name, description });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
       // Write a minimal runnable Vite scaffold so the app can be previewed right away

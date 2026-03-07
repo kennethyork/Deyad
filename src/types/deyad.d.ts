@@ -20,7 +20,7 @@ interface ChatMessage {
 
 type DbProvider = 'mysql' | 'postgresql';
 
-type AppType = 'frontend' | 'fullstack' | 'mobile';
+type AppType = 'frontend' | 'fullstack';
 
 interface AppProject {
   id: string;
