@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { AppProject } from '../App';
 
 /** How long (ms) the delete confirmation button stays active before auto-cancelling. */
@@ -10,10 +10,14 @@ interface Props {
   onSelectApp: (app: AppProject) => void;
   onNewApp: () => void;
   onDeleteApp: (id: string) => void;
+  onRenameApp: (id: string, newName: string) => void;
 }
 
-export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp }: Props) {
+export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -24,6 +28,26 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
       setConfirmDelete(id);
       setTimeout(() => setConfirmDelete(null), DELETE_CONFIRM_TIMEOUT_MS);
     }
+  };
+
+  const startRename = (e: React.MouseEvent, app: AppProject) => {
+    e.stopPropagation();
+    setRenamingId(app.id);
+    setRenameValue(app.name);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const commitRename = () => {
+    const trimmed = renameValue.trim();
+    if (renamingId && trimmed && trimmed !== apps.find((a) => a.id === renamingId)?.name) {
+      onRenameApp(renamingId, trimmed);
+    }
+    setRenamingId(null);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') commitRename();
+    if (e.key === 'Escape') setRenamingId(null);
   };
 
   return (
@@ -45,12 +69,30 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
           <div
             key={app.id}
             className={`sidebar-item ${selectedApp?.id === app.id ? 'active' : ''}`}
-            onClick={() => onSelectApp(app)}
+            onClick={() => renamingId !== app.id && onSelectApp(app)}
           >
             <span className="sidebar-item-icon">
               {app.isFullStack ? '🗄️' : '⚡'}
             </span>
-            <span className="sidebar-item-name">{app.name}</span>
+            {renamingId === app.id ? (
+              <input
+                ref={renameInputRef}
+                className="sidebar-rename-input"
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={handleRenameKeyDown}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span
+                className="sidebar-item-name"
+                onDoubleClick={(e) => startRename(e, app)}
+                title="Double-click to rename"
+              >
+                {app.name}
+              </span>
+            )}
             <button
               className={`sidebar-delete ${confirmDelete === app.id ? 'confirm' : ''}`}
               onClick={(e) => handleDelete(e, app.id)}

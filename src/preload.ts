@@ -25,6 +25,13 @@ export interface AppProject {
   isFullStack: boolean;
 }
 
+export interface UiMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  filesGenerated?: string[];
+}
+
 contextBridge.exposeInMainWorld('deyad', {
   // ── Ollama ──────────────────────────────────────────────────────────────
   listModels: (): Promise<{ models: OllamaModel[] }> =>
@@ -72,6 +79,15 @@ contextBridge.exposeInMainWorld('deyad', {
 
   openAppFolder: (appId: string): Promise<boolean> =>
     ipcRenderer.invoke('apps:open-folder', appId),
+
+  renameApp: (appId: string, newName: string): Promise<boolean> =>
+    ipcRenderer.invoke('apps:rename', { appId, newName }),
+
+  saveMessages: (appId: string, messages: UiMessage[]): Promise<boolean> =>
+    ipcRenderer.invoke('apps:save-messages', { appId, messages }),
+
+  loadMessages: (appId: string): Promise<UiMessage[]> =>
+    ipcRenderer.invoke('apps:load-messages', appId),
 
   // ── Docker / MySQL ──────────────────────────────────────────────────────
   checkDocker: (): Promise<boolean> =>

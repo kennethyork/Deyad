@@ -140,6 +140,18 @@ body {
 .sidebar-delete:hover { background: var(--danger-bg); color: var(--danger); }
 .sidebar-delete.confirm { opacity: 1; background: var(--danger); color: #fff; }
 
+.sidebar-rename-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-focus);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 1px 6px;
+  outline: none;
+  min-width: 0;
+}
+
 .sidebar-footer {
   padding: 10px 12px;
   border-top: 1px solid var(--border);
@@ -550,17 +562,45 @@ body {
   font-family: var(--font-mono);
   background: var(--bg-surface);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
-.code-content {
+.btn-save-file {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.btn-save-file:disabled { opacity: 0.5; cursor: default; }
+.btn-save-file.dirty {
+  color: var(--accent-light);
+  border-color: var(--accent);
+}
+.btn-save-file.dirty:hover { background: rgba(99,102,241,0.1); }
+.code-editor {
   flex: 1;
-  overflow: auto;
-  padding: 14px 16px;
+  background: #0d1526;
+  color: #c9d1d9;
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.7;
-  color: #c9d1d9;
+  padding: 14px 16px;
+  border: none;
+  outline: none;
+  resize: none;
   white-space: pre;
+  overflow: auto;
+  tab-size: 2;
 }
+.code-editor::selection { background: rgba(99,102,241,0.3); }
 .code-viewer-empty {
   flex: 1;
   display: flex;

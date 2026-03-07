@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
+
 interface Props {
   files: Record<string, string>;
   selectedFile: string | null;
   onSelectFile: (path: string) => void;
   onOpenFolder: () => void;
+  onFileEdit: (path: string, content: string) => void;
 }
 
 function getFileIcon(path: string): string {
@@ -104,9 +107,56 @@ function FileTree({
   );
 }
 
-export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenFolder }: Props) {
+export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenFolder, onFileEdit }: Props) {
   const fileCount = Object.keys(files).length;
   const tree = buildTree(files);
+
+  // Local edit state: tracks the content being edited before saving
+  const [editContent, setEditContent] = useState<string>('');
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Reset edit content when selected file or its persisted content changes
+  useEffect(() => {
+    if (selectedFile !== null && files[selectedFile] !== undefined) {
+      setEditContent(files[selectedFile]);
+      setIsDirty(false);
+    }
+  }, [selectedFile, files]);
+
+  const handleContentChange = (value: string) => {
+    setEditContent(value);
+    setIsDirty(value !== (files[selectedFile ?? ''] ?? ''));
+  };
+
+  const handleSave = () => {
+    if (selectedFile && isDirty) {
+      onFileEdit(selectedFile, editContent);
+      setIsDirty(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Save on Ctrl+S / Cmd+S
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
+    // Insert 2-space indent on Tab
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const newValue = editContent.substring(0, start) + '  ' + editContent.substring(end);
+      setEditContent(newValue);
+      setIsDirty(newValue !== (files[selectedFile ?? ''] ?? ''));
+      // Restore cursor position after React re-render
+      requestAnimationFrame(() => {
+        target.selectionStart = start + 2;
+        target.selectionEnd = start + 2;
+      });
+    }
+  };
 
   return (
     <div className="editor-panel">
@@ -132,16 +182,30 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
         )}
       </div>
 
-      {/* Code viewer */}
+      {/* Code editor */}
       <div className="code-viewer">
         {selectedFile ? (
           <>
             <div className="code-viewer-header">
               <span>{getFileIcon(selectedFile)} {selectedFile}</span>
+              <button
+                className={`btn-save-file${isDirty ? ' dirty' : ''}`}
+                onClick={handleSave}
+                disabled={!isDirty}
+                title="Save file (Ctrl+S)"
+              >
+                {isDirty ? '● Save' : '✓ Saved'}
+              </button>
             </div>
-            <pre className="code-content">
-              <code>{files[selectedFile] || ''}</code>
-            </pre>
+            <textarea
+              className="code-editor"
+              value={editContent}
+              onChange={(e) => handleContentChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+            />
           </>
         ) : (
           <div className="code-viewer-empty">

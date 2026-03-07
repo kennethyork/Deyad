@@ -132,7 +132,7 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
         walk(fullPath, relPath);
-      } else if (entry.name !== 'deyad.json') {
+      } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
         try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch { /* skip binary */ }
       }
     }
@@ -165,6 +165,33 @@ ipcMain.handle('apps:get-dir', (_event, appId?: string) =>
 ipcMain.handle('apps:open-folder', (_event, appId: string) => {
   shell.openPath(path.join(APPS_DIR, appId));
   return true;
+});
+
+ipcMain.handle('apps:rename', (_event, { appId, newName }: { appId: string; newName: string }) => {
+  const metaPath = path.join(APPS_DIR, appId, 'deyad.json');
+  if (!fs.existsSync(metaPath)) return false;
+  try {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    meta.name = newName;
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+    return true;
+  } catch { return false; }
+});
+
+ipcMain.handle('apps:save-messages', (_event, { appId, messages }: { appId: string; messages: unknown[] }) => {
+  const dir = path.join(APPS_DIR, appId);
+  if (!fs.existsSync(dir)) return false;
+  try {
+    fs.writeFileSync(path.join(dir, 'deyad-messages.json'), JSON.stringify(messages), 'utf-8');
+    return true;
+  } catch { return false; }
+});
+
+ipcMain.handle('apps:load-messages', (_event, appId: string) => {
+  const file = path.join(APPS_DIR, appId, 'deyad-messages.json');
+  if (!fs.existsSync(file)) return [];
+  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
+  catch { return []; }
 });
 
 // ── Docker / MySQL ──────────────────────────────────────────────────────────

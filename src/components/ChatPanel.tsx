@@ -40,11 +40,13 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load models on mount / app change
+  // Load models and persisted messages on mount / app change
   useEffect(() => {
     setMessages([]);
     loadModels();
     checkDocker();
+    loadPersistedMessages();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.id]);
 
   // Scroll to bottom when messages change
@@ -69,6 +71,18 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   const checkDocker = async () => {
     const available = await window.deyad.checkDocker();
     setDockerAvailable(available);
+  };
+
+  const loadPersistedMessages = async () => {
+    try {
+      const saved = await window.deyad.loadMessages(app.id);
+      if (saved.length > 0) setMessages(saved);
+    } catch { /* ignore persistence errors */ }
+  };
+
+  const persistMessages = async (msgs: UiMessage[]) => {
+    try { await window.deyad.saveMessages(app.id, msgs); }
+    catch { /* ignore persistence errors */ }
   };
 
   const buildHistory = useCallback((): ChatMessage[] => {
@@ -105,7 +119,8 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
     const userContent = input.trim();
     setInput('');
     const userMsg: UiMessage = { id: Date.now().toString(), role: 'user', content: userContent };
-    setMessages((prev) => [...prev, userMsg]);
+    const msgsWithUser = [...messages, userMsg];
+    setMessages(msgsWithUser);
 
     // Detect if user is asking for full-stack (only show hint if not already full-stack)
     if (!app.isFullStack && isFullStackRequest(userContent)) {
@@ -114,13 +129,17 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
         role: 'assistant',
         content: '💡 **Tip:** This sounds like a full-stack request. Create a new app with "Full Stack (React + Express + MySQL)" enabled to get Docker Compose, Prisma, and a complete backend scaffold automatically.',
       };
-      setMessages((prev) => [...prev, hint]);
+      const msgsWithHint = [...msgsWithUser, hint];
+      setMessages(msgsWithHint);
+      persistMessages(msgsWithHint);
       return;
     }
 
     // Start streaming
     const assistantId = `assistant-${Date.now()}`;
-    setMessages((prev) => [...prev, { id: assistantId, role: 'assistant', content: '' }]);
+    const placeholder: UiMessage = { id: assistantId, role: 'assistant', content: '' };
+    const msgsWithPlaceholder = [...msgsWithUser, placeholder];
+    setMessages(msgsWithPlaceholder);
     setStreaming(true);
 
     let fullContent = '';
@@ -144,24 +163,29 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
         const fileMap: Record<string, string> = {};
         for (const f of parsed) fileMap[f.path] = f.content;
         onFilesUpdated(fileMap);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, filesGenerated: parsed.map((f) => f.path) }
-              : m,
-          ),
-        );
       }
+
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: fullContent, filesGenerated: parsed.length > 0 ? parsed.map((f) => f.path) : undefined }
+            : m,
+        );
+        persistMessages(updated);
+        return updated;
+      });
     });
 
     const unsubError = window.deyad.onStreamError((err) => {
       setStreaming(false);
       unsubToken();
-      setMessages((prev) =>
-        prev.map((m) =>
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
           m.id === assistantId ? { ...m, content: `❌ Error: ${err}` } : m,
-        ),
-      );
+        );
+        persistMessages(updated);
+        return updated;
+      });
     });
 
     try {

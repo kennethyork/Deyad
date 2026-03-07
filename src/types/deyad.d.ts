@@ -26,6 +26,13 @@ interface AppProject {
   isFullStack: boolean;
 }
 
+interface UiMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  filesGenerated?: string[];
+}
+
 interface DeyadAPI {
   // Ollama
   listModels(): Promise<{ models: OllamaModel[] }>;
@@ -42,6 +49,9 @@ interface DeyadAPI {
   deleteApp(appId: string): Promise<boolean>;
   getAppDir(appId: string): Promise<string>;
   openAppFolder(appId: string): Promise<boolean>;
+  renameApp(appId: string, newName: string): Promise<boolean>;
+  saveMessages(appId: string, messages: UiMessage[]): Promise<boolean>;
+  loadMessages(appId: string): Promise<UiMessage[]>;
 
   // Docker / MySQL
   checkDocker(): Promise<boolean>;

@@ -64,6 +64,12 @@ export default function App() {
     if (firstKey) setSelectedFile(firstKey);
   }, [selectedApp]);
 
+  const handleFileEdit = useCallback(async (filePath: string, content: string) => {
+    if (!selectedApp) return;
+    await window.deyad.writeFiles(selectedApp.id, { [filePath]: content });
+    setAppFiles((prev) => ({ ...prev, [filePath]: content }));
+  }, [selectedApp]);
+
   const handleCreateApp = async (name: string, description: string, isFullStack: boolean) => {
     const app = await window.deyad.createApp(name, description, isFullStack);
     setShowNewAppModal(false);
@@ -97,6 +103,14 @@ export default function App() {
     await loadApps();
   };
 
+  const handleRenameApp = useCallback(async (appId: string, newName: string) => {
+    await window.deyad.renameApp(appId, newName);
+    setApps((prev) => prev.map((a) => a.id === appId ? { ...a, name: newName } : a));
+    if (selectedApp?.id === appId) {
+      setSelectedApp((prev) => prev ? { ...prev, name: newName } : prev);
+    }
+  }, [selectedApp]);
+
   const handleDbToggle = async () => {
     if (!selectedApp) return;
     if (dbStatus === 'running') {
@@ -122,6 +136,7 @@ export default function App() {
         onSelectApp={selectApp}
         onNewApp={() => setShowNewAppModal(true)}
         onDeleteApp={handleDeleteApp}
+        onRenameApp={handleRenameApp}
       />
 
       {selectedApp ? (
@@ -141,6 +156,7 @@ export default function App() {
             selectedFile={selectedFile}
             onSelectFile={setSelectedFile}
             onOpenFolder={() => window.deyad.openAppFolder(selectedApp.id)}
+            onFileEdit={handleFileEdit}
           />
         </>
       ) : (
