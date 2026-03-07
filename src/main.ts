@@ -175,11 +175,17 @@ ipcMain.handle('apps:list', () => {
   } catch { return []; }
 });
 
-ipcMain.handle('apps:create', async (_event, { name, description, isFullStack }: { name: string; description: string; isFullStack: boolean }) => {
+ipcMain.handle('apps:create', async (_event, { name, description, isFullStack, dbProvider }: { name: string; description: string; isFullStack: boolean; dbProvider?: string }) => {
   const id = `${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const dir = path.join(APPS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
-  const meta = { name, description, createdAt: new Date().toISOString(), isFullStack: !!isFullStack };
+  const meta = {
+    name,
+    description,
+    createdAt: new Date().toISOString(),
+    isFullStack: !!isFullStack,
+    ...(isFullStack && dbProvider ? { dbProvider } : {}),
+  };
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
   return { id, ...meta };
 });

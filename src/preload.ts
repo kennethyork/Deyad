@@ -17,12 +17,15 @@ export interface ChatMessage {
   content: string;
 }
 
+export type DbProvider = 'mysql' | 'postgresql';
+
 export interface AppProject {
   id: string;
   name: string;
   description: string;
   createdAt: string;
   isFullStack: boolean;
+  dbProvider?: DbProvider;
 }
 
 export interface UiMessage {
@@ -62,8 +65,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listApps: (): Promise<AppProject[]> =>
     ipcRenderer.invoke('apps:list'),
 
-  createApp: (name: string, description: string, isFullStack: boolean): Promise<AppProject> =>
-    ipcRenderer.invoke('apps:create', { name, description, isFullStack }),
+  createApp: (name: string, description: string, isFullStack: boolean, dbProvider?: DbProvider): Promise<AppProject> =>
+    ipcRenderer.invoke('apps:create', { name, description, isFullStack, dbProvider }),
 
   readFiles: (appId: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke('apps:read-files', appId),
@@ -111,7 +114,7 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('apps:dev-status', handler);
   },
 
-  // ── Docker / MySQL ──────────────────────────────────────────────────────
+  // ── Docker / Database ───────────────────────────────────────────────────
   checkDocker: (): Promise<boolean> =>
     ipcRenderer.invoke('docker:check'),
 

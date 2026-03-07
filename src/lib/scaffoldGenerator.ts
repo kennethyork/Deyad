@@ -7,7 +7,7 @@
  * generateFullStackScaffold — a project with:
  *   - React + Vite  (frontend, port 5173)
  *   - Express       (backend API, port 3001)
- *   - MySQL 8       (via Docker Compose, port 3306)
+ *   - MySQL 8 or PostgreSQL 16 (via Docker Compose)
  *   - Prisma ORM    (schema + client)
  *   - docker-compose.yml
  *   - README with startup instructions
@@ -178,6 +178,8 @@ input:focus { border-color: #6366f1; }
   };
 }
 
+export type DbProvider = 'mysql' | 'postgresql';
+
 export interface ScaffoldOptions {
   appName: string;
   description: string;
@@ -187,6 +189,8 @@ export interface ScaffoldOptions {
   dbPassword: string;
   /** Separately generated root password (optional; random if omitted). */
   dbRootPassword?: string;
+  /** Database provider. Defaults to 'mysql' for backward compatibility. */
+  dbProvider?: DbProvider;
 }
 
 /**
@@ -204,10 +208,36 @@ export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string,
   const dbUser = sanitize(opts.dbUser || 'deyad_user');
   const dbPassword = opts.dbPassword;
   const dbRootPassword = opts.dbRootPassword ?? opts.dbPassword;
+  const dbProvider: DbProvider = opts.dbProvider ?? 'mysql';
+  const isPostgres = dbProvider === 'postgresql';
 
-  return {
-    // ── Docker Compose ──────────────────────────────────────────────────
-    'docker-compose.yml': `version: '3.9'
+  const dockerCompose = isPostgres
+    ? `version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ${sanitize(appName)}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${dbName}
+      POSTGRES_USER: ${dbUser}
+      POSTGRES_PASSWORD: ${dbPassword}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${dbUser} -d ${dbName}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+`
+    : `version: '3.9'
 
 services:
   mysql:
@@ -232,7 +262,16 @@ services:
 
 volumes:
   mysql_data:
-`,
+`;
+
+  const dbPort = isPostgres ? '5432' : '3306';
+  const dbProtocol = isPostgres ? 'postgresql' : 'mysql';
+  const prismaProvider = isPostgres ? 'postgresql' : 'mysql';
+  const dbLabel = isPostgres ? 'PostgreSQL 16' : 'MySQL 8';
+
+  return {
+    // ── Docker Compose ──────────────────────────────────────────────────
+    'docker-compose.yml': dockerCompose,
 
     // ── Backend: Express + Prisma ───────────────────────────────────────
     'backend/package.json': JSON.stringify(
@@ -289,11 +328,11 @@ volumes:
       2,
     ),
 
-    'backend/.env': `DATABASE_URL="mysql://${dbUser}:${dbPassword}@localhost:3306/${dbName}"
+    'backend/.env': `DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
 PORT=3001
 `,
 
-    'backend/.env.example': `DATABASE_URL="mysql://USER:PASSWORD@localhost:3306/${dbName}"
+    'backend/.env.example': `DATABASE_URL="${dbProtocol}://USER:PASSWORD@localhost:${dbPort}/${dbName}"
 PORT=3001
 `,
 
@@ -305,7 +344,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "${prismaProvider}"
   url      = env("DATABASE_URL")
 }
 
@@ -642,12 +681,12 @@ ${description}
 |----------|-----------------------------|
 | Frontend | React 18 + Vite + TypeScript |
 | Backend  | Node.js + Express + TypeScript |
-| Database | MySQL 8 (Docker)             |
+| Database | ${dbLabel} (Docker)             |
 | ORM      | Prisma                       |
 
 ## Getting Started
 
-### 1. Start the MySQL database
+### 1. Start the ${isPostgres ? 'PostgreSQL' : 'MySQL'} database
 
 > Requires [Docker](https://www.docker.com/) to be installed.
 
@@ -686,7 +725,7 @@ Frontend runs at **http://localhost:5173**
 Edit \`backend/.env\` to change the connection string:
 
 \`\`\`
-DATABASE_URL="mysql://${dbUser}:${dbPassword}@localhost:3306/${dbName}"
+DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
 \`\`\`
 
 ## Prisma

@@ -18,12 +18,15 @@ interface ChatMessage {
   content: string;
 }
 
+type DbProvider = 'mysql' | 'postgresql';
+
 interface AppProject {
   id: string;
   name: string;
   description: string;
   createdAt: string;
   isFullStack: boolean;
+  dbProvider?: DbProvider;
 }
 
 interface UiMessage {
@@ -54,7 +57,7 @@ interface DeyadAPI {
 
   // App projects
   listApps(): Promise<AppProject[]>;
-  createApp(name: string, description: string, isFullStack: boolean): Promise<AppProject>;
+  createApp(name: string, description: string, isFullStack: boolean, dbProvider?: DbProvider): Promise<AppProject>;
   readFiles(appId: string): Promise<Record<string, string>>;
   writeFiles(appId: string, files: Record<string, string>): Promise<boolean>;
   deleteApp(appId: string): Promise<boolean>;
@@ -72,7 +75,7 @@ interface DeyadAPI {
   onAppDevLog(cb: (payload: { appId: string; data: string }) => void): () => void;
   onAppDevStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
-  // Docker / MySQL
+  // Docker / Database
   checkDocker(): Promise<boolean>;
   dbStart(appId: string): Promise<{ success: boolean; error?: string }>;
   dbStop(appId: string): Promise<{ success: boolean; error?: string }>;
