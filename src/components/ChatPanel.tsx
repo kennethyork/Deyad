@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AppProject } from '../App';
-import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, FRONTEND_SYSTEM_PROMPT, MOBILE_SYSTEM_PROMPT, getFullStackSystemPrompt } from '../lib/codeParser';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -94,7 +94,14 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   };
 
   const buildHistory = useCallback((): ChatMessage[] => {
-    const systemPrompt = app.isFullStack ? getFullStackSystemPrompt(app.dbProvider) : FRONTEND_SYSTEM_PROMPT;
+    let systemPrompt: string;
+    if (app.appType === 'fullstack') {
+      systemPrompt = getFullStackSystemPrompt(app.dbProvider);
+    } else if (app.appType === 'mobile') {
+      systemPrompt = MOBILE_SYSTEM_PROMPT;
+    } else {
+      systemPrompt = FRONTEND_SYSTEM_PROMPT;
+    }
     const history: ChatMessage[] = [{ role: 'system', content: systemPrompt }];
 
     // Inject current files as context (truncated for large codebases)
@@ -119,7 +126,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       history.push({ role: msg.role, content: msg.content });
     }
     return history;
-  }, [app.isFullStack, appFiles, messages]);
+  }, [app.appType, app.dbProvider, appFiles, messages]);
 
   const sendMessage = async () => {
     if (!input.trim() || streaming || !selectedModel) return;
@@ -131,7 +138,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
     setMessages(msgsWithUser);
 
     // Detect if user is asking for full-stack (only show hint if not already full-stack)
-    if (!app.isFullStack && isFullStackRequest(userContent)) {
+    if (app.appType !== 'fullstack' && isFullStackRequest(userContent)) {
       const hint: UiMessage = {
         id: `hint-${Date.now()}`,
         role: 'assistant',
@@ -218,7 +225,9 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       {/* Header */}
       <div className="chat-header">
         <div className="chat-header-left">
-          <span className="chat-app-name">{app.isFullStack ? '🗄️' : '⚡'} {app.name}</span>
+          <span className="chat-app-name">
+            {app.appType === 'mobile' ? '📱' : app.appType === 'fullstack' ? '🗄️' : '⚡'} {app.name}
+          </span>
           {app.description && <span className="chat-app-desc">{app.description}</span>}
         </div>
         <div className="chat-header-right">
@@ -234,7 +243,7 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
           )}
 
           {/* DB controls for full-stack apps */}
-          {app.isFullStack && (
+          {app.appType === 'fullstack' && (
             <div className="db-status">
               {dockerAvailable === false && (
                 <span className="db-warning" title="Docker not found">⚠️ No Docker</span>
@@ -284,12 +293,14 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
         {messages.length === 0 && (
           <div className="chat-welcome">
             <p className="chat-welcome-title">
-              {app.isFullStack
+              {app.appType === 'mobile'
+                ? '📱 Mobile App — React Native + Expo'
+                : app.appType === 'fullstack'
                 ? `🗄️ Full-Stack App — React + Express + ${app.dbProvider === 'postgresql' ? 'PostgreSQL' : 'MySQL'}`
                 : '⚡ Frontend App — React + Vite'}
             </p>
             <p className="chat-welcome-sub">Describe what you want to build and I'll generate the code.</p>
-            {app.isFullStack && (
+            {app.appType === 'fullstack' && (
               <>
                 <div className="stack-badge-row">
                   <span className="stack-badge">React</span>
@@ -314,8 +325,30 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
                 </div>
               </>
             )}
+            {app.appType === 'mobile' && (
+              <>
+                <div className="stack-badge-row">
+                  <span className="stack-badge">React Native</span>
+                  <span className="stack-badge">Expo</span>
+                  <span className="stack-badge">TypeScript</span>
+                </div>
+                <div className="chat-guide">
+                  <p className="chat-guide-title">📖 Quick-start guide</p>
+                  <ol className="chat-guide-steps">
+                    <li>Open a terminal in the project folder and run:<br />
+                      <code>npx expo install</code></li>
+                    <li>Start the dev server:<br />
+                      <code>npx expo start</code></li>
+                    <li>Scan the QR code with <strong>Expo Go</strong> on your phone, or press <code>i</code> for iOS / <code>a</code> for Android simulator</li>
+                  </ol>
+                  <p className="chat-guide-hint">
+                    💡 Use React Native components (View, Text, etc.) — not HTML · Use StyleSheet.create() — not CSS
+                  </p>
+                </div>
+              </>
+            )}
             <div className="chat-suggestions">
-              {app.isFullStack ? (
+              {app.appType === 'fullstack' ? (
                 <>
                   <button className="suggestion" onClick={() => setInput('Add a users table with email and name, and REST endpoints for CRUD operations')}>
                     Add users table with CRUD
@@ -325,6 +358,18 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
                   </button>
                   <button className="suggestion" onClick={() => setInput('Update the Prisma schema to add a todo list with title, completed boolean, and due date')}>
                     Todo list schema
+                  </button>
+                </>
+              ) : app.appType === 'mobile' ? (
+                <>
+                  <button className="suggestion" onClick={() => setInput('Create a tab-based navigation with Home, Search, and Profile screens')}>
+                    Tab navigation with 3 screens
+                  </button>
+                  <button className="suggestion" onClick={() => setInput('Build a list with pull-to-refresh and swipe-to-delete')}>
+                    List with pull-to-refresh
+                  </button>
+                  <button className="suggestion" onClick={() => setInput('Add a settings screen with toggles and a dark mode switch')}>
+                    Settings screen with toggles
                   </button>
                 </>
               ) : (

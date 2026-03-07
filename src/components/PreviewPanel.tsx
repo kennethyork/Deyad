@@ -80,25 +80,25 @@ export default function PreviewPanel({ app }: Props) {
     <div className="preview-panel">
       {/* Toolbar */}
       <div className="preview-toolbar">
-        <span className="preview-url">{PREVIEW_URL}</span>
+        <span className="preview-url">{app.appType === 'mobile' ? 'npx expo start' : PREVIEW_URL}</span>
 
         <div className="preview-toolbar-actions">
-          {status === 'running' && (
+          {app.appType !== 'mobile' && status === 'running' && (
             <button className="btn-preview-action" onClick={handleRefresh} title="Refresh preview">
               ↺
             </button>
           )}
-          {(status === 'stopped' || status === 'error') && (
+          {app.appType !== 'mobile' && (status === 'stopped' || status === 'error') && (
             <button className="btn-preview-run" onClick={handleStart}>
               ▶ Run App
             </button>
           )}
-          {status === 'starting' && (
+          {app.appType !== 'mobile' && status === 'starting' && (
             <button className="btn-preview-run starting" disabled>
               <span className="preview-spinner" /> Starting…
             </button>
           )}
-          {status === 'running' && (
+          {app.appType !== 'mobile' && status === 'running' && (
             <button className="btn-preview-stop" onClick={handleStop}>
               ⏹ Stop
             </button>
@@ -130,11 +130,27 @@ export default function PreviewPanel({ app }: Props) {
 
       {/* Preview area */}
       <div className="preview-frame-wrapper">
-        {status === 'stopped' || status === 'error' ? (
+        {app.appType === 'mobile' ? (
+          <div className="preview-placeholder">
+            <div className="preview-placeholder-icon">📱</div>
+            <p><strong>Mobile App — Expo + React Native</strong></p>
+            <p className="preview-placeholder-hint">
+              Open the project folder and run:
+            </p>
+            <ol className="preview-expo-steps">
+              <li><code>npx expo install</code></li>
+              <li><code>npx expo start</code></li>
+            </ol>
+            <p className="preview-placeholder-hint">
+              Then scan the QR code with <strong>Expo Go</strong> on your phone,<br />
+              or press <code>i</code> for iOS / <code>a</code> for Android simulator.
+            </p>
+          </div>
+        ) : status === 'stopped' || status === 'error' ? (
           <div className="preview-placeholder">
             <div className="preview-placeholder-icon">👁</div>
             <p>Click <strong>Run App</strong> to start the dev server and preview your app here.</p>
-            {!app.isFullStack && (
+            {app.appType !== 'fullstack' && (
               <p className="preview-placeholder-hint">
                 Make sure the AI has generated a complete app before running.
               </p>

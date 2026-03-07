@@ -1152,6 +1152,35 @@ body {
   color: var(--accent);
 }
 
+.template-badge-mobile {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+/* ── type-cards — 3-column layout when there are 3 or more cards ─────────── */
+
+.type-cards:has(> :nth-child(3)) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* ── Expo preview steps ─────────────────────────────────────────────────── */
+
+.preview-expo-steps {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.preview-expo-steps li code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
 /* ── Sidebar header actions ─────────────────────────────────────────────── */
 
 .sidebar-header-actions {

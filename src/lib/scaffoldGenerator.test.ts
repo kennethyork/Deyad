@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateFrontendScaffold, generateFullStackScaffold } from '../lib/scaffoldGenerator';
+import { generateFrontendScaffold, generateFullStackScaffold, generateMobileScaffold } from '../lib/scaffoldGenerator';
 
 describe('generateFrontendScaffold', () => {
   const opts = { appName: 'My App', description: 'A test app' };
@@ -307,5 +307,72 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
     expect(files['docker-compose.yml']).toContain('mysql:8.0');
     expect(files['backend/prisma/schema.prisma']).toContain('provider = "mysql"');
     expect(files['backend/.env']).toContain('mysql://');
+  });
+});
+
+describe('generateMobileScaffold', () => {
+  const opts = { appName: 'My Mobile App', description: 'A test mobile app' };
+
+  it('generates app.json with Expo config', () => {
+    const files = generateMobileScaffold(opts);
+    const appJson = JSON.parse(files['app.json']);
+    expect(appJson.expo).toBeDefined();
+    expect(appJson.expo.name).toBe('My Mobile App');
+    expect(appJson.expo.sdkVersion).toBe('52.0.0');
+  });
+
+  it('generates package.json with Expo dependencies', () => {
+    const files = generateMobileScaffold(opts);
+    const pkg = JSON.parse(files['package.json']);
+    expect(pkg.dependencies.expo).toBeDefined();
+    expect(pkg.dependencies['react-native']).toBeDefined();
+    expect(pkg.dependencies.react).toBeDefined();
+    expect(pkg.dependencies['expo-status-bar']).toBeDefined();
+    expect(pkg.scripts.start).toBe('expo start');
+    expect(pkg.scripts.android).toBe('expo start --android');
+    expect(pkg.scripts.ios).toBe('expo start --ios');
+    expect(pkg.scripts.web).toBe('expo start --web');
+  });
+
+  it('generates tsconfig.json extending expo/tsconfig.base', () => {
+    const files = generateMobileScaffold(opts);
+    const ts = JSON.parse(files['tsconfig.json']);
+    expect(ts.extends).toBe('expo/tsconfig.base');
+    expect(ts.compilerOptions.strict).toBe(true);
+  });
+
+  it('generates babel.config.js with expo preset', () => {
+    const files = generateMobileScaffold(opts);
+    expect(files['babel.config.js']).toContain('babel-preset-expo');
+  });
+
+  it('generates App.tsx with React Native components', () => {
+    const files = generateMobileScaffold(opts);
+    expect(files['App.tsx']).toContain('My Mobile App');
+    expect(files['App.tsx']).toContain('A test mobile app');
+    expect(files['App.tsx']).toContain('StyleSheet');
+    expect(files['App.tsx']).toContain('View');
+    expect(files['App.tsx']).toContain('Text');
+  });
+
+  it('generates Expo Router entry files', () => {
+    const files = generateMobileScaffold(opts);
+    expect(files['app/index.tsx']).toBeDefined();
+    expect(files['app/(tabs)/_layout.tsx']).toBeDefined();
+    expect(files['app/(tabs)/index.tsx']).toBeDefined();
+    expect(files['app/(tabs)/profile.tsx']).toBeDefined();
+  });
+
+  it('generates README with Expo instructions', () => {
+    const files = generateMobileScaffold(opts);
+    expect(files['README.md']).toContain('Expo');
+    expect(files['README.md']).toContain('expo start');
+    expect(files['README.md']).toContain('React Native');
+  });
+
+  it('sanitizes app name into a valid npm package name', () => {
+    const files = generateMobileScaffold({ appName: 'Hello World!', description: '' });
+    const pkg = JSON.parse(files['package.json']);
+    expect(pkg.name).toBe('hello-world');
   });
 });

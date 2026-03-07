@@ -166,26 +166,33 @@ ipcMain.handle('apps:list', () => {
       .filter((e) => e.isDirectory())
       .map((e) => {
         const metaPath = path.join(APPS_DIR, e.name, 'deyad.json');
-        let meta = { name: e.name, description: '', createdAt: '', isFullStack: false };
+        let meta: Record<string, unknown> = { name: e.name, description: '', createdAt: '', appType: 'frontend' };
         if (fs.existsSync(metaPath)) {
           try { meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf-8')) }; } catch { /* ignore */ }
+        }
+        // Backward compatibility: migrate isFullStack boolean to appType
+        if (!meta.appType && 'isFullStack' in meta) {
+          meta.appType = meta.isFullStack ? 'fullstack' : 'frontend';
         }
         return { id: e.name, ...meta };
       });
   } catch { return []; }
 });
 
-ipcMain.handle('apps:create', async (_event, { name, description, isFullStack, dbProvider }: { name: string; description: string; isFullStack: boolean; dbProvider?: string }) => {
+ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider }: { name: string; description: string; appType: string; dbProvider?: string }) => {
   const id = `${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const dir = path.join(APPS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
-  const meta = {
+  const resolvedAppType = appType || 'frontend';
+  const meta: Record<string, unknown> = {
     name,
     description,
     createdAt: new Date().toISOString(),
-    isFullStack: !!isFullStack,
-    ...(isFullStack && dbProvider ? { dbProvider } : {}),
+    appType: resolvedAppType,
   };
+  if (resolvedAppType === 'fullstack' && dbProvider) {
+    meta.dbProvider = dbProvider;
+  }
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
   return { id, ...meta };
 });
@@ -635,6 +642,16 @@ ipcMain.handle('apps:import', async (_event, name: string) => {
 
   // Detect if it's a full-stack project (has backend/ and frontend/ dirs)
   const isFullStack = fs.existsSync(path.join(srcDir, 'backend')) && fs.existsSync(path.join(srcDir, 'frontend'));
+  // Detect if it's a mobile project (has app.json with expo key)
+  let isMobile = false;
+  const appJsonPath = path.join(srcDir, 'app.json');
+  if (fs.existsSync(appJsonPath)) {
+    try {
+      const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf-8'));
+      if (appJson.expo) isMobile = true;
+    } catch { /* ignore */ }
+  }
+  const appType = isMobile ? 'mobile' : isFullStack ? 'fullstack' : 'frontend';
 
   // Copy files recursively (skip node_modules and .git)
   const copyDir = (src: string, dest: string) => {
@@ -653,7 +670,7 @@ ipcMain.handle('apps:import', async (_event, name: string) => {
   copyDir(srcDir, destDir);
 
   // Write deyad.json metadata
-  const meta = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), isFullStack };
+  const meta = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
   fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
   // Initialize git for the imported project

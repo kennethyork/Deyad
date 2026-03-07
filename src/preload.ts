@@ -18,13 +18,14 @@ export interface ChatMessage {
 }
 
 export type DbProvider = 'mysql' | 'postgresql';
+export type AppType = 'frontend' | 'fullstack' | 'mobile';
 
 export interface AppProject {
   id: string;
   name: string;
   description: string;
   createdAt: string;
-  isFullStack: boolean;
+  appType: AppType;
   dbProvider?: DbProvider;
 }
 
@@ -65,8 +66,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listApps: (): Promise<AppProject[]> =>
     ipcRenderer.invoke('apps:list'),
 
-  createApp: (name: string, description: string, isFullStack: boolean, dbProvider?: DbProvider): Promise<AppProject> =>
-    ipcRenderer.invoke('apps:create', { name, description, isFullStack, dbProvider }),
+  createApp: (name: string, description: string, appType: AppType, dbProvider?: DbProvider): Promise<AppProject> =>
+    ipcRenderer.invoke('apps:create', { name, description, appType, dbProvider }),
 
   readFiles: (appId: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke('apps:read-files', appId),

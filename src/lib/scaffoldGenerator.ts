@@ -18,6 +18,263 @@ export interface FrontendScaffoldOptions {
   description: string;
 }
 
+export interface MobileScaffoldOptions {
+  appName: string;
+  description: string;
+}
+
+/**
+ * Generates a minimal but runnable Expo (React Native) + TypeScript project.
+ */
+export function generateMobileScaffold(opts: MobileScaffoldOptions): Record<string, string> {
+  const { appName, description } = opts;
+  const slug = appName.toLowerCase().replace(/[^a-z0-9-_.]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  return {
+    'app.json': JSON.stringify(
+      {
+        expo: {
+          name: appName,
+          slug,
+          version: '1.0.0',
+          orientation: 'portrait',
+          sdkVersion: '52.0.0',
+          platforms: ['ios', 'android', 'web'],
+          icon: './assets/icon.png',
+          splash: {
+            image: './assets/splash-icon.png',
+            resizeMode: 'contain',
+            backgroundColor: '#0f172a',
+          },
+          web: {
+            bundler: 'metro',
+            output: 'static',
+          },
+        },
+      },
+      null,
+      2,
+    ),
+
+    'package.json': JSON.stringify(
+      {
+        name: slug,
+        version: '1.0.0',
+        description,
+        main: 'expo-router/entry',
+        scripts: {
+          start: 'expo start',
+          android: 'expo start --android',
+          ios: 'expo start --ios',
+          web: 'expo start --web',
+        },
+        dependencies: {
+          expo: '~52.0.0',
+          'expo-router': '~4.0.0',
+          'expo-status-bar': '~2.0.0',
+          react: '^18.3.1',
+          'react-native': '0.76.5',
+        },
+        devDependencies: {
+          '@babel/core': '^7.25.0',
+          '@types/react': '^18.3.11',
+          typescript: '^5.4.5',
+        },
+      },
+      null,
+      2,
+    ),
+
+    'tsconfig.json': JSON.stringify(
+      {
+        extends: 'expo/tsconfig.base',
+        compilerOptions: {
+          strict: true,
+          paths: {
+            '@/*': ['./*'],
+          },
+        },
+        include: ['.'],
+      },
+      null,
+      2,
+    ),
+
+    'babel.config.js': `module.exports = function(api) {
+  api.cache(true);
+  return {
+    presets: ['babel-preset-expo'],
+  };
+};
+`,
+
+    'App.tsx': `import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View } from 'react-native';
+
+export default function App() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>✨ ${appName}</Text>
+      <Text style={styles.subtitle}>${description}</Text>
+      <Text style={styles.hint}>Chat with the AI to build your app →</Text>
+      <StatusBar style="light" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#e2e8f0',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#94a3b8',
+    marginBottom: 32,
+    textAlign: 'center',
+  },
+  hint: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+});
+`,
+
+    'app/index.tsx': `import { Redirect } from 'expo-router';
+
+export default function Index() {
+  return <Redirect href="/(tabs)" />;
+}
+`,
+
+    'app/(tabs)/_layout.tsx': `import { Tabs } from 'expo-router';
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarStyle: { backgroundColor: '#1e293b', borderTopColor: '#334155' },
+        tabBarActiveTintColor: '#6366f1',
+        tabBarInactiveTintColor: '#64748b',
+        headerStyle: { backgroundColor: '#1e293b' },
+        headerTitleStyle: { color: '#e2e8f0' },
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarLabel: 'Home' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarLabel: 'Profile' }} />
+    </Tabs>
+  );
+}
+`,
+
+    'app/(tabs)/index.tsx': `import { StyleSheet, Text, View } from 'react-native';
+
+export default function HomeScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>✨ ${appName}</Text>
+      <Text style={styles.subtitle}>${description}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#e2e8f0',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
+});
+`,
+
+    'app/(tabs)/profile.tsx': `import { StyleSheet, Text, View } from 'react-native';
+
+export default function ProfileScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>👤 Profile</Text>
+      <Text style={styles.subtitle}>Your profile details will go here.</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#e2e8f0',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#94a3b8',
+  },
+});
+`,
+
+    'README.md': `# ${appName}
+
+${description}
+
+## Stack
+
+| Layer    | Technology                  |
+|----------|-----------------------------|
+| Mobile   | React Native + Expo SDK 52  |
+| Routing  | Expo Router (file-based)    |
+| Language | TypeScript                  |
+
+## Getting Started
+
+\`\`\`bash
+# Install dependencies
+npx expo install
+
+# Start the Expo dev server
+npx expo start
+\`\`\`
+
+Then:
+- Press **i** to open in iOS Simulator
+- Press **a** to open in Android Emulator
+- Scan the QR code with **Expo Go** on your phone
+- Press **w** to open in web browser
+`,
+  };
+}
+
 /**
  * Generates a minimal but complete React + Vite + TypeScript project.
  * The AI subsequently overwrites files as the user chats, so the scaffold

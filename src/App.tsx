@@ -11,7 +11,7 @@ export interface AppProject {
   name: string;
   description: string;
   createdAt: string;
-  isFullStack: boolean;
+  appType: 'frontend' | 'fullstack' | 'mobile';
   dbProvider?: 'mysql' | 'postgresql';
 }
 
@@ -62,7 +62,7 @@ export default function App() {
     setCanRevert(hasSnap);
 
     // Check DB status for full-stack apps
-    if (app.isFullStack) {
+    if (app.appType === 'fullstack') {
       const { status } = await window.deyad.dbStatus(app.id);
       setDbStatus(status);
     } else {
@@ -88,12 +88,12 @@ export default function App() {
     setAppFiles((prev) => ({ ...prev, [filePath]: content }));
   }, [selectedApp]);
 
-  const handleCreateApp = async (name: string, description: string, isFullStack: boolean, dbProvider?: 'mysql' | 'postgresql') => {
-    const app = await window.deyad.createApp(name, description, isFullStack, dbProvider);
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack' | 'mobile', dbProvider?: 'mysql' | 'postgresql') => {
+    const app = await window.deyad.createApp(name, description, appType, dbProvider);
     setShowNewAppModal(false);
     await loadApps();
 
-    if (isFullStack) {
+    if (appType === 'fullstack') {
       // Write scaffold files with randomly-generated DB credentials
       const { generateFullStackScaffold } = await import('./lib/scaffoldGenerator');
       const { generatePassword } = await import('./lib/crypto');
@@ -106,6 +106,11 @@ export default function App() {
         dbRootPassword: generatePassword(24),
         dbProvider: dbProvider ?? 'mysql',
       });
+      await window.deyad.writeFiles(app.id, scaffold);
+    } else if (appType === 'mobile') {
+      // Write a minimal runnable Expo scaffold
+      const { generateMobileScaffold } = await import('./lib/scaffoldGenerator');
+      const scaffold = generateMobileScaffold({ appName: name, description });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
       // Write a minimal runnable Vite scaffold so the app can be previewed right away

@@ -80,7 +80,7 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
             onClick={() => renamingId !== app.id && onSelectApp(app)}
           >
             <span className="sidebar-item-icon">
-              {app.isFullStack ? '🗄️' : '⚡'}
+              {app.appType === 'mobile' ? '📱' : app.appType === 'fullstack' ? '🗄️' : '⚡'}
             </span>
             {renamingId === app.id ? (
               <input
