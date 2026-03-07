@@ -2,8 +2,6 @@
  * Global type augmentation for the contextBridge API exposed by preload.ts
  */
 
-type AiProvider = 'ollama' | 'openai' | 'anthropic' | 'google';
-
 interface OllamaModel {
   name: string;
   modified_at: string;
@@ -38,10 +36,6 @@ interface UiMessage {
 interface DeyadSettings {
   ollamaHost: string;
   defaultModel: string;
-  aiProvider: AiProvider;
-  openaiApiKey: string;
-  anthropicApiKey: string;
-  googleApiKey: string;
 }
 
 interface GitLogEntry {
@@ -51,7 +45,7 @@ interface GitLogEntry {
 }
 
 interface DeyadAPI {
-  // AI (provider-agnostic)
+  // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[]): Promise<void>;
   onStreamToken(cb: (token: string) => void): () => void;

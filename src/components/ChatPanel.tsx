@@ -38,7 +38,6 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   const [selectedModel, setSelectedModel] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [providerError, setProviderError] = useState('');
-  const [aiProvider, setAiProvider] = useState('ollama');
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -60,7 +59,6 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   const loadModels = async () => {
     try {
       const settings = await window.deyad.getSettings();
-      setAiProvider(settings.aiProvider || 'ollama');
       const { models: list } = await window.deyad.listModels();
       const names = list.map((m) => m.name);
       setModels(names);
@@ -369,8 +367,8 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
           onKeyDown={handleKeyDown}
           placeholder={
             models.length === 0
-              ? 'Configure an AI provider in Settings to use chat…'
-              : `Message ${selectedModel || aiProvider}… (Enter to send, Shift+Enter for newline)`
+              ? 'Configure Ollama in Settings to use chat…'
+              : `Message ${selectedModel || 'Ollama'}… (Enter to send, Shift+Enter for newline)`
           }
           disabled={models.length === 0 || streaming}
           rows={3}

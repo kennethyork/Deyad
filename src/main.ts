@@ -18,24 +18,14 @@ const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.jso
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-type AiProvider = 'ollama' | 'openai' | 'anthropic' | 'google';
-
 interface DeyadSettings {
   ollamaHost: string;
   defaultModel: string;
-  aiProvider: AiProvider;
-  openaiApiKey: string;
-  anthropicApiKey: string;
-  googleApiKey: string;
 }
 
 const DEFAULT_SETTINGS: DeyadSettings = {
   ollamaHost: 'http://localhost:11434',
   defaultModel: '',
-  aiProvider: 'ollama',
-  openaiApiKey: '',
-  anthropicApiKey: '',
-  googleApiKey: '',
 };
 
 function loadSettings(): DeyadSettings {
@@ -104,22 +94,7 @@ const createWindow = () => {
   }
 };
 
-// ── AI Providers ──────────────────────────────────────────────────────────────
-
-/** Well-known Anthropic models (API has no list endpoint). */
-const ANTHROPIC_MODELS = [
-  'claude-sonnet-4-20250514',
-  'claude-3-5-haiku-20241022',
-  'claude-3-5-sonnet-20241022',
-];
-
-/** Well-known Google Gemini models. */
-const GOOGLE_MODELS = [
-  'gemini-2.5-pro',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-pro',
-];
+// ── AI (Ollama) ───────────────────────────────────────────────────────────────
 
 async function listOllamaModels(): Promise<{ models: { name: string; modified_at: string; size: number; details?: Record<string, string> }[] }> {
   return new Promise((resolve, reject) => {
@@ -137,52 +112,8 @@ async function listOllamaModels(): Promise<{ models: { name: string; modified_at
   });
 }
 
-async function listOpenAIModels(apiKey: string): Promise<{ models: { name: string; modified_at: string; size: number }[] }> {
-  return new Promise((resolve, reject) => {
-    const request = net.request({ method: 'GET', url: 'https://api.openai.com/v1/models' });
-    request.setHeader('Authorization', `Bearer ${apiKey}`);
-    let data = '';
-    request.on('response', (response) => {
-      response.on('data', (chunk) => { data += chunk; });
-      response.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          const chatModels = (parsed.data || [])
-            .filter((m: { id: string }) => /^(gpt-|o[1-9])/.test(m.id))
-            .sort((a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id))
-            .map((m: { id: string; created: number }) => ({
-              name: m.id,
-              modified_at: new Date((m.created || 0) * 1000).toISOString(),
-              size: 0,
-            }));
-          resolve({ models: chatModels });
-        } catch { reject(new Error('Failed to parse OpenAI response')); }
-      });
-    });
-    request.on('error', (err: Error) => reject(new Error(`OpenAI not reachable: ${err.message}`)));
-    request.end();
-  });
-}
-
-function listStaticModels(names: string[]): { models: { name: string; modified_at: string; size: number }[] } {
-  return { models: names.map((name) => ({ name, modified_at: '', size: 0 })) };
-}
-
 ipcMain.handle('ollama:list-models', async () => {
-  const provider = currentSettings.aiProvider;
-  switch (provider) {
-    case 'openai':
-      if (!currentSettings.openaiApiKey) throw new Error('OpenAI API key not configured. Go to Settings to add it.');
-      return listOpenAIModels(currentSettings.openaiApiKey);
-    case 'anthropic':
-      if (!currentSettings.anthropicApiKey) throw new Error('Anthropic API key not configured. Go to Settings to add it.');
-      return listStaticModels(ANTHROPIC_MODELS);
-    case 'google':
-      if (!currentSettings.googleApiKey) throw new Error('Google API key not configured. Go to Settings to add it.');
-      return listStaticModels(GOOGLE_MODELS);
-    default:
-      return listOllamaModels();
-  }
+  return listOllamaModels();
 });
 
 /** Stream from Ollama (NDJSON format). */
@@ -222,151 +153,8 @@ function streamOllama(event: Electron.IpcMainInvokeEvent, model: string, message
   });
 }
 
-/** Stream from OpenAI-compatible API (SSE format). */
-function streamOpenAI(event: Electron.IpcMainInvokeEvent, model: string, messages: { role: string; content: string }[], apiKey: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const body = JSON.stringify({ model, messages, stream: true });
-    const request = net.request({ method: 'POST', url: 'https://api.openai.com/v1/chat/completions' });
-    request.setHeader('Content-Type', 'application/json');
-    request.setHeader('Authorization', `Bearer ${apiKey}`);
-    let buffer = '';
-    request.on('response', (response) => {
-      response.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          const payload = trimmed.slice(6);
-          if (payload === '[DONE]') {
-            event.sender.send('ollama:stream-done');
-            resolve();
-            return;
-          }
-          try {
-            const parsed = JSON.parse(payload);
-            const token = parsed.choices?.[0]?.delta?.content;
-            if (token) event.sender.send('ollama:stream-token', token);
-          } catch { /* skip malformed */ }
-        }
-      });
-      response.on('end', () => { event.sender.send('ollama:stream-done'); resolve(); });
-    });
-    request.on('error', (err: Error) => {
-      event.sender.send('ollama:stream-error', err.message);
-      reject(err);
-    });
-    request.write(body);
-    request.end();
-  });
-}
-
-/** Stream from Anthropic Messages API (SSE format). */
-function streamAnthropic(event: Electron.IpcMainInvokeEvent, model: string, messages: { role: string; content: string }[], apiKey: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    // Anthropic requires system as a top-level field, not in messages array
-    const systemMsg = messages.find((m) => m.role === 'system');
-    const nonSystem = messages.filter((m) => m.role !== 'system');
-    const body = JSON.stringify({
-      model,
-      max_tokens: 4096,
-      stream: true,
-      ...(systemMsg ? { system: systemMsg.content } : {}),
-      messages: nonSystem,
-    });
-    const request = net.request({ method: 'POST', url: 'https://api.anthropic.com/v1/messages' });
-    request.setHeader('Content-Type', 'application/json');
-    request.setHeader('x-api-key', apiKey);
-    request.setHeader('anthropic-version', '2023-06-01');
-    let buffer = '';
-    request.on('response', (response) => {
-      response.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          try {
-            const parsed = JSON.parse(trimmed.slice(6));
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              event.sender.send('ollama:stream-token', parsed.delta.text);
-            }
-            if (parsed.type === 'message_stop') {
-              event.sender.send('ollama:stream-done');
-              resolve();
-            }
-          } catch { /* skip malformed */ }
-        }
-      });
-      response.on('end', () => { event.sender.send('ollama:stream-done'); resolve(); });
-    });
-    request.on('error', (err: Error) => {
-      event.sender.send('ollama:stream-error', err.message);
-      reject(err);
-    });
-    request.write(body);
-    request.end();
-  });
-}
-
-/** Stream from Google Gemini API. */
-function streamGoogle(event: Electron.IpcMainInvokeEvent, model: string, messages: { role: string; content: string }[], apiKey: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    // Convert chat messages to Gemini format
-    const systemMsg = messages.find((m) => m.role === 'system');
-    const nonSystem = messages.filter((m) => m.role !== 'system');
-    const contents = nonSystem.map((m) => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
-    }));
-    const body = JSON.stringify({
-      contents,
-      ...(systemMsg ? { systemInstruction: { parts: [{ text: systemMsg.content }] } } : {}),
-    });
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
-    const request = net.request({ method: 'POST', url });
-    request.setHeader('Content-Type', 'application/json');
-    let buffer = '';
-    request.on('response', (response) => {
-      response.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data: ')) continue;
-          try {
-            const parsed = JSON.parse(trimmed.slice(6));
-            const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (text) event.sender.send('ollama:stream-token', text);
-          } catch { /* skip malformed */ }
-        }
-      });
-      response.on('end', () => { event.sender.send('ollama:stream-done'); resolve(); });
-    });
-    request.on('error', (err: Error) => {
-      event.sender.send('ollama:stream-error', err.message);
-      reject(err);
-    });
-    request.write(body);
-    request.end();
-  });
-}
-
 ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
-  const provider = currentSettings.aiProvider;
-  switch (provider) {
-    case 'openai':
-      return streamOpenAI(event, model, messages, currentSettings.openaiApiKey);
-    case 'anthropic':
-      return streamAnthropic(event, model, messages, currentSettings.anthropicApiKey);
-    case 'google':
-      return streamGoogle(event, model, messages, currentSettings.googleApiKey);
-    default:
-      return streamOllama(event, model, messages);
-  }
+  return streamOllama(event, model, messages);
 });
 
 // ── App Projects ────────────────────────────────────────────────────────────
