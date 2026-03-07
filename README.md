@@ -6,6 +6,41 @@ Like [dyad.sh](https://dyad.sh) but without any cloud dependency — every AI ca
 
 ---
 
+## Why Deyad for Ollama-Only Users?
+
+If you're committed to running AI locally with Ollama, Deyad offers several advantages over dyad.sh:
+
+### 🔒 Privacy First
+
+| | Deyad | dyad.sh |
+|---|---|---|
+| **Cloud API calls** | ❌ None — 100% local | Uses cloud providers by default |
+| **API keys required** | ❌ Never | Often required for full functionality |
+| **Data leaves machine** | ❌ Never | Depends on provider selection |
+| **Works offline** | ✅ Fully offline-capable | Requires internet for cloud models |
+
+### ⚡ Ollama-Optimized
+
+- **Native Ollama streaming** — Direct integration with Ollama's streaming API for real-time token display
+- **Model auto-discovery** — Automatically detects and lists all models available in your local Ollama instance
+- **Zero configuration** — No API keys, no environment variables, no account setup
+- **Fast local inference** — No network latency to cloud endpoints
+
+### 💰 Cost Savings
+
+- **$0 per token** — No cloud API fees, ever
+- **No usage limits** — Generate as much code as your hardware allows
+- **No rate limiting** — Full speed ahead, limited only by your GPU/CPU
+
+### 🛠️ Built for Local Development
+
+- **Electron desktop app** — Native performance, no browser required
+- **Integrated file management** — View and edit generated files directly in the app
+- **Docker Compose integration** — One-click database setup for full-stack apps
+- **Persistent project storage** — All apps saved locally in your user data directory
+
+---
+
 ## Features
 
 - 🦙 **Ollama-only** — no cloud APIs, no keys, complete privacy
@@ -78,6 +113,19 @@ npm start      # start Electron app
 npm test       # run unit tests (vitest)
 npm run lint   # lint TypeScript files
 ```
+
+## When to Use Deyad vs dyad.sh
+
+| Use Case | Recommendation |
+|----------|----------------|
+| Privacy-critical projects | ✅ **Deyad** — data never leaves your machine |
+| Offline development | ✅ **Deyad** — works without internet |
+| Ollama-exclusive workflow | ✅ **Deyad** — purpose-built for Ollama |
+| Cost-conscious teams | ✅ **Deyad** — zero cloud API costs |
+| Need cloud provider options | Consider dyad.sh for cloud model variety |
+| Enterprise/team features | Consider dyad.sh if cloud features are needed |
+
+**Bottom line:** If you're an Ollama user who values privacy, cost savings, and offline capability, Deyad is the better choice. It's designed from the ground up for local-first AI development.
 
 ## License
 
