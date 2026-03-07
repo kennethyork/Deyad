@@ -174,7 +174,10 @@ ipcMain.handle('apps:write-files', (_event, { appId, files }: { appId: string; f
 ipcMain.handle('apps:delete', async (_event, appId: string) => {
   // Stop dev server if running
   const proc = devProcesses.get(appId);
-  if (proc) { proc.kill(); devProcesses.delete(appId); }
+  if (proc) {
+    proc.kill();
+    devProcesses.delete(appId);
+  }
   await stopCompose(appId).catch(() => {});
   const dir = path.join(APPS_DIR, appId);
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });

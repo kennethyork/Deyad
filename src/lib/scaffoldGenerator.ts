@@ -29,7 +29,7 @@ export function generateFrontendScaffold(opts: FrontendScaffoldOptions): Record<
   return {
     'package.json': JSON.stringify(
       {
-        name: appName.toLowerCase().replace(/\s+/g, '-'),
+        name: appName.toLowerCase().replace(/[^a-z0-9-_.]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''),
         version: '0.0.1',
         description,
         type: 'module',

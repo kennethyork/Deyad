@@ -54,7 +54,8 @@ describe('generateFrontendScaffold', () => {
   it('sanitizes app name into a valid npm package name', () => {
     const files = generateFrontendScaffold({ appName: 'Hello World!', description: '' });
     const pkg = JSON.parse(files['package.json']);
-    expect(pkg.name).toBe('hello-world!');
+    // spaces and special chars become hyphens; trailing hyphens are trimmed
+    expect(pkg.name).toBe('hello-world');
   });
 });
 

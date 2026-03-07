@@ -47,6 +47,8 @@ export default function App() {
   const selectApp = useCallback(async (app: AppProject) => {
     setSelectedApp(app);
     setSelectedFile(null);
+    // Always show the file editor when switching apps — the preview iframe always
+    // points to localhost:5173 so it could show a stale/different app's preview.
     setRightTab('editor');
     const files = await window.deyad.readFiles(app.id);
     setAppFiles(files);
