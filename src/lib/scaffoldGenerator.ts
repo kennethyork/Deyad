@@ -78,7 +78,6 @@ export function generateMobileScaffold(opts: MobileScaffoldOptions): Record<stri
         devDependencies: {
           '@babel/core': '^7.25.0',
           '@types/react': '^18.3.11',
-          '@types/react-native': '^0.73.0',
           typescript: '^5.4.5',
         },
       },
