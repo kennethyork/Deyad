@@ -1,17 +1,18 @@
-import { app, BrowserWindow, ipcMain, net } from 'electron';
+import { app, BrowserWindow, ipcMain, net, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import started from 'electron-squirrel-startup';
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
-}
+const execFileAsync = promisify(execFile);
+
+if (started) { app.quit(); }
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_HOST || 'http://localhost:11434';
 const APPS_DIR = path.join(app.getPath('userData'), 'deyad-apps');
+const DOCKER_CHECK_TIMEOUT_MS = 5000;
 
-// Ensure apps directory exists
 if (!fs.existsSync(APPS_DIR)) {
   fs.mkdirSync(APPS_DIR, { recursive: true });
 }
@@ -40,9 +41,8 @@ const createWindow = () => {
   }
 };
 
-// ── Ollama IPC Handlers ────────────────────────────────────────────────────
+// ── Ollama ─────────────────────────────────────────────────────────────────
 
-/** Fetch all locally available Ollama models */
 ipcMain.handle('ollama:list-models', async () => {
   return new Promise((resolve, reject) => {
     const request = net.request(`${OLLAMA_BASE_URL}/api/tags`);
@@ -50,53 +50,19 @@ ipcMain.handle('ollama:list-models', async () => {
     request.on('response', (response) => {
       response.on('data', (chunk) => { data += chunk; });
       response.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          reject(new Error('Failed to parse Ollama response'));
-        }
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error('Failed to parse Ollama response')); }
       });
     });
-    request.on('error', (err) => reject(new Error(`Ollama not reachable: ${err.message}`)));
+    request.on('error', (err: Error) => reject(new Error(`Ollama not reachable: ${err.message}`)));
     request.end();
   });
 });
 
-/** Non-streaming chat completion via Ollama */
-ipcMain.handle('ollama:chat', async (_event, { model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ model, messages, stream: false });
-    const request = net.request({
-      method: 'POST',
-      url: `${OLLAMA_BASE_URL}/api/chat`,
-    });
-    let data = '';
-    request.on('response', (response) => {
-      response.on('data', (chunk) => { data += chunk; });
-      response.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          reject(new Error('Failed to parse Ollama chat response'));
-        }
-      });
-    });
-    request.on('error', (err) => reject(new Error(`Ollama chat error: ${err.message}`)));
-    request.setHeader('Content-Type', 'application/json');
-    request.write(body);
-    request.end();
-  });
-});
-
-/** Streaming chat — sends tokens back via webContents.send */
 ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const body = JSON.stringify({ model, messages, stream: true });
-    const request = net.request({
-      method: 'POST',
-      url: `${OLLAMA_BASE_URL}/api/chat`,
-    });
-
+    const request = net.request({ method: 'POST', url: `${OLLAMA_BASE_URL}/api/chat` });
     let buffer = '';
     request.on('response', (response) => {
       response.on('data', (chunk: Buffer) => {
@@ -112,17 +78,14 @@ ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model:
             }
             if (parsed.done) {
               event.sender.send('ollama:stream-done');
-              resolve(undefined);
+              resolve();
             }
-          } catch { /* skip malformed lines */ }
+          } catch { /* skip malformed */ }
         }
       });
-      response.on('end', () => {
-        event.sender.send('ollama:stream-done');
-        resolve(undefined);
-      });
+      response.on('end', () => { event.sender.send('ollama:stream-done'); resolve(); });
     });
-    request.on('error', (err) => {
+    request.on('error', (err: Error) => {
       event.sender.send('ollama:stream-error', err.message);
       reject(err);
     });
@@ -132,9 +95,8 @@ ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model:
   });
 });
 
-// ── App/Project IPC Handlers ───────────────────────────────────────────────
+// ── App Projects ────────────────────────────────────────────────────────────
 
-/** List saved app projects */
 ipcMain.handle('apps:list', () => {
   try {
     const entries = fs.readdirSync(APPS_DIR, { withFileTypes: true });
@@ -142,28 +104,24 @@ ipcMain.handle('apps:list', () => {
       .filter((e) => e.isDirectory())
       .map((e) => {
         const metaPath = path.join(APPS_DIR, e.name, 'deyad.json');
-        let meta = { name: e.name, description: '', createdAt: '' };
+        let meta = { name: e.name, description: '', createdAt: '', isFullStack: false };
         if (fs.existsSync(metaPath)) {
           try { meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf-8')) }; } catch { /* ignore */ }
         }
         return { id: e.name, ...meta };
       });
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 });
 
-/** Create a new app project */
-ipcMain.handle('apps:create', (_event, { name, description }: { name: string; description: string }) => {
+ipcMain.handle('apps:create', (_event, { name, description, isFullStack }: { name: string; description: string; isFullStack: boolean }) => {
   const id = `${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const dir = path.join(APPS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
-  const meta = { name, description, createdAt: new Date().toISOString() };
+  const meta = { name, description, createdAt: new Date().toISOString(), isFullStack: !!isFullStack };
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
   return { id, ...meta };
 });
 
-/** Read the files of an app project */
 ipcMain.handle('apps:read-files', (_event, appId: string) => {
   const dir = path.join(APPS_DIR, appId);
   if (!fs.existsSync(dir)) return {};
@@ -175,7 +133,7 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
       if (entry.isDirectory()) {
         walk(fullPath, relPath);
       } else if (entry.name !== 'deyad.json') {
-        try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch { /* skip binary files */ }
+        try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch { /* skip binary */ }
       }
     }
   };
@@ -183,7 +141,6 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
   return result;
 });
 
-/** Write / update files in an app project */
 ipcMain.handle('apps:write-files', (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
   const dir = path.join(APPS_DIR, appId);
   for (const [relPath, content] of Object.entries(files)) {
@@ -194,17 +151,90 @@ ipcMain.handle('apps:write-files', (_event, { appId, files }: { appId: string; f
   return true;
 });
 
-/** Delete an app project */
-ipcMain.handle('apps:delete', (_event, appId: string) => {
+ipcMain.handle('apps:delete', async (_event, appId: string) => {
+  await stopCompose(appId).catch(() => {});
   const dir = path.join(APPS_DIR, appId);
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
   return true;
 });
 
-/** Get the apps directory path (so user can open it in Finder/Explorer) */
-ipcMain.handle('apps:get-dir', () => APPS_DIR);
+ipcMain.handle('apps:get-dir', (_event, appId?: string) =>
+  appId ? path.join(APPS_DIR, appId) : APPS_DIR,
+);
 
-// ── Lifecycle ──────────────────────────────────────────────────────────────
+ipcMain.handle('apps:open-folder', (_event, appId: string) => {
+  shell.openPath(path.join(APPS_DIR, appId));
+  return true;
+});
+
+// ── Docker / MySQL ──────────────────────────────────────────────────────────
+
+async function checkDockerAvailable(): Promise<boolean> {
+  try {
+    await execFileAsync('docker', ['info'], { timeout: DOCKER_CHECK_TIMEOUT_MS });
+    return true;
+  } catch { return false; }
+}
+
+async function stopCompose(appId: string): Promise<void> {
+  const dir = path.join(APPS_DIR, appId);
+  const composeFile = path.join(dir, 'docker-compose.yml');
+  if (fs.existsSync(composeFile)) {
+    try {
+      await execFileAsync('docker', ['compose', '-f', composeFile, 'down'], { timeout: 30000 });
+    } catch { /* best-effort */ }
+  }
+}
+
+ipcMain.handle('docker:check', async () => checkDockerAvailable());
+
+ipcMain.handle('docker:db-start', async (event, appId: string) => {
+  const dir = path.join(APPS_DIR, appId);
+  const composeFile = path.join(dir, 'docker-compose.yml');
+  if (!fs.existsSync(composeFile)) {
+    return { success: false, error: 'No docker-compose.yml found in app directory' };
+  }
+  try {
+    await execFileAsync('docker', ['compose', '-f', composeFile, 'up', '-d', '--wait'], { timeout: 120000 });
+    event.sender.send('docker:db-status', { appId, status: 'running' });
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+});
+
+ipcMain.handle('docker:db-stop', async (event, appId: string) => {
+  try {
+    await stopCompose(appId);
+    event.sender.send('docker:db-status', { appId, status: 'stopped' });
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+});
+
+ipcMain.handle('docker:db-status', async (_event, appId: string) => {
+  const dir = path.join(APPS_DIR, appId);
+  const composeFile = path.join(dir, 'docker-compose.yml');
+  if (!fs.existsSync(composeFile)) return { status: 'none' };
+  try {
+    const { stdout } = await execFileAsync(
+      'docker', ['compose', '-f', composeFile, 'ps', '--format', 'json'],
+      { timeout: 10000 },
+    );
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    if (!lines.length) return { status: 'stopped' };
+    const containers = lines
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean);
+    const running = containers.some((c: { State?: string }) => c?.State === 'running');
+    return { status: running ? 'running' : 'stopped' };
+  } catch { return { status: 'stopped' }; }
+});
+
+// ── Lifecycle ───────────────────────────────────────────────────────────────
 
 app.on('ready', createWindow);
 
@@ -215,7 +245,3 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
-
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

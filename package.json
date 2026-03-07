@@ -13,7 +13,12 @@
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run"
   },
-  "keywords": ["ollama", "ai", "app-builder", "electron"],
+  "keywords": [
+    "ollama",
+    "ai",
+    "app-builder",
+    "electron"
+  ],
   "author": "Deyad",
   "license": "MIT",
   "devDependencies": {
@@ -32,6 +37,7 @@
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^4.4.1",
+    "electron": "^40.8.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
     "typescript": "~5.7.3",

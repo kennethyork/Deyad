@@ -1,9 +1,6 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
-
+// Preload — exposes safe IPC bridges to the renderer (contextIsolation: true)
 import { contextBridge, ipcRenderer } from 'electron';
 
-/** Types shared between main and renderer */
 export interface OllamaModel {
   name: string;
   modified_at: string;
@@ -25,15 +22,13 @@ export interface AppProject {
   name: string;
   description: string;
   createdAt: string;
+  isFullStack: boolean;
 }
 
 contextBridge.exposeInMainWorld('deyad', {
-  // Ollama
+  // ── Ollama ──────────────────────────────────────────────────────────────
   listModels: (): Promise<{ models: OllamaModel[] }> =>
     ipcRenderer.invoke('ollama:list-models'),
-
-  chat: (model: string, messages: ChatMessage[]): Promise<{ message: ChatMessage }> =>
-    ipcRenderer.invoke('ollama:chat', { model, messages }),
 
   chatStream: (model: string, messages: ChatMessage[]): Promise<void> =>
     ipcRenderer.invoke('ollama:chat-stream', { model, messages }),
@@ -56,12 +51,12 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('ollama:stream-error', handler);
   },
 
-  // App projects
+  // ── App Projects ────────────────────────────────────────────────────────
   listApps: (): Promise<AppProject[]> =>
     ipcRenderer.invoke('apps:list'),
 
-  createApp: (name: string, description: string): Promise<AppProject> =>
-    ipcRenderer.invoke('apps:create', { name, description }),
+  createApp: (name: string, description: string, isFullStack: boolean): Promise<AppProject> =>
+    ipcRenderer.invoke('apps:create', { name, description, isFullStack }),
 
   readFiles: (appId: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke('apps:read-files', appId),
@@ -72,7 +67,28 @@ contextBridge.exposeInMainWorld('deyad', {
   deleteApp: (appId: string): Promise<boolean> =>
     ipcRenderer.invoke('apps:delete', appId),
 
-  getAppsDir: (): Promise<string> =>
-    ipcRenderer.invoke('apps:get-dir'),
-});
+  getAppDir: (appId: string): Promise<string> =>
+    ipcRenderer.invoke('apps:get-dir', appId),
 
+  openAppFolder: (appId: string): Promise<boolean> =>
+    ipcRenderer.invoke('apps:open-folder', appId),
+
+  // ── Docker / MySQL ──────────────────────────────────────────────────────
+  checkDocker: (): Promise<boolean> =>
+    ipcRenderer.invoke('docker:check'),
+
+  dbStart: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('docker:db-start', appId),
+
+  dbStop: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('docker:db-stop', appId),
+
+  dbStatus: (appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }> =>
+    ipcRenderer.invoke('docker:db-status', appId),
+
+  onDbStatus: (cb: (payload: { appId: string; status: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; status: string }) => cb(payload);
+    ipcRenderer.on('docker:db-status', handler);
+    return () => ipcRenderer.removeListener('docker:db-status', handler);
+  },
+});
