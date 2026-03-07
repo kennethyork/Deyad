@@ -1,0 +1,60 @@
+/**
+ * Global type augmentation for the contextBridge API exposed by preload.ts
+ */
+
+interface OllamaModel {
+  name: string;
+  modified_at: string;
+  size: number;
+  details?: {
+    family: string;
+    parameter_size: string;
+    quantization_level: string;
+  };
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+interface AppProject {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  isFullStack: boolean;
+}
+
+interface DeyadAPI {
+  // Ollama
+  listModels(): Promise<{ models: OllamaModel[] }>;
+  chatStream(model: string, messages: ChatMessage[]): Promise<void>;
+  onStreamToken(cb: (token: string) => void): () => void;
+  onStreamDone(cb: () => void): () => void;
+  onStreamError(cb: (err: string) => void): () => void;
+
+  // App projects
+  listApps(): Promise<AppProject[]>;
+  createApp(name: string, description: string, isFullStack: boolean): Promise<AppProject>;
+  readFiles(appId: string): Promise<Record<string, string>>;
+  writeFiles(appId: string, files: Record<string, string>): Promise<boolean>;
+  deleteApp(appId: string): Promise<boolean>;
+  getAppDir(appId: string): Promise<string>;
+  openAppFolder(appId: string): Promise<boolean>;
+
+  // Docker / MySQL
+  checkDocker(): Promise<boolean>;
+  dbStart(appId: string): Promise<{ success: boolean; error?: string }>;
+  dbStop(appId: string): Promise<{ success: boolean; error?: string }>;
+  dbStatus(appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }>;
+  onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
+}
+
+declare global {
+  interface Window {
+    deyad: DeyadAPI;
+  }
+}
+
+export {};
