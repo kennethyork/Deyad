@@ -11,9 +11,11 @@ interface Props {
   onNewApp: () => void;
   onDeleteApp: (id: string) => void;
   onRenameApp: (id: string, newName: string) => void;
+  onExportApp: (id: string) => void;
+  onOpenSettings: () => void;
 }
 
-export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp }: Props) {
+export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onExportApp, onOpenSettings }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -94,6 +96,13 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
               </span>
             )}
             <button
+              className="sidebar-export"
+              onClick={(e) => { e.stopPropagation(); onExportApp(app.id); }}
+              title="Export as ZIP"
+            >
+              📦
+            </button>
+            <button
               className={`sidebar-delete ${confirmDelete === app.id ? 'confirm' : ''}`}
               onClick={(e) => handleDelete(e, app.id)}
               title={confirmDelete === app.id ? 'Click again to confirm' : 'Delete app'}
@@ -105,6 +114,9 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
       </nav>
 
       <div className="sidebar-footer">
+        <button className="sidebar-settings-btn" onClick={onOpenSettings} title="Settings">
+          ⚙️ Settings
+        </button>
         <a
           className="sidebar-footer-link"
           href="https://ollama.ai"

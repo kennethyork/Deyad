@@ -66,6 +66,18 @@ interface DeyadAPI {
   dbStop(appId: string): Promise<{ success: boolean; error?: string }>;
   dbStatus(appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }>;
   onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
+
+  // Settings
+  getSettings(): Promise<{ ollamaHost: string; defaultModel: string }>;
+  setSettings(settings: { ollamaHost?: string; defaultModel?: string }): Promise<{ ollamaHost: string; defaultModel: string }>;
+
+  // Export
+  exportApp(appId: string): Promise<{ success: boolean; error?: string; path?: string }>;
+
+  // Undo / Revert
+  snapshotFiles(appId: string, files: Record<string, string>): Promise<boolean>;
+  hasSnapshot(appId: string): Promise<boolean>;
+  revertFiles(appId: string): Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

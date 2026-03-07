@@ -129,4 +129,25 @@ contextBridge.exposeInMainWorld('deyad', {
     ipcRenderer.on('docker:db-status', handler);
     return () => ipcRenderer.removeListener('docker:db-status', handler);
   },
+
+  // ── Settings ────────────────────────────────────────────────────────────
+  getSettings: (): Promise<{ ollamaHost: string; defaultModel: string }> =>
+    ipcRenderer.invoke('settings:get'),
+
+  setSettings: (settings: { ollamaHost?: string; defaultModel?: string }): Promise<{ ollamaHost: string; defaultModel: string }> =>
+    ipcRenderer.invoke('settings:set', settings),
+
+  // ── Export ──────────────────────────────────────────────────────────────
+  exportApp: (appId: string): Promise<{ success: boolean; error?: string; path?: string }> =>
+    ipcRenderer.invoke('apps:export', appId),
+
+  // ── Undo / Revert ──────────────────────────────────────────────────────
+  snapshotFiles: (appId: string, files: Record<string, string>): Promise<boolean> =>
+    ipcRenderer.invoke('apps:snapshot', { appId, files }),
+
+  hasSnapshot: (appId: string): Promise<boolean> =>
+    ipcRenderer.invoke('apps:has-snapshot', appId),
+
+  revertFiles: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('apps:revert', appId),
 });

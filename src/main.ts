@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, net, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFile, spawn } from 'node:child_process';
@@ -10,9 +10,40 @@ const execFileAsync = promisify(execFile);
 
 if (started) { app.quit(); }
 
-const OLLAMA_BASE_URL = process.env.OLLAMA_HOST || 'http://localhost:11434';
 const APPS_DIR = path.join(app.getPath('userData'), 'deyad-apps');
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'deyad-settings.json');
 const DOCKER_CHECK_TIMEOUT_MS = 5000;
+
+// ── Settings ──────────────────────────────────────────────────────────────────
+
+interface DeyadSettings {
+  ollamaHost: string;
+  defaultModel: string;
+}
+
+const DEFAULT_SETTINGS: DeyadSettings = {
+  ollamaHost: 'http://localhost:11434',
+  defaultModel: '',
+};
+
+function loadSettings(): DeyadSettings {
+  try {
+    if (fs.existsSync(SETTINGS_PATH)) {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8')) };
+    }
+  } catch { /* ignore corrupt file */ }
+  return { ...DEFAULT_SETTINGS };
+}
+
+function saveSettings(settings: DeyadSettings): void {
+  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+}
+
+let currentSettings = loadSettings();
+
+function getOllamaBaseUrl(): string {
+  return process.env.OLLAMA_HOST || currentSettings.ollamaHost || DEFAULT_SETTINGS.ollamaHost;
+}
 
 /** Tracks running `npm run dev` processes keyed by appId. */
 const devProcesses = new Map<string, ChildProcess>();
@@ -65,7 +96,7 @@ const createWindow = () => {
 
 ipcMain.handle('ollama:list-models', async () => {
   return new Promise((resolve, reject) => {
-    const request = net.request(`${OLLAMA_BASE_URL}/api/tags`);
+    const request = net.request(`${getOllamaBaseUrl()}/api/tags`);
     let data = '';
     request.on('response', (response) => {
       response.on('data', (chunk) => { data += chunk; });
@@ -82,7 +113,7 @@ ipcMain.handle('ollama:list-models', async () => {
 ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
   return new Promise<void>((resolve, reject) => {
     const body = JSON.stringify({ model, messages, stream: true });
-    const request = net.request({ method: 'POST', url: `${OLLAMA_BASE_URL}/api/chat` });
+    const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/chat` });
     let buffer = '';
     request.on('response', (response) => {
       response.on('data', (chunk: Buffer) => {
@@ -349,6 +380,194 @@ ipcMain.handle('docker:db-status', async (_event, appId: string) => {
     const running = containers.some((c: { State?: string }) => c?.State === 'running');
     return { status: running ? 'running' : 'stopped' };
   } catch { return { status: 'stopped' }; }
+});
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+ipcMain.handle('settings:get', () => currentSettings);
+
+ipcMain.handle('settings:set', (_event, settings: Partial<DeyadSettings>) => {
+  currentSettings = { ...currentSettings, ...settings };
+  saveSettings(currentSettings);
+  return currentSettings;
+});
+
+// ── App Export (ZIP) ────────────────────────────────────────────────────────
+
+ipcMain.handle('apps:export', async (_event, appId: string) => {
+  const dir = path.join(APPS_DIR, appId);
+  if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
+
+  // Read app name for the suggested filename
+  let appName = appId;
+  const metaPath = path.join(dir, 'deyad.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+      if (meta.name) appName = meta.name;
+    } catch { /* ignore */ }
+  }
+
+  const sanitized = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    defaultPath: `${sanitized}.zip`,
+    filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+  });
+
+  if (canceled || !filePath) return { success: false, error: 'Cancelled' };
+
+  try {
+    // Build a zip using Node.js without additional dependencies.
+    // We use a minimal zip builder that creates a valid ZIP file.
+    const zipData = await buildZipBuffer(dir, appId);
+    fs.writeFileSync(filePath, zipData);
+    return { success: true, path: filePath };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+});
+
+/**
+ * Builds a ZIP buffer from a directory using the Store method (no compression).
+ * This is a minimal implementation that produces valid ZIP archives.
+ */
+async function buildZipBuffer(baseDir: string, prefix: string): Promise<Buffer> {
+  const entries: { name: string; data: Buffer }[] = [];
+  const walk = (dir: string, rel: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      if (entry.isDirectory()) {
+        walk(fullPath, relPath);
+      } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+        try {
+          entries.push({ name: relPath, data: fs.readFileSync(fullPath) });
+        } catch { /* skip unreadable */ }
+      }
+    }
+  };
+  walk(baseDir, '');
+
+  // Build ZIP in memory (Store method, no compression)
+  const parts: Buffer[] = [];
+  const centralDir: Buffer[] = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const nameBuffer = Buffer.from(entry.name, 'utf-8');
+    // Local file header
+    const local = Buffer.alloc(30 + nameBuffer.length);
+    local.writeUInt32LE(0x04034b50, 0); // signature
+    local.writeUInt16LE(20, 4);          // version needed
+    local.writeUInt16LE(0, 6);           // flags
+    local.writeUInt16LE(0, 8);           // compression (store)
+    local.writeUInt16LE(0, 10);          // mod time
+    local.writeUInt16LE(0, 12);          // mod date
+    local.writeUInt32LE(crc32(entry.data), 14);
+    local.writeUInt32LE(entry.data.length, 18);
+    local.writeUInt32LE(entry.data.length, 22);
+    local.writeUInt16LE(nameBuffer.length, 26);
+    local.writeUInt16LE(0, 28);          // extra field length
+    nameBuffer.copy(local, 30);
+
+    parts.push(local, entry.data);
+
+    // Central directory entry
+    const central = Buffer.alloc(46 + nameBuffer.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(0, 10);
+    central.writeUInt16LE(0, 12);
+    central.writeUInt16LE(0, 14);
+    central.writeUInt32LE(crc32(entry.data), 16);
+    central.writeUInt32LE(entry.data.length, 20);
+    central.writeUInt32LE(entry.data.length, 24);
+    central.writeUInt16LE(nameBuffer.length, 28);
+    central.writeUInt16LE(0, 30);
+    central.writeUInt16LE(0, 32);
+    central.writeUInt16LE(0, 34);
+    central.writeUInt16LE(0, 36);
+    central.writeUInt32LE(0, 38);
+    central.writeUInt32LE(offset, 42);
+    nameBuffer.copy(central, 46);
+    centralDir.push(central);
+
+    offset += local.length + entry.data.length;
+  }
+
+  const centralDirBuffer = Buffer.concat(centralDir);
+  const endRecord = Buffer.alloc(22);
+  endRecord.writeUInt32LE(0x06054b50, 0);
+  endRecord.writeUInt16LE(0, 4);
+  endRecord.writeUInt16LE(0, 6);
+  endRecord.writeUInt16LE(entries.length, 8);
+  endRecord.writeUInt16LE(entries.length, 10);
+  endRecord.writeUInt32LE(centralDirBuffer.length, 12);
+  endRecord.writeUInt32LE(offset, 16);
+  endRecord.writeUInt16LE(0, 20);
+
+  return Buffer.concat([...parts, centralDirBuffer, endRecord]);
+}
+
+/** CRC-32 (ISO 3309) — used for ZIP file entries. */
+function crc32(buf: Buffer): number {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// ── Undo / Revert ───────────────────────────────────────────────────────────
+
+/** Stores one snapshot per app — the state before the most recent AI write. */
+const fileSnapshots = new Map<string, Record<string, string>>();
+
+ipcMain.handle('apps:snapshot', (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
+  fileSnapshots.set(appId, files);
+  return true;
+});
+
+ipcMain.handle('apps:has-snapshot', (_event, appId: string) => {
+  return fileSnapshots.has(appId);
+});
+
+ipcMain.handle('apps:revert', async (_event, appId: string) => {
+  const snapshot = fileSnapshots.get(appId);
+  if (!snapshot) return { success: false, error: 'No snapshot available' };
+
+  const dir = path.join(APPS_DIR, appId);
+
+  // Remove all current non-meta files
+  const walk = (base: string) => {
+    for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+      const fullPath = path.join(base, entry.name);
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+        try { fs.unlinkSync(fullPath); } catch { /* skip */ }
+      }
+    }
+  };
+  walk(dir);
+
+  // Write snapshot files back
+  for (const [relPath, content] of Object.entries(snapshot)) {
+    const fullPath = path.join(dir, relPath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content, 'utf-8');
+  }
+
+  fileSnapshots.delete(appId);
+  return { success: true };
 });
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────

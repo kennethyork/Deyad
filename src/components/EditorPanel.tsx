@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface Props {
   files: Record<string, string>;
@@ -109,7 +109,23 @@ function FileTree({
 
 export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenFolder, onFileEdit }: Props) {
   const fileCount = Object.keys(files).length;
-  const tree = buildTree(files);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter files by search query (matches path or content)
+  const filteredFiles = useMemo(() => {
+    if (!searchQuery.trim()) return files;
+    const query = searchQuery.toLowerCase();
+    const result: Record<string, string> = {};
+    for (const [path, content] of Object.entries(files)) {
+      if (path.toLowerCase().includes(query) || content.toLowerCase().includes(query)) {
+        result[path] = content;
+      }
+    }
+    return result;
+  }, [files, searchQuery]);
+
+  const filteredCount = Object.keys(filteredFiles).length;
+  const tree = buildTree(filteredFiles);
 
   // Local edit state: tracks the content being edited before saving
   const [editContent, setEditContent] = useState<string>('');
@@ -168,13 +184,31 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
             📂
           </button>
         </div>
+        {fileCount > 0 && (
+          <div className="file-search">
+            <input
+              className="file-search-input"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search files…"
+            />
+            {searchQuery && (
+              <span className="file-search-count">
+                {filteredCount}/{fileCount}
+              </span>
+            )}
+          </div>
+        )}
         {fileCount === 0 ? (
           <p className="file-tree-empty">No files yet</p>
+        ) : filteredCount === 0 ? (
+          <p className="file-tree-empty">No matches</p>
         ) : (
           <FileTree
             tree={tree}
             dir=""
-            files={files}
+            files={filteredFiles}
             selectedFile={selectedFile}
             onSelectFile={onSelectFile}
             depth={0}
