@@ -8,27 +8,22 @@ Competes with [dyad.sh](https://dyad.sh) and [Base44](https://base44.com) with f
 
 ## Why Deyad?
 
-### 🔒 Privacy First — Local by Default
+### 🔒 Privacy First — Local Only
 
 - **Ollama** runs 100% on your machine — no cloud, no API keys, works offline
-- Cloud providers (OpenAI, Anthropic, Google) available when you want more powerful models
 - Your code never leaves your machine unless you choose to deploy it
 
-### 🧠 Multi-Provider AI
+### 🦙 Powered by Ollama
 
 | Provider | Models | Auth |
 |----------|--------|------|
 | 🦙 **Ollama** (local) | Any model you pull (llama3.2, codellama, etc.) | None needed |
-| 🟢 **OpenAI** | GPT-4o, GPT-4o-mini, o1, etc. | API key |
-| 🟠 **Anthropic** | Claude Sonnet 4, Claude 3.5 Haiku, etc. | API key |
-| 🔵 **Google Gemini** | Gemini 2.5 Pro, Gemini 2.5 Flash, etc. | API key |
 
 ### ⚡ Full Feature Set
 
 | Feature | Deyad | dyad.sh | Base44 |
 |---------|-------|---------|--------|
 | Local AI (Ollama) | ✅ | ✅ | ❌ |
-| Cloud AI (OpenAI, Anthropic, Google) | ✅ | ✅ | ✅ |
 | Open source | ✅ | ✅ | ❌ |
 | Desktop app | ✅ | ✅ | ❌ |
 | Full-stack (React + Express + MySQL) | ✅ | Supabase | Managed |
@@ -43,7 +38,7 @@ Competes with [dyad.sh](https://dyad.sh) and [Base44](https://base44.com) with f
 
 ## Features
 
-- 🧠 **Multi-provider AI** — Ollama, OpenAI, Anthropic, Google Gemini — switch freely
+- 🦙 **Ollama-powered AI** — runs locally, no API keys needed
 - ⚡ **Frontend apps** — React + Vite scaffolded instantly
 - 🗄️ **Full-stack apps** — React + Express + MySQL (Docker) + Prisma, one click
 - 💬 **Chat to build** — describe your app, get working code with streaming
@@ -55,7 +50,7 @@ Competes with [dyad.sh](https://dyad.sh) and [Base44](https://base44.com) with f
 - 🔀 **Git auto-commit** — every AI generation is versioned automatically
 - 📂 **Import projects** — bring existing codebases into Deyad
 - 🎨 **Templates** — start from Todo, Dashboard, Landing Page, Chat UI, Blog, E-commerce
-- ⚙️ **Configurable** — Ollama host, default model, API keys all in Settings
+- ⚙️ **Configurable** — Ollama host and default model in Settings
 
 ## Stack (full-stack mode)
 
@@ -71,7 +66,7 @@ Competes with [dyad.sh](https://dyad.sh) and [Base44](https://base44.com) with f
 | Requirement | Why |
 |-------------|-----|
 | [Node.js ≥ 18](https://nodejs.org) | Run the app |
-| [Ollama](https://ollama.ai) *(or cloud API key)* | Powers AI chat |
+| [Ollama](https://ollama.ai) | Powers AI chat |
 | [Docker](https://docker.com) *(optional)* | Full-stack MySQL support |
 | [Git](https://git-scm.com) *(optional)* | Auto version control |
 
@@ -84,9 +79,8 @@ npm install
 # 2. Start Deyad
 npm start
 
-# 3. In Settings, choose your AI provider:
-#    - Ollama (local): make sure ollama is running with `ollama pull llama3.2`
-#    - OpenAI/Anthropic/Google: paste your API key
+# 3. Make sure Ollama is running:
+#    ollama pull llama3.2
 ```
 
 ## Usage
