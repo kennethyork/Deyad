@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import ErrorBoundary from './components/ErrorBoundary';
 import { isElectronApp } from './lib/electronCheck';
 import './index.css';
 
@@ -23,6 +24,6 @@ function NotElectronError() {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    {isElectronApp() ? <App /> : <NotElectronError />}
+    {isElectronApp() ? <ErrorBoundary><App /></ErrorBoundary> : <NotElectronError />}
   </React.StrictMode>,
 );
