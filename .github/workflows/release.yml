@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Step 1: Run tests before building anything ──────────────────────────
+  test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+  # ── Step 2: Build platform-specific installers in parallel ──────────────
+  build:
+    name: Build (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and package
+        run: npm run make
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deyad-${{ matrix.os }}
+          path: out/make/**
+          retention-days: 30
+
+  # ── Step 3: Create GitHub Release and attach all binaries ───────────────
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all platform artifacts into ./artifacts/
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deyad-ubuntu-latest
+          path: artifacts/linux
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deyad-macos-latest
+          path: artifacts/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deyad-windows-latest
+          path: artifacts/windows
+
+      # Flatten nested directories so all installers are easy to find
+      - name: Collect release files
+        run: |
+          mkdir -p release
+          find artifacts -type f \( \
+            -name '*.deb' -o -name '*.rpm' -o -name '*.zip' \
+            -o -name '*.dmg' -o -name '*.exe' -o -name '*.nupkg' \
+            -o -name '*.AppImage' -o -name '*.snap' \
+          \) -exec cp {} release/ \;
+          echo "=== Release files ==="
+          ls -lh release/
+
+      # Create the release with all binaries attached
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

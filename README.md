@@ -118,6 +118,36 @@ npm test       # run unit tests (vitest)
 npm run lint   # lint TypeScript files
 ```
 
+## Packaging & CI/CD
+
+Automated GitHub Actions build all three platforms (ubuntu, macOS, Windows) on every tag or manual dispatch. The workflow:
+
+1. `npm ci` installs dependencies
+2. `npm run make` creates platform-specific installers and archives
+3. Artifacts are uploaded to the workflow run
+4. On tag pushes the job also runs `npx electron-forge publish --platform=all --target=github` which creates a GitHub Release and attaches the binaries.
+
+You can manually package locally:
+
+```bash
+npm run make
+```
+
+Artifacts land under `out/make/<platform>` (deb/rpm/exe/zip/dmg).
+
+To publish a release, tag and push:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+(This requires the `GITHUB_TOKEN` secret; Actions handles it automatically.)
+
+Once the workflow completes a release page will contain the installers for Mac, Windows and Linux.
+
+## License
+
 ## License
 
 MIT
