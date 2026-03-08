@@ -41,34 +41,5 @@ jobs:
           path: out/make/**
           retention-days: 7
 
-      # playwright E2E on linux only
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Package with Electron Forge
-        run: npm run make
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: deyad-${{ matrix.os }}
-          path: out/make/**
-          retention-days: 7
-
-      # playwright E2E on linux only
 
