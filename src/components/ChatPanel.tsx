@@ -29,9 +29,11 @@ interface Props {
   onDbToggle: () => void;
   onRevert: () => void;
   canRevert: boolean;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
 }
 
-export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onDbToggle, onRevert, canRevert }: Props) {
+export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onDbToggle, onRevert, canRevert, initialPrompt, onInitialPromptConsumed }: Props) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [models, setModels] = useState<string[]>([]);
@@ -55,6 +57,21 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-send template prompt when a new app is created from a template
+  useEffect(() => {
+    if (initialPrompt && selectedModel && !streaming) {
+      setInput(initialPrompt);
+      onInitialPromptConsumed?.();
+      // Small delay to let the input propagate, then trigger send
+      const timer = setTimeout(() => {
+        setInput('');
+        sendWithContent(initialPrompt);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, selectedModel]);
 
   const loadModels = async () => {
     try {
@@ -126,11 +143,10 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
     return history;
   }, [app.appType, app.dbProvider, appFiles, messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || streaming || !selectedModel) return;
+  const sendWithContent = async (content: string) => {
+    if (!content.trim() || streaming || !selectedModel) return;
 
-    const userContent = input.trim();
-    setInput('');
+    const userContent = content.trim();
     const userMsg: UiMessage = { id: Date.now().toString(), role: 'user', content: userContent };
     const msgsWithUser = [...messages, userMsg];
     setMessages(msgsWithUser);
@@ -209,6 +225,13 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
       unsubError();
       setStreaming(false);
     }
+  };
+
+  const sendMessage = async () => {
+    if (!input.trim() || streaming || !selectedModel) return;
+    const content = input.trim();
+    setInput('');
+    await sendWithContent(content);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

@@ -7,14 +7,44 @@ import type { ChildProcess } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { crc32 } from './lib/crc32';
 
+// ── Auto-updater ──────────────────────────────────────────────────────────────
+// update-electron-app checks for updates from GitHub Releases by default.
+// It no-ops gracefully in dev mode or when no repository field is in package.json.
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const updateElectronApp = require('update-electron-app');
+  updateElectronApp({ updateInterval: '1 hour' });
+} catch { /* auto-updater not available in dev — ignore */ }
+
 const execFileAsync = promisify(execFile);
 
 if (started) { app.quit(); }
 
 const APPS_DIR = path.join(app.getPath('userData'), 'deyad-apps');
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'deyad-settings.json');
+const SNAPSHOTS_DIR = path.join(app.getPath('userData'), 'deyad-snapshots');
 const DOCKER_CHECK_TIMEOUT_MS = 5000;
 const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.json\n';
+
+// ── Security: appId sanitization ──────────────────────────────────────────────
+
+/**
+ * Validates and sanitizes an appId to prevent path-traversal attacks.
+ * AppIds are generated as `{timestamp}-{slug}` — they must not contain
+ * path separators, `..`, or any character outside `[a-zA-Z0-9_-]`.
+ * Throws if the id is invalid.
+ */
+function safeAppId(appId: string): string {
+  if (!appId || typeof appId !== 'string') throw new Error('Invalid app ID');
+  if (/[/\\]/.test(appId) || appId.includes('..')) throw new Error('Invalid app ID');
+  if (!/^[a-zA-Z0-9_-]+$/.test(appId)) throw new Error('Invalid app ID');
+  return appId;
+}
+
+/** Returns the verified absolute directory for an app. */
+function appDir(appId: string): string {
+  return path.join(APPS_DIR, safeAppId(appId));
+}
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -56,7 +86,7 @@ const devProcesses = new Map<string, ChildProcess>();
  * for frontend-only apps it is the app root itself.
  */
 function getViteRoot(appId: string): string | null {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (fs.existsSync(path.join(dir, 'frontend', 'vite.config.ts'))) {
     return path.join(dir, 'frontend');
   }
@@ -198,7 +228,7 @@ ipcMain.handle('apps:create', async (_event, { name, description, appType, dbPro
 });
 
 ipcMain.handle('apps:read-files', (_event, appId: string) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (!fs.existsSync(dir)) return {};
   const result: Record<string, string> = {};
   const walk = (base: string, rel = '') => {
@@ -217,7 +247,7 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
 });
 
 ipcMain.handle('apps:write-files', async (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   for (const [relPath, content] of Object.entries(files)) {
     const fullPath = path.join(dir, relPath);
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
@@ -236,22 +266,24 @@ ipcMain.handle('apps:delete', async (_event, appId: string) => {
     devProcesses.delete(appId);
   }
   await stopCompose(appId).catch(() => {});
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+  // Clean up persisted snapshot
+  deleteSnapshot(appId);
   return true;
 });
 
 ipcMain.handle('apps:get-dir', (_event, appId?: string) =>
-  appId ? path.join(APPS_DIR, appId) : APPS_DIR,
+  appId ? appDir(appId) : APPS_DIR,
 );
 
 ipcMain.handle('apps:open-folder', (_event, appId: string) => {
-  shell.openPath(path.join(APPS_DIR, appId));
+  shell.openPath(appDir(appId));
   return true;
 });
 
 ipcMain.handle('apps:rename', (_event, { appId, newName }: { appId: string; newName: string }) => {
-  const metaPath = path.join(APPS_DIR, appId, 'deyad.json');
+  const metaPath = path.join(appDir(appId), 'deyad.json');
   if (!fs.existsSync(metaPath)) return false;
   try {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -262,7 +294,7 @@ ipcMain.handle('apps:rename', (_event, { appId, newName }: { appId: string; newN
 });
 
 ipcMain.handle('apps:save-messages', (_event, { appId, messages }: { appId: string; messages: unknown[] }) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (!fs.existsSync(dir)) return false;
   try {
     fs.writeFileSync(path.join(dir, 'deyad-messages.json'), JSON.stringify(messages), 'utf-8');
@@ -271,7 +303,7 @@ ipcMain.handle('apps:save-messages', (_event, { appId, messages }: { appId: stri
 });
 
 ipcMain.handle('apps:load-messages', (_event, appId: string) => {
-  const file = path.join(APPS_DIR, appId, 'deyad-messages.json');
+  const file = path.join(appDir(appId), 'deyad-messages.json');
   if (!fs.existsSync(file)) return [];
   try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
   catch { return []; }
@@ -351,7 +383,7 @@ async function checkDockerAvailable(): Promise<boolean> {
 }
 
 async function stopCompose(appId: string): Promise<void> {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   const composeFile = path.join(dir, 'docker-compose.yml');
   if (fs.existsSync(composeFile)) {
     try {
@@ -363,7 +395,7 @@ async function stopCompose(appId: string): Promise<void> {
 ipcMain.handle('docker:check', async () => checkDockerAvailable());
 
 ipcMain.handle('docker:db-start', async (event, appId: string) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   const composeFile = path.join(dir, 'docker-compose.yml');
   if (!fs.existsSync(composeFile)) {
     return { success: false, error: 'No docker-compose.yml found in app directory' };
@@ -390,7 +422,7 @@ ipcMain.handle('docker:db-stop', async (event, appId: string) => {
 });
 
 ipcMain.handle('docker:db-status', async (_event, appId: string) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   const composeFile = path.join(dir, 'docker-compose.yml');
   if (!fs.existsSync(composeFile)) return { status: 'none' };
   try {
@@ -421,7 +453,7 @@ ipcMain.handle('settings:set', (_event, settings: Partial<DeyadSettings>) => {
 // ── App Export (ZIP) ────────────────────────────────────────────────────────
 
 ipcMain.handle('apps:export', async (_event, appId: string) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
   // Read app name for the suggested filename
@@ -541,23 +573,42 @@ async function buildZipBuffer(baseDir: string, prefix: string): Promise<Buffer> 
 
 // ── Undo / Revert ───────────────────────────────────────────────────────────
 
-/** Stores one snapshot per app — the state before the most recent AI write. */
-const fileSnapshots = new Map<string, Record<string, string>>();
+/** Persists snapshots to disk so they survive app restarts. */
+if (!fs.existsSync(SNAPSHOTS_DIR)) {
+  fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
+}
+
+function saveSnapshot(appId: string, files: Record<string, string>): void {
+  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
+  fs.writeFileSync(filePath, JSON.stringify(files), 'utf-8');
+}
+
+function loadSnapshot(appId: string): Record<string, string> | null {
+  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
+  if (!fs.existsSync(filePath)) return null;
+  try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
+  catch { return null; }
+}
+
+function deleteSnapshot(appId: string): void {
+  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
+  try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+}
 
 ipcMain.handle('apps:snapshot', (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
-  fileSnapshots.set(appId, files);
+  saveSnapshot(appId, files);
   return true;
 });
 
 ipcMain.handle('apps:has-snapshot', (_event, appId: string) => {
-  return fileSnapshots.has(appId);
+  return loadSnapshot(safeAppId(appId)) !== null;
 });
 
 ipcMain.handle('apps:revert', async (_event, appId: string) => {
-  const snapshot = fileSnapshots.get(appId);
+  const snapshot = loadSnapshot(safeAppId(appId));
   if (!snapshot) return { success: false, error: 'No snapshot available' };
 
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
 
   // Remove all current non-meta files
   const walk = (base: string) => {
@@ -580,14 +631,14 @@ ipcMain.handle('apps:revert', async (_event, appId: string) => {
     fs.writeFileSync(fullPath, content, 'utf-8');
   }
 
-  fileSnapshots.delete(appId);
+  deleteSnapshot(appId);
   return { success: true };
 });
 
 // ── Git Version Control ─────────────────────────────────────────────────────
 
 async function gitInit(appId: string): Promise<void> {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (fs.existsSync(path.join(dir, '.git'))) return;
   try {
     await execFileAsync('git', ['init'], { cwd: dir, timeout: 10000 });
@@ -599,7 +650,7 @@ async function gitInit(appId: string): Promise<void> {
 }
 
 async function gitCommit(appId: string, message: string): Promise<void> {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (!fs.existsSync(path.join(dir, '.git'))) return;
   try {
     await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
@@ -612,7 +663,7 @@ async function gitCommit(appId: string, message: string): Promise<void> {
 }
 
 ipcMain.handle('git:log', async (_event, appId: string) => {
-  const dir = path.join(APPS_DIR, appId);
+  const dir = appDir(appId);
   if (!fs.existsSync(path.join(dir, '.git'))) return [];
   try {
     const { stdout } = await execFileAsync(

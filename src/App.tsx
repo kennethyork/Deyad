@@ -4,6 +4,7 @@ import ChatPanel from './components/ChatPanel';
 import EditorPanel from './components/EditorPanel';
 import PreviewPanel from './components/PreviewPanel';
 import NewAppModal from './components/NewAppModal';
+import ImportModal from './components/ImportModal';
 import SettingsModal from './components/SettingsModal';
 
 export interface AppProject {
@@ -24,9 +25,11 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [showNewAppModal, setShowNewAppModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [dbStatus, setDbStatus] = useState<'none' | 'running' | 'stopped'>('none');
   const [rightTab, setRightTab] = useState<RightTab>('editor');
   const [canRevert, setCanRevert] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   // Load app list on mount
   useEffect(() => {
@@ -88,7 +91,7 @@ export default function App() {
     setAppFiles((prev) => ({ ...prev, [filePath]: content }));
   }, [selectedApp]);
 
-  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', dbProvider?: 'mysql' | 'postgresql') => {
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', dbProvider?: 'mysql' | 'postgresql', templatePrompt?: string) => {
     const app = await window.deyad.createApp(name, description, appType, dbProvider);
     setShowNewAppModal(false);
     await loadApps();
@@ -114,13 +117,17 @@ export default function App() {
       await window.deyad.writeFiles(app.id, scaffold);
     }
 
+    // If a template prompt was selected, queue it for auto-send in ChatPanel
+    if (templatePrompt) {
+      setPendingPrompt(templatePrompt);
+    }
+
     await selectApp({ ...app });
   };
 
-  const handleImportApp = async () => {
-    const name = prompt('Name for the imported project:');
-    if (!name?.trim()) return;
-    const app = await window.deyad.importApp(name.trim());
+  const handleImportApp = async (name: string) => {
+    setShowImportModal(false);
+    const app = await window.deyad.importApp(name);
     if (app) {
       await loadApps();
       await selectApp(app);
@@ -192,7 +199,7 @@ export default function App() {
         onDeleteApp={handleDeleteApp}
         onRenameApp={handleRenameApp}
         onExportApp={handleExportApp}
-        onImportApp={handleImportApp}
+        onImportApp={() => setShowImportModal(true)}
         onOpenSettings={() => setShowSettings(true)}
       />
 
@@ -207,6 +214,8 @@ export default function App() {
             onDbToggle={handleDbToggle}
             onRevert={handleRevert}
             canRevert={canRevert}
+            initialPrompt={pendingPrompt}
+            onInitialPromptConsumed={() => setPendingPrompt(null)}
           />
 
           {/* Right: file editor + preview tabs */}
@@ -262,6 +271,13 @@ export default function App() {
 
       {showSettings && (
         <SettingsModal onClose={() => setShowSettings(false)} />
+      )}
+
+      {showImportModal && (
+        <ImportModal
+          onClose={() => setShowImportModal(false)}
+          onImport={handleImportApp}
+        />
       )}
     </div>
   );

@@ -5,7 +5,7 @@ type AppType = 'frontend' | 'fullstack';
 
 interface Props {
   onClose: () => void;
-  onCreate: (name: string, description: string, appType: AppType, dbProvider?: DbProvider) => void;
+  onCreate: (name: string, description: string, appType: AppType, dbProvider?: DbProvider, templatePrompt?: string) => void;
 }
 
 interface Template {
@@ -17,13 +17,20 @@ interface Template {
 }
 
 const TEMPLATES: Template[] = [
-  { name: 'Blank App', description: 'Start from scratch', icon: '', appType: 'frontend', prompt: '' },
-  { name: 'Todo List', description: 'Task manager with add, complete & delete', icon: '', appType: 'frontend', prompt: 'Create a todo list app with add, complete, and delete functionality. Use a clean modern UI.' },
-  { name: 'Landing Page', description: 'Hero section, features & contact form', icon: '', appType: 'frontend', prompt: 'Build a responsive landing page with a hero section, features grid, and contact form.' },
-  { name: 'Dashboard', description: 'Admin dashboard with charts & stats', icon: '', appType: 'frontend', prompt: 'Create an admin dashboard with stat cards, a chart area, and a recent activity table.' },
-  { name: 'Chat UI', description: 'Real-time chat interface', icon: '', appType: 'frontend', prompt: 'Build a chat interface with message bubbles, a text input, and a sidebar with conversation list.' },
-  { name: 'Blog', description: 'Blog with posts, categories & comments', icon: '', appType: 'fullstack', prompt: 'Create a blog with posts, categories, and comments. Include CRUD for posts and a clean reading UI.' },
-  { name: 'E-commerce', description: 'Product catalog with cart & checkout', icon: '', appType: 'fullstack', prompt: 'Build an e-commerce app with product listings, shopping cart, and a checkout flow.' },
+  { name: 'Blank App', description: 'Start from scratch', icon: '📄', appType: 'frontend', prompt: '' },
+  { name: 'Todo List', description: 'Task manager with add, complete & delete', icon: '✅', appType: 'frontend', prompt: 'Create a todo list app with add, complete, and delete functionality. Use a clean modern UI with animations.' },
+  { name: 'Landing Page', description: 'Hero section, features & contact form', icon: '🚀', appType: 'frontend', prompt: 'Build a responsive landing page with a hero section, features grid, testimonials section, and contact form. Use modern design with gradients.' },
+  { name: 'Dashboard', description: 'Admin dashboard with charts & stats', icon: '📊', appType: 'frontend', prompt: 'Create an admin dashboard with stat cards, a chart area, and a recent activity table. Include a sidebar navigation.' },
+  { name: 'Chat UI', description: 'Real-time chat interface', icon: '💬', appType: 'frontend', prompt: 'Build a chat interface with message bubbles, a text input, and a sidebar with conversation list. Add typing indicators.' },
+  { name: 'Portfolio', description: 'Personal portfolio with projects', icon: '🎨', appType: 'frontend', prompt: 'Build a personal portfolio site with an about section, project cards with images, skill tags, and a contact form. Use smooth scroll navigation.' },
+  { name: 'Weather App', description: 'Weather dashboard with forecasts', icon: '🌤️', appType: 'frontend', prompt: 'Create a weather dashboard app with a search bar, current weather display with temperature and conditions, a 5-day forecast section, and weather icons. Use a clean card-based layout.' },
+  { name: 'Calculator', description: 'Scientific calculator with history', icon: '🔢', appType: 'frontend', prompt: 'Build a calculator app with basic arithmetic, scientific functions, calculation history, and a clean modern UI with button grid.' },
+  { name: 'Notes App', description: 'Markdown notes with live preview', icon: '📝', appType: 'frontend', prompt: 'Create a notes app with markdown editing and live preview side by side. Include a sidebar for note list, search, and categories.' },
+  { name: 'Kanban Board', description: 'Drag & drop task board', icon: '📋', appType: 'frontend', prompt: 'Build a Kanban board with columns (To Do, In Progress, Done), draggable task cards, add/edit/delete tasks, and column management.' },
+  { name: 'Blog', description: 'Blog with posts, categories & comments', icon: '✍️', appType: 'fullstack', prompt: 'Create a blog with posts, categories, and comments. Include CRUD for posts and a clean reading UI with pagination.' },
+  { name: 'E-commerce', description: 'Product catalog with cart & checkout', icon: '🛒', appType: 'fullstack', prompt: 'Build an e-commerce app with product listings, shopping cart, checkout flow, and order history.' },
+  { name: 'Social Feed', description: 'Social media feed with posts & likes', icon: '📱', appType: 'fullstack', prompt: 'Build a social media feed with user posts, like/unlike functionality, comments, and a create post form with image upload support.' },
+  { name: 'Task Tracker', description: 'Project task tracker with teams', icon: '🗂️', appType: 'fullstack', prompt: 'Create a project task tracker with user assignment, due dates, priority levels, project grouping, and a dashboard overview.' },
 ];
 
 export default function NewAppModal({ onClose, onCreate }: Props) {
@@ -41,13 +48,14 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onCreate(name.trim(), description.trim(), appType, appType === 'fullstack' ? dbProvider : undefined);
+    const tPrompt = selectedTemplate?.prompt || undefined;
+    onCreate(name.trim(), description.trim(), appType, appType === 'fullstack' ? dbProvider : undefined, tPrompt);
   };
 
   const selectTemplate = (template: Template) => {
     setSelectedTemplate(template);
-    if (!name) setName(template.name === 'Blank App' ? '' : template.name);
-    if (!description) setDescription(template.prompt || template.description);
+    setName(template.name === 'Blank App' ? '' : template.name);
+    setDescription(template.prompt || template.description);
     setAppType(template.appType);
   };
 
@@ -63,20 +71,23 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
           {/* Template picker */}
           <div className="form-field">
             <label>Start from a template</label>
-            <div className="template-grid">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.name}
-                  type="button"
-                  className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''} ${t.appType === 'fullstack' && dockerAvailable === false ? 'disabled' : ''}`}
-                  onClick={() => !(t.appType === 'fullstack' && dockerAvailable === false) && selectTemplate(t)}
-                  title={t.appType === 'fullstack' && dockerAvailable === false ? 'Docker required' : t.description}
-                >
-                  <span className="template-icon">{t.icon}</span>
-                  <span className="template-name">{t.name}</span>
-                  {t.appType === 'fullstack' && <span className="template-badge">Full Stack</span>}
-                </button>
-              ))}
+            <div className="template-grid-scroll">
+              <div className="template-grid">
+                {TEMPLATES.map((t) => (
+                  <button
+                    key={t.name}
+                    type="button"
+                    className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''} ${t.appType === 'fullstack' && dockerAvailable === false ? 'disabled' : ''}`}
+                    onClick={() => !(t.appType === 'fullstack' && dockerAvailable === false) && selectTemplate(t)}
+                    title={t.appType === 'fullstack' && dockerAvailable === false ? 'Docker required' : t.description}
+                  >
+                    <span className="template-icon">{t.icon}</span>
+                    <span className="template-name">{t.name}</span>
+                    <span className="template-desc">{t.description}</span>
+                    {t.appType === 'fullstack' && <span className="template-badge">Full Stack</span>}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
