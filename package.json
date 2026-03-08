@@ -14,6 +14,9 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
+    "build:linux": "npm run make -- --platform=linux --publish never",
+    "build:win": "npm run make -- --platform=win32 --publish never",
+    "build:mac": "npm run make -- --platform=darwin --publish never",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
