@@ -1,0 +1,31 @@
+name: Auto Tag on Main
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  tag:
+    name: Create tag from package version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: getver
+        run: |
+          echo "version=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
+
+      - name: Check for existing tag
+        run: |
+          if git rev-parse "v${{ steps.getver.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ steps.getver.outputs.version }} already exists, skipping.";
+            exit 0;
+          fi
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.getver.outputs.version }}"
+          git push origin "v${{ steps.getver.outputs.version }}"
