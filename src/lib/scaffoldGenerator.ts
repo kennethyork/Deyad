@@ -234,6 +234,19 @@ services:
       retries: 5
       start_period: 30s
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: ${sanitize(appName)}_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: ${dbPassword}
+    ports:
+      - '5050:80'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
 `
@@ -259,6 +272,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: ${sanitize(appName)}_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${dbUser}
+      PMA_PASSWORD: ${dbPassword}
+    ports:
+      - '8080:80'
+    depends_on:
+      mysql:
+        condition: service_healthy
 
 volumes:
   mysql_data:
@@ -719,6 +747,20 @@ npm run dev
 \`\`\`
 
 Frontend runs at **http://localhost:5173**
+
+### 4. Open the database admin UI
+
+${isPostgres
+  ? `pgAdmin is available at **http://localhost:5050**
+
+Login with:
+- **Email:** admin@admin.com
+- **Password:** (your DB password)`
+  : `phpMyAdmin is available at **http://localhost:8080**
+
+Login with:
+- **Username:** ${dbUser}
+- **Password:** (your DB password)`}
 
 ## Database connection
 

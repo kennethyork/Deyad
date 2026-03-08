@@ -78,6 +78,14 @@ describe('generateFullStackScaffold', () => {
     expect(files['docker-compose.yml']).toContain("'3306:3306'");
   });
 
+  it('includes phpMyAdmin service in MySQL docker-compose', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('phpmyadmin:5');
+    expect(files['docker-compose.yml']).toContain("'8080:80'");
+    expect(files['docker-compose.yml']).toContain('PMA_HOST: mysql');
+    expect(files['docker-compose.yml']).toContain('condition: service_healthy');
+  });
+
   it('does not expose password in healthcheck command args', () => {
     const files = generateFullStackScaffold(opts);
     // Password must NOT appear as a -p flag in healthcheck
@@ -165,6 +173,14 @@ describe('generateFullStackScaffold (MySQL — simple password)', () => {
     expect(files['docker-compose.yml']).toContain("'3306:3306'");
   });
 
+  it('includes phpMyAdmin service in MySQL docker-compose', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('phpmyadmin:5');
+    expect(files['docker-compose.yml']).toContain("'8080:80'");
+    expect(files['docker-compose.yml']).toContain('PMA_HOST: mysql');
+    expect(files['docker-compose.yml']).toContain('condition: service_healthy');
+  });
+
   it('generates backend package.json with Express and Prisma', () => {
     const files = generateFullStackScaffold(opts);
     const pkg = JSON.parse(files['backend/package.json']);
@@ -236,6 +252,14 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
     expect(files['docker-compose.yml']).toContain('mypgapp_user');
     expect(files['docker-compose.yml']).toContain('PgP@ss!456');
     expect(files['docker-compose.yml']).toContain("'5432:5432'");
+  });
+
+  it('includes pgAdmin service in PostgreSQL docker-compose', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('dpage/pgadmin4');
+    expect(files['docker-compose.yml']).toContain("'5050:80'");
+    expect(files['docker-compose.yml']).toContain('PGADMIN_DEFAULT_EMAIL');
+    expect(files['docker-compose.yml']).toContain('condition: service_healthy');
   });
 
   it('uses pg_isready for healthcheck', () => {
