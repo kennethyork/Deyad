@@ -154,6 +154,8 @@ git push origin v1.0.0
 
 Once the workflow completes a release page will contain the installers for Windows and Linux.
 
+Automatic versioning is supported: pushing to `main` will bump the patch version, tag the commit, and trigger the build workflow (see CI section below).
+
 ## License
 
 ## License

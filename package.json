@@ -17,6 +17,7 @@
     "build:linux": "npm run make -- --platform=linux --publish never",
     "build:appimage": "npm run make -- --platform=linux --publish never && (appimagetool -n out/Deyad-linux-x64 out/make/Deyad-${npm_package_version}-x86_64.AppImage || echo \"AppImage step skipped - install appimagetool or run npx electron-installer-appimage manually\" )",
     "build:win": "npm run make -- --platform=win32 --publish never",
+    "version:patch": "npm version patch -m \"chore: bump version to %s\" && git push origin --follow-tags",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

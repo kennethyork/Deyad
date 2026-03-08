@@ -1,0 +1,44 @@
+name: Auto Version & Release
+
+on:
+  push:
+    branches: [ main ]
+    # only run when commits include changes to src or package.json
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump patch version
+        run: |
+          git config user.name "github-actions[bot]" \
+            && git config user.email "github-actions[bot]@users.noreply.github.com"
+          # create commit and tag
+          "$(npm bin)/npm" version patch -m "chore: bump version to %s"
+          git push origin main --follow-tags
+
+      - name: Trigger build workflow
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          workflow: build.yml
+          ref: main
