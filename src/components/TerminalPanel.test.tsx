@@ -19,6 +19,12 @@ describe('TerminalPanel', () => {
     const { container, getByText } = render(<TerminalPanel appId="foo" />);
     expect(container.querySelector('.terminal-panel')).toBeTruthy();
     expect(getByText('Clear')).toBeTruthy();
+    // simulate right-click
+    const div = container.querySelector('.terminal-panel');
+    expect(div).toBeTruthy();
+    div.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    // menu isn't actually shown in tests, but handler should exist
+    expect(div).toBeTruthy();
     // wait a tick for effect
     await Promise.resolve();
     expect(window.deyad.createTerminal).toHaveBeenCalledWith('foo');

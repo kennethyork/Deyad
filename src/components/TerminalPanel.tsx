@@ -65,10 +65,37 @@ export default function TerminalPanel({ appId }: Props) {
       return true;
     });
 
+    // right-click context menu
+    const handleContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const { Menu, clipboard } = window.require('electron');
+      const menu = Menu.buildFromTemplate([
+        {
+          label: 'Copy',
+          click: () => {
+            const sel = term.getSelection();
+            if (sel) clipboard.writeText(sel);
+          },
+        },
+        {
+          label: 'Paste',
+          click: () => clipboard.readText().then(t => term.write(t)),
+        },
+        { type: 'separator' },
+        {
+          label: 'Clear',
+          click: clearTerminal,
+        },
+      ]);
+      menu.popup({ window: window.require('electron').remote.getCurrentWindow() });
+    };
+    containerRef.current.addEventListener('contextmenu', handleContext);
+
     // cleanup
     return () => {
       observer.disconnect();
       term.dispose();
+      containerRef.current?.removeEventListener('contextmenu', handleContext);
     };
 
     return () => {
