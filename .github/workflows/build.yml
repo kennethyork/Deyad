@@ -24,27 +24,31 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 make g++ rpm
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Install AppImage tool
-        run: |
-          sudo apt-get update && sudo apt-get install -y appimagetool || true
-          # the package may not exist; build:appimage script has fallback
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Package Linux
-        run: |
-          npm run build:appimage || npm run make -- --platform=linux --publish never
+        run: npm run make -- --platform=linux --publish never
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: linux-builds
           path: |
-            out/make/*.AppImage
-            out/make/**/*.AppImage
             out/make/**/*.deb
             out/make/**/*.rpm
+            out/make/**/*.zip
 
   build-windows:
     runs-on: windows-latest
@@ -58,23 +62,36 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Configure node-gyp for Windows
+        run: npm config set msvs_version 2022
+        shell: pwsh
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Package Windows
         run: npm run make -- --platform=win32 --publish never
 
       - name: List Windows output directory
-        run: ls -R out/make || true
+        run: Get-ChildItem -Recurse out\make | Select-Object FullName
+        shell: pwsh
+        continue-on-error: true
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: windows-builds
           path: |
             out/make/**/*.exe
             out/make/**/*.zip
             out/make/**/*.msi
+            out/make/**/*.nupkg
 
   build-mac:
     runs-on: macos-latest
@@ -91,14 +108,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
       - name: Package macOS
         run: npm run make -- --platform=darwin --publish never
 
-      - name: List mac output directory
+      - name: List macOS output directory
         run: ls -R out/make || true
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: mac-builds
           path: |
@@ -113,7 +136,7 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
@@ -124,9 +147,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/linux-builds/*
-            artifacts/windows-builds/*
-            artifacts/mac-builds/*
+            artifacts/linux-builds/**/*
+            artifacts/windows-builds/**/*
+            artifacts/mac-builds/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
