@@ -31,16 +31,18 @@ jobs:
       - name: Check for existing tag
         run: |
           if git rev-parse "v${{ steps.getver.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag exists, skipping";
-            exit 0;
+            echo "Tag v${{ steps.getver.outputs.version }} already exists. Bumping patch.";
+            NEWVER=$(npm version patch --no-git-tag-version)
+            echo "version=$NEWVER" >> $GITHUB_OUTPUT
           fi
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "v${{ steps.getver.outputs.version }}"
-          git push origin "v${{ steps.getver.outputs.version }}"
-
+          TAG="v${{ steps.getver.outputs.version }}"
+          echo "Creating tag $TAG"
+          git tag "$TAG"
+          git push origin "$TAG"
   build:
     name: Build (${{ matrix.os }})
     # run on branch pushes and tag pushes; tag job executes concurrently but is not required
