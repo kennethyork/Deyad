@@ -106,6 +106,8 @@ interface DeyadAPI {
   terminalResize(termId: string, cols: number, rows: number): Promise<void>;
   onTerminalData(cb: (payload: { id: string; data: string }) => void): () => void;
   onTerminalExit(cb: (payload: { id: string; exitCode: number; signal: number }) => void): () => void;
+  showContextMenu(): Promise<void>;
+  onTerminalClear(cb: () => void): () => void;
 
   // Capacitor (Mobile)
   capacitorInit(appId: string): Promise<{ success: boolean; alreadyInitialized?: boolean; error?: string }>;

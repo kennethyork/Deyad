@@ -85,6 +85,11 @@ function getViteRoot(appId: string): string | null {
   return null;
 }
 
+// Vite injects these constants during build; declare them for TypeScript
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
+declare const MAIN_WINDOW_VITE_NAME: string;
+
 if (!fs.existsSync(APPS_DIR)) {
   fs.mkdirSync(APPS_DIR, { recursive: true });
 }
