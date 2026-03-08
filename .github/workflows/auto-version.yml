@@ -39,9 +39,13 @@ jobs:
           git push origin main --follow-tags
 
       - name: Trigger build workflow
-        uses: peter-evans/workflow-dispatch@v3
+        uses: actions/github-script@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          workflow: build.yml
-          ref: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml',
+              ref: 'main',
+            });
