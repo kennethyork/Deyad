@@ -22,6 +22,7 @@ describe('TerminalPanel', () => {
     // simulate right-click
     const div = container.querySelector('.terminal-panel');
     expect(div).toBeTruthy();
+    // event should be fired on inner element
     div.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
     // menu isn't actually shown in tests, but handler should exist
     expect(div).toBeTruthy();

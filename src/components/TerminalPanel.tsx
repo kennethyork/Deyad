@@ -70,7 +70,9 @@ export default function TerminalPanel({ appId }: Props) {
       e.preventDefault();
       window.deyad.showContextMenu();
     };
-    containerRef.current.addEventListener('contextmenu', handleContext);
+    // xterm renders inside its own element; attach listener there if available
+    const target = term.element || containerRef.current;
+    target?.addEventListener('contextmenu', handleContext);
 
     // listen for clear command sent from main
     const clearListener = () => clearTerminal();
