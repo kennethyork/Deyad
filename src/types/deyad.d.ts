@@ -36,6 +36,7 @@ interface UiMessage {
   role: 'user' | 'assistant';
   content: string;
   filesGenerated?: string[];
+  model?: string;
 }
 
 interface DeyadSettings {

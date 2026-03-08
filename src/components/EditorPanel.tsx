@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Editor, { type OnMount } from '@monaco-editor/react';
+import type { editor as monacoEditor } from 'monaco-editor';
 
 interface Props {
   files: Record<string, string>;
@@ -6,6 +8,24 @@ interface Props {
   onSelectFile: (path: string) => void;
   onOpenFolder: () => void;
   onFileEdit: (path: string, content: string) => void;
+}
+
+function getLanguage(path: string): string {
+  if (path.endsWith('.tsx')) return 'typescript';
+  if (path.endsWith('.jsx')) return 'javascript';
+  if (path.endsWith('.ts')) return 'typescript';
+  if (path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.cjs')) return 'javascript';
+  if (path.endsWith('.css')) return 'css';
+  if (path.endsWith('.html')) return 'html';
+  if (path.endsWith('.json')) return 'json';
+  if (path.endsWith('.md')) return 'markdown';
+  if (path.endsWith('.yml') || path.endsWith('.yaml')) return 'yaml';
+  if (path.endsWith('.prisma')) return 'graphql';
+  if (path.endsWith('.sql')) return 'sql';
+  if (path.endsWith('.sh')) return 'shell';
+  if (path.endsWith('.py')) return 'python';
+  if (path.endsWith('.dockerfile') || path.split('/').pop() === 'Dockerfile') return 'dockerfile';
+  return 'plaintext';
 }
 
 function getFileIcon(path: string): string {
@@ -127,9 +147,10 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
   const filteredCount = Object.keys(filteredFiles).length;
   const tree = buildTree(filteredFiles);
 
-  // Local edit state: tracks the content being edited before saving
+  // Local edit state
   const [editContent, setEditContent] = useState<string>('');
   const [isDirty, setIsDirty] = useState(false);
+  const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
 
   // Reset edit content when selected file or its persisted content changes
   useEffect(() => {
@@ -139,40 +160,32 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     }
   }, [selectedFile, files]);
 
-  const handleContentChange = (value: string) => {
-    setEditContent(value);
-    setIsDirty(value !== (files[selectedFile ?? ''] ?? ''));
-  };
+  const handleSave = useCallback(() => {
+    if (selectedFile && editorRef.current) {
+      const value = editorRef.current.getValue();
+      if (value !== (files[selectedFile] ?? '')) {
+        onFileEdit(selectedFile, value);
+        setIsDirty(false);
+      }
+    }
+  }, [selectedFile, files, onFileEdit]);
 
-  const handleSave = () => {
-    if (selectedFile && isDirty) {
-      onFileEdit(selectedFile, editContent);
-      setIsDirty(false);
-    }
-  };
+  const handleEditorMount: OnMount = useCallback((editor, monaco) => {
+    editorRef.current = editor;
+    // Add Ctrl+S / Cmd+S save action
+    editor.addAction({
+      id: 'save-file',
+      label: 'Save File',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+      run: () => handleSave(),
+    });
+  }, [handleSave]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Save on Ctrl+S / Cmd+S
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      handleSave();
-    }
-    // Insert 2-space indent on Tab
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const newValue = editContent.substring(0, start) + '  ' + editContent.substring(end);
-      setEditContent(newValue);
-      setIsDirty(newValue !== (files[selectedFile ?? ''] ?? ''));
-      // Restore cursor position after React re-render
-      requestAnimationFrame(() => {
-        target.selectionStart = start + 2;
-        target.selectionEnd = start + 2;
-      });
-    }
-  };
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    const v = value ?? '';
+    setEditContent(v);
+    setIsDirty(v !== (files[selectedFile ?? ''] ?? ''));
+  }, [files, selectedFile]);
 
   return (
     <div className="editor-panel">
@@ -231,14 +244,22 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
                 {isDirty ? '● Save' : '✓ Saved'}
               </button>
             </div>
-            <textarea
-              className="code-editor"
+            <Editor
+              theme="vs-dark"
+              language={getLanguage(selectedFile)}
               value={editContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              spellCheck={false}
-              autoCorrect="off"
-              autoCapitalize="off"
+              onChange={handleEditorChange}
+              onMount={handleEditorMount}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                wordWrap: 'on',
+                tabSize: 2,
+                automaticLayout: true,
+                padding: { top: 8 },
+              }}
             />
           </>
         ) : (

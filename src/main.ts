@@ -6,6 +6,17 @@ import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
 import started from 'electron-squirrel-startup';
 import { crc32 } from './lib/crc32';
+import {
+  safeAppId,
+  appDir as appDirUtil,
+  loadSettings as loadSettingsUtil,
+  saveSettings as saveSettingsUtil,
+  saveSnapshot as saveSnapshotUtil,
+  loadSnapshot as loadSnapshotUtil,
+  deleteSnapshot as deleteSnapshotUtil,
+  DEFAULT_SETTINGS,
+} from './lib/mainUtils';
+import type { DeyadSettings } from './lib/mainUtils';
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 // update-electron-app checks for updates from GitHub Releases by default.
@@ -27,48 +38,23 @@ const DOCKER_CHECK_TIMEOUT_MS = 5000;
 const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.json\n';
 
 // ── Security: appId sanitization ──────────────────────────────────────────────
-
-/**
- * Validates and sanitizes an appId to prevent path-traversal attacks.
- * AppIds are generated as `{timestamp}-{slug}` — they must not contain
- * path separators, `..`, or any character outside `[a-zA-Z0-9_-]`.
- * Throws if the id is invalid.
- */
-function safeAppId(appId: string): string {
-  if (!appId || typeof appId !== 'string') throw new Error('Invalid app ID');
-  if (/[/\\]/.test(appId) || appId.includes('..')) throw new Error('Invalid app ID');
-  if (!/^[a-zA-Z0-9_-]+$/.test(appId)) throw new Error('Invalid app ID');
-  return appId;
-}
+// safeAppId and appDir imported from ./lib/mainUtils
 
 /** Returns the verified absolute directory for an app. */
 function appDir(appId: string): string {
-  return path.join(APPS_DIR, safeAppId(appId));
+  return appDirUtil(APPS_DIR, appId);
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-interface DeyadSettings {
-  ollamaHost: string;
-  defaultModel: string;
-}
-
-const DEFAULT_SETTINGS: DeyadSettings = {
-  ollamaHost: 'http://localhost:11434',
-  defaultModel: '',
-};
+// Settings: imported from ./lib/mainUtils, bound to SETTINGS_PATH
 
 function loadSettings(): DeyadSettings {
-  try {
-    if (fs.existsSync(SETTINGS_PATH)) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(SETTINGS_PATH, 'utf-8')) };
-    }
-  } catch { /* ignore corrupt file */ }
-  return { ...DEFAULT_SETTINGS };
+  return loadSettingsUtil(SETTINGS_PATH);
 }
 
 function saveSettings(settings: DeyadSettings): void {
-  fs.writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  saveSettingsUtil(SETTINGS_PATH, settings);
 }
 
 let currentSettings = loadSettings();
@@ -579,20 +565,15 @@ if (!fs.existsSync(SNAPSHOTS_DIR)) {
 }
 
 function saveSnapshot(appId: string, files: Record<string, string>): void {
-  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(files), 'utf-8');
+  saveSnapshotUtil(SNAPSHOTS_DIR, appId, files);
 }
 
 function loadSnapshot(appId: string): Record<string, string> | null {
-  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
-  if (!fs.existsSync(filePath)) return null;
-  try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
-  catch { return null; }
+  return loadSnapshotUtil(SNAPSHOTS_DIR, appId);
 }
 
 function deleteSnapshot(appId: string): void {
-  const filePath = path.join(SNAPSHOTS_DIR, `${safeAppId(appId)}.json`);
-  try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+  deleteSnapshotUtil(SNAPSHOTS_DIR, appId);
 }
 
 ipcMain.handle('apps:snapshot', (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {

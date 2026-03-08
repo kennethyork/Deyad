@@ -209,6 +209,7 @@ export default function App() {
           <ChatPanel
             app={selectedApp}
             appFiles={appFiles}
+            selectedFile={selectedFile}
             dbStatus={dbStatus}
             onFilesUpdated={handleFilesUpdated}
             onDbToggle={handleDbToggle}
