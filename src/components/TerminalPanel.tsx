@@ -70,15 +70,30 @@ export default function TerminalPanel({ appId }: Props) {
       e.preventDefault();
       window.deyad.showContextMenu();
     };
-    // xterm renders inside its own element; attach listener there if available
-    const target = term.element || containerRef.current;
-    target?.addEventListener('contextmenu', handleContext);
+    // attach to both the container and the actual xterm element to avoid missing clicks
+    containerRef.current?.addEventListener('contextmenu', handleContext, { capture: true });
+    const attachToTerm = () => {
+      if (term.element && term.element !== containerRef.current) {
+        term.element.addEventListener('contextmenu', handleContext, { capture: true });
+      }
+    };
+    attachToTerm();
+    // if element is created later, listen for it (xterm sets element synchronously though)
 
     // listen for clear command sent from main
     const clearListener = () => clearTerminal();
     const removeClear = window.deyad.onTerminalClear(clearListener);
 
     // cleanup will call removeClear later
+    return () => {
+      observer.disconnect();
+      term.dispose();
+      containerRef.current?.removeEventListener('contextmenu', handleContext);
+      if (term.element) {
+        term.element.removeEventListener('contextmenu', handleContext);
+      }
+      removeClear();
+    };
 
     // cleanup
     return () => {
