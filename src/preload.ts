@@ -216,4 +216,10 @@ contextBridge.exposeInMainWorld('deyad', {
     ipcRenderer.on('terminal:exit', handler);
     return () => ipcRenderer.removeListener('terminal:exit', handler);
   },
+  showContextMenu: (): Promise<void> => ipcRenderer.invoke('terminal:show-menu'),
+  onTerminalClear: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on('terminal:clear', handler);
+    return () => ipcRenderer.removeListener('terminal:clear', handler);
+  },
 });
