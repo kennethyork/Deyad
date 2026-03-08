@@ -37,12 +37,14 @@ jobs:
           # build deb, rpm and zip packages
           npm run make -- --platform=linux --targets=deb,rpm,zip --publish never
 
+      - name: List linux output directory
+        run: ls -R out/make || true
+
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
           name: linux-builds
           path: |
-            out/make/**/*.AppImage
             out/make/**/*.deb
             out/make/**/*.rpm
             out/make/**/*.zip
