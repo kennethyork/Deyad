@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Linux
-        run: npm run build:linux -- --publish never
+      - name: Package Linux
+        run: npm run make -- --platform=linux --publish never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
@@ -54,8 +54,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows
-        run: npm run build:win -- --publish never
+      - name: Package Windows
+        run: npm run make -- --platform=win32 --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
@@ -79,8 +79,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build macOS
-        run: npm run build:mac -- --publish never
+      - name: Package macOS
+        run: npm run make -- --platform=darwin --publish never
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v7
