@@ -41,6 +41,10 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
   const [streaming, setStreaming] = useState(false);
   const [providerError, setProviderError] = useState('');
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
+  const [mobileStatus, setMobileStatus] = useState<'idle' | 'initializing' | 'ready' | 'error'>('idle');
+  const [deployStatus, setDeployStatus] = useState<'idle' | 'deploying' | 'done'>('idle');
+  const [showDeployMenu, setShowDeployMenu] = useState(false);
+  const [deployUrl, setDeployUrl] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -262,6 +266,132 @@ export default function ChatPanel({ app, appFiles, dbStatus, onFilesUpdated, onD
               ↩ Undo
             </button>
           )}
+
+          {/* Mobile / Capacitor button */}
+          {(
+            <button
+              className={`btn-mobile ${mobileStatus === 'ready' ? 'ready' : ''}`}
+              disabled={mobileStatus === 'initializing'}
+              onClick={async () => {
+                if (mobileStatus === 'ready') {
+                  const res = await window.deyad.capacitorOpen(app.id, 'android');
+                  if (!res.success) alert(`Failed to open Android Studio:\n${res.error}`);
+                  return;
+                }
+                setMobileStatus('initializing');
+                const res = await window.deyad.capacitorInit(app.id);
+                if (res.success) {
+                  setMobileStatus('ready');
+                } else {
+                  setMobileStatus('error');
+                  alert(`Capacitor init failed:\n${res.error}`);
+                }
+              }}
+              title={mobileStatus === 'ready' ? 'Open in Android Studio' : 'Add Capacitor for iOS & Android'}
+            >
+              📱 {mobileStatus === 'initializing' ? 'Setting up…' : mobileStatus === 'ready' ? 'Open Android' : 'Mobile'}
+            </button>
+          )}
+
+          {/* Deploy button with provider dropdown */}
+          <div className="deploy-wrapper">
+            <button
+              className={`btn-deploy ${deployStatus === 'done' ? 'done' : ''}`}
+              disabled={deployStatus === 'deploying'}
+              onClick={() => {
+                if (deployUrl) {
+                  window.open(deployUrl, '_blank');
+                  return;
+                }
+                setShowDeployMenu((v) => !v);
+              }}
+              title={deployUrl ? `Open ${deployUrl}` : 'Deploy your app to the web'}
+            >
+              🚀 {deployStatus === 'deploying' ? 'Deploying…' : deployUrl ? 'View Site' : 'Deploy'}
+            </button>
+            {showDeployMenu && (
+              <div className="deploy-menu">
+                {app.appType === 'fullstack' ? (
+                  // Fullstack: Railway / Fly.io
+                  <>
+                    {(['railway', 'flyio'] as const).map((p) => (
+                      <button
+                        key={p}
+                        className="deploy-menu-item"
+                        onClick={async () => {
+                          setShowDeployMenu(false);
+                          setDeployStatus('deploying');
+                          setDeployUrl(null);
+                          const unsub = window.deyad.onDeployLog(({ data }) => console.log('[deploy]', data));
+                          const res = await window.deyad.deployFullstack(app.id, p);
+                          unsub();
+                          if (res.success && res.url) {
+                            setDeployUrl(res.url);
+                            setDeployStatus('done');
+                          } else {
+                            setDeployStatus('idle');
+                            alert(`Deploy failed:\n${res.error || 'Unknown error'}`);
+                          }
+                        }}
+                      >
+                        {p === 'railway' ? '🚂 Railway' : '🦋 Fly.io'}
+                      </button>
+                    ))}
+                    <div className="deploy-menu-divider" />
+                    <span className="deploy-menu-hint">Frontend only:</span>
+                    {(['netlify', 'vercel'] as const).map((p) => (
+                      <button
+                        key={p}
+                        className="deploy-menu-item"
+                        onClick={async () => {
+                          setShowDeployMenu(false);
+                          setDeployStatus('deploying');
+                          setDeployUrl(null);
+                          const unsub = window.deyad.onDeployLog(({ data }) => console.log('[deploy]', data));
+                          const res = await window.deyad.deploy(app.id, p);
+                          unsub();
+                          if (res.success && res.url) {
+                            setDeployUrl(res.url);
+                            setDeployStatus('done');
+                          } else {
+                            setDeployStatus('idle');
+                            alert(`Deploy failed:\n${res.error || 'Unknown error'}`);
+                          }
+                        }}
+                      >
+                        {p === 'netlify' ? '🟢 Netlify' : '▲ Vercel'}
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  // Frontend-only: static hosts
+                  (['netlify', 'vercel', 'surge'] as const).map((p) => (
+                    <button
+                      key={p}
+                      className="deploy-menu-item"
+                      onClick={async () => {
+                        setShowDeployMenu(false);
+                        setDeployStatus('deploying');
+                        setDeployUrl(null);
+                        const unsub = window.deyad.onDeployLog(({ data }) => console.log('[deploy]', data));
+                        const res = await window.deyad.deploy(app.id, p);
+                        unsub();
+                        if (res.success && res.url) {
+                          setDeployUrl(res.url);
+                          setDeployStatus('done');
+                        } else {
+                          setDeployStatus('idle');
+                          alert(`Deploy failed:\n${res.error || 'Unknown error'}`);
+                        }
+                      }}
+                    >
+                      {p === 'netlify' ? '🟢 Netlify' : p === 'vercel' ? '▲ Vercel' : '⚡ Surge'}
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
           {/* DB controls for full-stack apps */}
           {app.appType === 'fullstack' && (

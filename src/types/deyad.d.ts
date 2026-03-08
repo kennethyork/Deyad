@@ -98,6 +98,16 @@ interface DeyadAPI {
 
   // Git
   gitLog(appId: string): Promise<GitLogEntry[]>;
+
+  // Capacitor (Mobile)
+  capacitorInit(appId: string): Promise<{ success: boolean; alreadyInitialized?: boolean; error?: string }>;
+  capacitorOpen(appId: string, platform: 'android' | 'ios'): Promise<{ success: boolean; error?: string }>;
+
+  // Deploy
+  deployCheck(): Promise<Record<string, boolean>>;
+  deploy(appId: string, provider: 'netlify' | 'vercel' | 'surge'): Promise<{ success: boolean; url?: string; error?: string }>;
+  deployFullstack(appId: string, provider: 'railway' | 'flyio'): Promise<{ success: boolean; url?: string; error?: string }>;
+  onDeployLog(cb: (payload: { appId: string; data: string }) => void): () => void;
 }
 
 declare global {

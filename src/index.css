@@ -1068,6 +1068,81 @@ body {
   background: rgba(245, 158, 11, 0.15);
 }
 
+/* ─── Mobile / Capacitor Button ──────────────────────────────────────────── */
+.btn-mobile {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-mobile:hover { background: var(--bg-input); border-color: var(--accent); color: var(--text-primary); }
+.btn-mobile:disabled { opacity: 0.6; cursor: wait; }
+.btn-mobile.ready { border-color: var(--success); color: var(--success); }
+.btn-mobile.ready:hover { background: rgba(34, 197, 94, 0.1); }
+
+/* ─── Deploy Button & Menu ───────────────────────────────────────────────── */
+.deploy-wrapper {
+  position: relative;
+}
+.btn-deploy {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-deploy:hover { background: var(--bg-input); border-color: var(--accent); color: var(--text-primary); }
+.btn-deploy:disabled { opacity: 0.6; cursor: wait; }
+.btn-deploy.done { border-color: var(--success); color: var(--success); }
+.btn-deploy.done:hover { background: rgba(34, 197, 94, 0.1); }
+
+.deploy-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 50;
+  min-width: 140px;
+  overflow: hidden;
+}
+.deploy-menu-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.deploy-menu-item:hover { background: var(--bg-elevated); }
+.deploy-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.deploy-menu-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 14px 2px;
+}
+
 /* ── Provider Cards (Settings) ──────────────────────────────────────────── */
 
 .provider-cards {

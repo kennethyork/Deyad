@@ -168,6 +168,29 @@ contextBridge.exposeInMainWorld('deyad', {
   importApp: (name: string): Promise<AppProject | null> =>
     ipcRenderer.invoke('apps:import', name),
 
+  // ── Capacitor (Mobile) ─────────────────────────────────────────────────
+  capacitorInit: (appId: string): Promise<{ success: boolean; alreadyInitialized?: boolean; error?: string }> =>
+    ipcRenderer.invoke('apps:capacitor-init', appId),
+
+  capacitorOpen: (appId: string, platform: 'android' | 'ios'): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('apps:capacitor-open', appId, platform),
+
+  // ── Deploy ─────────────────────────────────────────────────────────────
+  deployCheck: (): Promise<Record<string, boolean>> =>
+    ipcRenderer.invoke('apps:deploy-check'),
+
+  deploy: (appId: string, provider: 'netlify' | 'vercel' | 'surge'): Promise<{ success: boolean; url?: string; error?: string }> =>
+    ipcRenderer.invoke('apps:deploy', appId, provider),
+
+  deployFullstack: (appId: string, provider: 'railway' | 'flyio'): Promise<{ success: boolean; url?: string; error?: string }> =>
+    ipcRenderer.invoke('apps:deploy-fullstack', appId, provider),
+
+  onDeployLog: (cb: (payload: { appId: string; data: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; data: string }) => cb(payload);
+    ipcRenderer.on('apps:deploy-log', handler);
+    return () => ipcRenderer.removeListener('apps:deploy-log', handler);
+  },
+
   // ── Git ────────────────────────────────────────────────────────────────
   gitLog: (appId: string): Promise<{ hash: string; message: string; date: string }[]> =>
     ipcRenderer.invoke('git:log', appId),
