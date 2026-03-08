@@ -30,10 +30,14 @@ jobs:
           git fetch --tags
       - name: Check for existing tag
         run: |
-          if git rev-parse "v${{ steps.getver.outputs.version }}" >/dev/null 2>&1; then
-            echo "Tag v${{ steps.getver.outputs.version }} already exists. Bumping patch.";
-            NEWVER=$(npm version patch --no-git-tag-version)
-            echo "version=$NEWVER" >> $GITHUB_OUTPUT
+          VER=${{ steps.getver.outputs.version }}
+          if git rev-parse "v${VER}" >/dev/null 2>&1; then
+            echo "Tag v${VER} already exists. Bumping patch.";
+            # split version into components
+            IFS=. read MAJOR MINOR PATCH <<<"${VER}"
+            PATCH=$((PATCH + 1))
+            NEWVER="${MAJOR}.${MINOR}.${PATCH}"
+            echo "version=${NEWVER}" >> $GITHUB_OUTPUT
           fi
       - name: Create and push tag
         run: |
