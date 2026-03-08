@@ -3,9 +3,12 @@ import { useState, useEffect } from 'react';
 type DbProvider = 'mysql' | 'postgresql';
 type AppType = 'frontend' | 'fullstack';
 
+const PG_VERSIONS = ['14', '15', '16', '17'] as const;
+type PgVersion = (typeof PG_VERSIONS)[number];
+
 interface Props {
   onClose: () => void;
-  onCreate: (name: string, description: string, appType: AppType, dbProvider?: DbProvider) => void;
+  onCreate: (name: string, description: string, appType: AppType, dbProvider?: DbProvider, pgVersion?: string) => void;
 }
 
 interface Template {
@@ -31,6 +34,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const [description, setDescription] = useState('');
   const [appType, setAppType] = useState<AppType>('frontend');
   const [dbProvider, setDbProvider] = useState<DbProvider>('postgresql');
+  const [pgVersion, setPgVersion] = useState<PgVersion>('16');
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
@@ -41,7 +45,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    onCreate(name.trim(), description.trim(), appType, appType === 'fullstack' ? dbProvider : undefined);
+    onCreate(name.trim(), description.trim(), appType, appType === 'fullstack' ? dbProvider : undefined, appType === 'fullstack' && dbProvider === 'postgresql' ? pgVersion : undefined);
   };
 
   const selectTemplate = (template: Template) => {
@@ -142,7 +146,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                   onClick={() => setDbProvider('postgresql')}
                 >
                   <span className="type-card-icon">🐘</span>
-                  <span className="type-card-title">PostgreSQL 16</span>
+                  <span className="type-card-title">PostgreSQL</span>
                   <span className="type-card-desc">Recommended · Feature-rich</span>
                 </button>
 
@@ -159,15 +163,40 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
             </div>
           )}
 
+          {appType === 'fullstack' && dbProvider === 'postgresql' && (
+            <div className="form-field">
+              <label>PostgreSQL Version</label>
+              <div className="type-cards">
+                {PG_VERSIONS.map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`type-card ${pgVersion === v ? 'selected' : ''}`}
+                    onClick={() => setPgVersion(v)}
+                  >
+                    <span className="type-card-icon">🐘</span>
+                    <span className="type-card-title">PostgreSQL {v}</span>
+                    {v === '16' && <span className="type-card-desc">Recommended</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {appType === 'fullstack' && (
             <div className="stack-info">
               <p className="stack-info-title">🚀 What gets scaffolded automatically:</p>
               <ul>
-                <li><strong>docker-compose.yml</strong> — {dbProvider === 'postgresql' ? 'PostgreSQL 16' : 'MySQL 8'} database</li>
+                <li><strong>docker-compose.yml</strong> — {dbProvider === 'postgresql' ? `PostgreSQL ${pgVersion}` : 'MySQL 8'} database{dbProvider === 'mysql' ? ' + phpMyAdmin (port 8080)' : ''}</li>
                 <li><strong>backend/</strong> — Express API + Prisma ORM</li>
                 <li><strong>frontend/</strong> — React + Vite app (proxies to backend)</li>
                 <li><strong>README.md</strong> — Setup &amp; run instructions</li>
               </ul>
+              {dbProvider === 'mysql' && (
+                <p className="stack-info-db">
+                  🛠️ phpMyAdmin will be available at <code>http://localhost:8080</code> once Docker is running.
+                </p>
+              )}
               <p className="stack-info-db">
                 🔑 DB credentials will be randomly generated when you create the app. Check <code>backend/.env</code> after creation.
               </p>

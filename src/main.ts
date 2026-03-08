@@ -179,7 +179,7 @@ ipcMain.handle('apps:list', () => {
   } catch { return []; }
 });
 
-ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider }: { name: string; description: string; appType: string; dbProvider?: string }) => {
+ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider, pgVersion }: { name: string; description: string; appType: string; dbProvider?: string; pgVersion?: string }) => {
   const id = `${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
   const dir = path.join(APPS_DIR, id);
   fs.mkdirSync(dir, { recursive: true });
@@ -192,6 +192,9 @@ ipcMain.handle('apps:create', async (_event, { name, description, appType, dbPro
   };
   if (resolvedAppType === 'fullstack' && dbProvider) {
     meta.dbProvider = dbProvider;
+    if (dbProvider === 'postgresql' && pgVersion) {
+      meta.pgVersion = pgVersion;
+    }
   }
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
   return { id, ...meta };

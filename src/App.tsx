@@ -88,8 +88,8 @@ export default function App() {
     setAppFiles((prev) => ({ ...prev, [filePath]: content }));
   }, [selectedApp]);
 
-  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', dbProvider?: 'mysql' | 'postgresql') => {
-    const app = await window.deyad.createApp(name, description, appType, dbProvider);
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', dbProvider?: 'mysql' | 'postgresql', pgVersion?: string) => {
+    const app = await window.deyad.createApp(name, description, appType, dbProvider, pgVersion);
     setShowNewAppModal(false);
     await loadApps();
 
@@ -105,6 +105,7 @@ export default function App() {
         dbPassword: generatePassword(24),
         dbRootPassword: generatePassword(24),
         dbProvider: dbProvider ?? 'mysql',
+        ...(dbProvider === 'postgresql' ? { pgVersion: pgVersion ?? '16' } : {}),
       });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {

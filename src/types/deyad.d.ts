@@ -29,6 +29,7 @@ interface AppProject {
   createdAt: string;
   appType: AppType;
   dbProvider?: DbProvider;
+  pgVersion?: string;
 }
 
 interface UiMessage {
@@ -59,7 +60,7 @@ interface DeyadAPI {
 
   // App projects
   listApps(): Promise<AppProject[]>;
-  createApp(name: string, description: string, appType: AppType, dbProvider?: DbProvider): Promise<AppProject>;
+  createApp(name: string, description: string, appType: AppType, dbProvider?: DbProvider, pgVersion?: string): Promise<AppProject>;
   readFiles(appId: string): Promise<Record<string, string>>;
   writeFiles(appId: string, files: Record<string, string>): Promise<boolean>;
   deleteApp(appId: string): Promise<boolean>;

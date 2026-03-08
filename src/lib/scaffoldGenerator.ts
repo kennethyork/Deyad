@@ -7,7 +7,8 @@
  * generateFullStackScaffold — a project with:
  *   - React + Vite  (frontend, port 5173)
  *   - Express       (backend API, port 3001)
- *   - MySQL 8 or PostgreSQL 16 (via Docker Compose)
+ *   - MySQL 8 (via Docker Compose) + phpMyAdmin (port 8080)
+ *   - PostgreSQL (configurable version, default 16) (via Docker Compose)
  *   - Prisma ORM    (schema + client)
  *   - docker-compose.yml
  *   - README with startup instructions
@@ -191,6 +192,8 @@ export interface ScaffoldOptions {
   dbRootPassword?: string;
   /** Database provider. Defaults to 'mysql' for backward compatibility. */
   dbProvider?: DbProvider;
+  /** PostgreSQL major version (e.g. '14', '15', '16', '17'). Defaults to '16'. */
+  pgVersion?: string;
 }
 
 /**
@@ -210,13 +213,14 @@ export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string,
   const dbRootPassword = opts.dbRootPassword ?? opts.dbPassword;
   const dbProvider: DbProvider = opts.dbProvider ?? 'mysql';
   const isPostgres = dbProvider === 'postgresql';
+  const pgVersion = opts.pgVersion ?? '16';
 
   const dockerCompose = isPostgres
     ? `version: '3.9'
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:${pgVersion}
     container_name: ${sanitize(appName)}_postgres
     restart: unless-stopped
     environment:
@@ -260,6 +264,20 @@ services:
       retries: 5
       start_period: 30s
 
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ${sanitize(appName)}_phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${dbUser}
+      PMA_PASSWORD: ${dbPassword}
+    ports:
+      - '8080:80'
+    depends_on:
+      mysql:
+        condition: service_healthy
+
 volumes:
   mysql_data:
 `;
@@ -267,7 +285,7 @@ volumes:
   const dbPort = isPostgres ? '5432' : '3306';
   const dbProtocol = isPostgres ? 'postgresql' : 'mysql';
   const prismaProvider = isPostgres ? 'postgresql' : 'mysql';
-  const dbLabel = isPostgres ? 'PostgreSQL 16' : 'MySQL 8';
+  const dbLabel = isPostgres ? `PostgreSQL ${pgVersion}` : 'MySQL 8';
 
   return {
     // ── Docker Compose ──────────────────────────────────────────────────
@@ -677,12 +695,12 @@ ${description}
 
 ## Stack
 
-| Layer    | Technology                  |
-|----------|-----------------------------|
-| Frontend | React 18 + Vite + TypeScript |
-| Backend  | Node.js + Express + TypeScript |
+| Layer    | Technology                      |
+|----------|---------------------------------|
+| Frontend | React 18 + Vite + TypeScript    |
+| Backend  | Node.js + Express + TypeScript  |
 | Database | ${dbLabel} (Docker)             |
-| ORM      | Prisma                       |
+| ORM      | Prisma                          |${!isPostgres ? '\n| DB Admin | phpMyAdmin (port 8080)          |' : ''}
 
 ## Getting Started
 
@@ -695,7 +713,11 @@ docker compose up -d
 \`\`\`
 
 You can also click **Start DB** inside Deyad.
+${!isPostgres ? `
+### phpMyAdmin
 
+Once the containers are running, open **http://localhost:8080** to manage your MySQL database through phpMyAdmin.
+` : ''}
 ### 2. Set up the backend
 
 \`\`\`bash

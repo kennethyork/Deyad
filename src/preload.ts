@@ -27,6 +27,7 @@ export interface AppProject {
   createdAt: string;
   appType: AppType;
   dbProvider?: DbProvider;
+  pgVersion?: string;
 }
 
 export interface UiMessage {
@@ -66,8 +67,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listApps: (): Promise<AppProject[]> =>
     ipcRenderer.invoke('apps:list'),
 
-  createApp: (name: string, description: string, appType: AppType, dbProvider?: DbProvider): Promise<AppProject> =>
-    ipcRenderer.invoke('apps:create', { name, description, appType, dbProvider }),
+  createApp: (name: string, description: string, appType: AppType, dbProvider?: DbProvider, pgVersion?: string): Promise<AppProject> =>
+    ipcRenderer.invoke('apps:create', { name, description, appType, dbProvider, pgVersion }),
 
   readFiles: (appId: string): Promise<Record<string, string>> =>
     ipcRenderer.invoke('apps:read-files', appId),

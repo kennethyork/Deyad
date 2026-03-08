@@ -69,13 +69,15 @@ describe('generateFullStackScaffold', () => {
     dbRootPassword: 'RootR@nd0m!123',
   };
 
-  it('generates docker-compose.yml with MySQL', () => {
+  it('generates docker-compose.yml with MySQL and phpMyAdmin', () => {
     const files = generateFullStackScaffold(opts);
     expect(files['docker-compose.yml']).toContain('mysql:8.0');
     expect(files['docker-compose.yml']).toContain('myapp_db');
     expect(files['docker-compose.yml']).toContain('myapp_user');
     expect(files['docker-compose.yml']).toContain('Rand0mP@ss!XYZ');
     expect(files['docker-compose.yml']).toContain("'3306:3306'");
+    expect(files['docker-compose.yml']).toContain('phpmyadmin');
+    expect(files['docker-compose.yml']).toContain("'8080:80'");
   });
 
   it('does not expose password in healthcheck command args', () => {
@@ -136,6 +138,12 @@ describe('generateFullStackScaffold', () => {
     expect(files['README.md']).toContain('docker compose up');
   });
 
+  it('includes phpMyAdmin info in MySQL README', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['README.md']).toContain('phpMyAdmin');
+    expect(files['README.md']).toContain('localhost:8080');
+  });
+
   it('sanitizes special characters in db name and user', () => {
     const files = generateFullStackScaffold({
       ...opts,
@@ -156,13 +164,15 @@ describe('generateFullStackScaffold (MySQL — simple password)', () => {
     dbPassword: 'secret123',
   };
 
-  it('generates docker-compose.yml with MySQL', () => {
+  it('generates docker-compose.yml with MySQL and phpMyAdmin', () => {
     const files = generateFullStackScaffold(opts);
     expect(files['docker-compose.yml']).toContain('mysql:8.0');
     expect(files['docker-compose.yml']).toContain('myapp_db');
     expect(files['docker-compose.yml']).toContain('myapp_user');
     expect(files['docker-compose.yml']).toContain('secret123');
     expect(files['docker-compose.yml']).toContain("'3306:3306'");
+    expect(files['docker-compose.yml']).toContain('phpmyadmin');
+    expect(files['docker-compose.yml']).toContain("'8080:80'");
   });
 
   it('generates backend package.json with Express and Prisma', () => {
@@ -208,6 +218,12 @@ describe('generateFullStackScaffold (MySQL — simple password)', () => {
     expect(files['README.md']).toContain('docker compose up');
   });
 
+  it('includes phpMyAdmin info in MySQL README', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['README.md']).toContain('phpMyAdmin');
+    expect(files['README.md']).toContain('localhost:8080');
+  });
+
   it('sanitizes special characters in db name and user', () => {
     const files = generateFullStackScaffold({
       ...opts,
@@ -236,6 +252,24 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
     expect(files['docker-compose.yml']).toContain('mypgapp_user');
     expect(files['docker-compose.yml']).toContain('PgP@ss!456');
     expect(files['docker-compose.yml']).toContain("'5432:5432'");
+  });
+
+  it('uses the specified pgVersion in the docker image', () => {
+    const files = generateFullStackScaffold({ ...opts, pgVersion: '17' });
+    expect(files['docker-compose.yml']).toContain('postgres:17');
+    expect(files['README.md']).toContain('PostgreSQL 17');
+  });
+
+  it('defaults to postgres:16 when pgVersion is omitted', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).toContain('postgres:16');
+    expect(files['README.md']).toContain('PostgreSQL 16');
+  });
+
+  it('does not include phpMyAdmin for PostgreSQL', () => {
+    const files = generateFullStackScaffold(opts);
+    expect(files['docker-compose.yml']).not.toContain('phpmyadmin');
+    expect(files['docker-compose.yml']).not.toContain('8080');
   });
 
   it('uses pg_isready for healthcheck', () => {
