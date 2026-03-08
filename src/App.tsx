@@ -131,11 +131,11 @@ export default function App() {
       }
     };
     const up = () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
     };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
   };
 
 
@@ -248,7 +248,7 @@ export default function App() {
   return (
     <div className="app-layout">
       {/* sidebar */}
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ width: sidebarWidth }}>
         <Sidebar
           apps={apps}
           selectedApp={selectedApp}
@@ -269,31 +269,47 @@ export default function App() {
         onMouseDown={(e) => startDrag('sidebar', e.clientX)}
       />
 
+      {/* centre: chat or empty state */}
       {selectedApp ? (
-        <>
-          <div className="chat-wrapper">
-            <ChatPanel
-              app={selectedApp}
-              appFiles={appFiles}
-              selectedFile={selectedFile}
-              dbStatus={dbStatus}
-              onFilesUpdated={handleFilesUpdated}
-              onDbToggle={handleDbToggle}
-              onRevert={handleRevert}
-              canRevert={canRevert}
-              initialPrompt={pendingPrompt}
-              onInitialPromptConsumed={() => setPendingPrompt(null)}
-            />
-          </div>
-
-          {/* resizer between centre and right */}
-          <div
-            className="resizer"
-            data-side="right"
-            onMouseDown={(e) => startDrag('right', e.clientX)}
+        <div className="chat-wrapper">
+          <ChatPanel
+            app={selectedApp}
+            appFiles={appFiles}
+            selectedFile={selectedFile}
+            dbStatus={dbStatus}
+            onFilesUpdated={handleFilesUpdated}
+            onDbToggle={handleDbToggle}
+            onRevert={handleRevert}
+            canRevert={canRevert}
+            initialPrompt={pendingPrompt}
+            onInitialPromptConsumed={() => setPendingPrompt(null)}
           />
+        </div>
+      ) : (
+        <div className="empty-state">
+          <div className="empty-state-content">
+            <div className="empty-logo"></div>
+            <h2>Welcome to Deyad</h2>
+            <p>A local AI app builder powered exclusively by Ollama.</p>
+            <p className="empty-hint">Create a new app to get started →</p>
+            <button className="btn-primary" onClick={() => setShowNewAppModal(true)}>
+              + New App
+            </button>
+          </div>
+        </div>
+      )}
 
-          <div className="right-panel">
+      {/* resizer between centre and right (always present) */}
+      <div
+        className="resizer"
+        data-side="right"
+        onMouseDown={(e) => startDrag('right', e.clientX)}
+      />
+
+      {/* right panel (always present so widths are always measurable) */}
+      <div className="right-panel" style={{ width: rightWidth }}>
+        {selectedApp && (
+          <>
             <div className="right-panel-tabs">
               <button
                 className={`right-tab ${rightTab === 'editor' ? 'active' : ''}`}
@@ -328,21 +344,9 @@ export default function App() {
             ) : (
               <TerminalPanel appId={selectedApp.id} />
             )}
-          </div>
-        </>
-      ) : (
-        <div className="empty-state">
-          <div className="empty-state-content">
-            <div className="empty-logo"></div>
-            <h2>Welcome to Deyad</h2>
-            <p>A local AI app builder powered exclusively by Ollama.</p>
-            <p className="empty-hint">Create a new app to get started →</p>
-            <button className="btn-primary" onClick={() => setShowNewAppModal(true)}>
-              + New App
-            </button>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {showNewAppModal && (
         <NewAppModal

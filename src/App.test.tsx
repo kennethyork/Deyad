@@ -1,9 +1,26 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // @ts-nocheck
 /// <reference types="vitest" />
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from './App';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+// Stub out heavy native modules that aren't needed for these tests
+vi.mock('@monaco-editor/react', () => ({ default: () => null }));
+vi.mock('xterm', () => ({
+  Terminal: vi.fn().mockImplementation(() => ({
+    loadAddon: vi.fn(),
+    open: vi.fn(),
+    dispose: vi.fn(),
+    onData: vi.fn(() => ({ dispose: vi.fn() })),
+    write: vi.fn(),
+    cols: 80,
+    rows: 24,
+  })),
+}));
+vi.mock('xterm-addon-fit', () => ({
+  FitAddon: vi.fn().mockImplementation(() => ({ fit: vi.fn() })),
+}));
 
 describe('App component', () => {
   beforeEach(() => {
@@ -80,23 +97,38 @@ describe('App component', () => {
     const resizer = container.querySelector('.resizer[data-side="right"]');
     expect(resizer).not.toBeNull();
 
-    // simulate drag from x=200 to x=100 (shrinking right by 100)
-    fireEvent.mouseDown(resizer!, { clientX: 200 });
+    // simulate drag from x=0 to x=100 (moving resizer right shrinks the right panel by 100)
+    fireEvent.mouseDown(resizer!, { clientX: 0 });
     fireEvent.mouseMove(window, { clientX: 100 });
     fireEvent.mouseUp(window);
 
-    // right width should be initial 340 - 100 = 240
+    // right width should decrease by dx (default 340 - 100 = 240)
     expect(right).toHaveStyle('width: 240px');
     expect(localStorage.getItem('rightWidth')).toBe('240');
   });
 
   it('shows terminal tab and switches to it', async () => {
-    const { getByText, container } = render(<App />);
-    const termBtn = getByText('Terminal');
+    const app = {
+      id: 'term-app',
+      name: 'Terminal Test App',
+      description: '',
+      createdAt: new Date().toISOString(),
+      appType: 'frontend' as const,
+    };
+    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+
+    const { container } = render(<App />);
+
+    // wait for app to appear in the sidebar, then select it
+    await screen.findByText('Terminal Test App');
+    fireEvent.click(screen.getByText('Terminal Test App'));
+
+    // wait for the right-panel tabs to appear
+    const termBtn = await screen.findByText('Terminal');
     expect(termBtn).toBeInTheDocument();
 
     fireEvent.click(termBtn);
     // terminal panel should appear
-    expect(container.querySelector('.terminal-panel')).toBeInTheDocument();
+    await waitFor(() => expect(container.querySelector('.terminal-panel')).toBeInTheDocument());
   });
 });

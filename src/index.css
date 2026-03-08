@@ -188,8 +188,8 @@ body {
 
 /* ─── Empty State ────────────────────────────────────────────────────────── */
 .empty-state {
-  /* centre + right panels (skip the 2 resizer columns) */
-  grid-column: 3 / 6;
+  /* centre column only — right panel now always rendered separately */
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: center;

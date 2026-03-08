@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 // @ts-nocheck
 import { render } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
