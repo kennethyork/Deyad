@@ -39,7 +39,7 @@ jobs:
           git push origin main --follow-tags
 
       - name: Trigger build workflow
-        uses: peter-evans/workflow-dispatch@v2
+        uses: peter-evans/workflow-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
