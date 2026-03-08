@@ -3,14 +3,17 @@ name: Auto Version & Release
 on:
   push:
     branches: [ main ]
-    # only run when commits include changes to src or package.json
+    # only run when commits include changes to src or package.json (ignore version bump commits)
     paths:
       - 'src/**'
       - 'package.json'
       - 'package-lock.json'
+    # also prevent running when the commit message itself is a bump, to avoid recursion
+    # this uses a conditional expression below in the job
 
 jobs:
   bump:
+    if: "!contains(github.event.head_commit.message, 'chore: bump version')"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
