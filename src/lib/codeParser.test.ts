@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractFilesFromResponse, isFullStackRequest, getFullStackSystemPrompt } from '../lib/codeParser';
+import { extractFilesFromResponse, isFullStackRequest, getFullStackSystemPrompt, FRONTEND_SYSTEM_PROMPT } from '../lib/codeParser';
 
 describe('extractFilesFromResponse', () => {
   it('extracts a single file block', () => {
@@ -58,6 +58,11 @@ describe('isFullStackRequest', () => {
     expect(isFullStackRequest('Make a landing page')).toBe(false);
     expect(isFullStackRequest('Add a button to my form')).toBe(false);
     expect(isFullStackRequest('Style the navbar with blue')).toBe(false);
+  });
+
+  it('frontend prompt explains vague "make" or "create" requests', () => {
+    const lower = FRONTEND_SYSTEM_PROMPT.toLowerCase();
+    expect(lower).toMatch(/make a login page|create a todo list|make something/i);
   });
 });
 

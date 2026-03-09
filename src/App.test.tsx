@@ -51,22 +51,19 @@ describe('App component', () => {
       onTerminalData: vi.fn().mockReturnValue(() => {}),
       onTerminalExit: vi.fn().mockReturnValue(() => {}),
       onTerminalClear: vi.fn().mockReturnValue(() => {}),
+      terminalKill: vi.fn().mockResolvedValue(undefined),
       // other stubs may be needed but App won't call them in tests
     } as any;
   });
-
-  afterEach(() => cleanup());
 
   it('initializes sidebar and right panel widths from localStorage', () => {
     localStorage.setItem('sidebarWidth', '300');
     localStorage.setItem('rightWidth', '500');
 
     const { container } = render(<App />);
-    const sidebar = container.querySelector('.sidebar');
-    const right = container.querySelector('.right-panel');
+    const layout = container.querySelector('.app-layout');
 
-    expect(sidebar).toHaveStyle('width: 300px');
-    expect(right).toHaveStyle('width: 500px');
+    expect(layout).toHaveStyle('grid-template-columns: 300px 4px 1fr 4px 500px');
   });
 
   it('falls back to defaults when storage is empty or invalid', () => {
@@ -74,17 +71,15 @@ describe('App component', () => {
     localStorage.setItem('rightWidth', '');
 
     const { container } = render(<App />);
-    const sidebar = container.querySelector('.sidebar');
-    const right = container.querySelector('.right-panel');
+    const layout = container.querySelector('.app-layout');
 
-    // defaults hard-coded in component
-    expect(sidebar).toHaveStyle('width: 220px');
-    expect(right).toHaveStyle('width: 340px');
+    // defaults hard-coded in component — widths live in grid-template-columns
+    expect(layout).toHaveStyle('grid-template-columns: 220px 4px 1fr 4px 340px');
   });
 
   it('allows sidebar to be resized by dragging the resizer', () => {
     const { container } = render(<App />);
-    const sidebar = container.querySelector('.sidebar');
+    const layout = container.querySelector('.app-layout');
     const resizer = container.querySelector('.resizer[data-side="sidebar"]');
     expect(resizer).not.toBeNull();
 
@@ -93,14 +88,14 @@ describe('App component', () => {
     fireEvent.mouseMove(window, { clientX: 100 });
     fireEvent.mouseUp(window);
 
-    // width should increase by dx (default 220 + 100)
-    expect(sidebar).toHaveStyle('width: 320px');
+    // width should increase by dx (default 220 + 100) — now in grid-template-columns
+    expect(layout).toHaveStyle('grid-template-columns: 320px 4px 1fr 4px 340px');
     expect(localStorage.getItem('sidebarWidth')).toBe('320');
   });
 
   it('allows right panel to be resized by dragging the resizer', () => {
     const { container } = render(<App />);
-    const right = container.querySelector('.right-panel');
+    const layout = container.querySelector('.app-layout');
     const resizer = container.querySelector('.resizer[data-side="right"]');
     expect(resizer).not.toBeNull();
 
@@ -109,8 +104,8 @@ describe('App component', () => {
     fireEvent.mouseMove(window, { clientX: 100 });
     fireEvent.mouseUp(window);
 
-    // right width should decrease by dx (default 340 - 100 = 240)
-    expect(right).toHaveStyle('width: 240px');
+    // right width should decrease by dx (default 340 - 100 = 240) — now in grid-template-columns
+    expect(layout).toHaveStyle('grid-template-columns: 220px 4px 1fr 4px 240px');
     expect(localStorage.getItem('rightWidth')).toBe('240');
   });
 

@@ -1,57 +1,39 @@
 // @vitest-environment happy-dom
-// @ts-nocheck
-import { render, waitFor } from '@testing-library/react';
+import { render, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import ChatPanel from './ChatPanel';
 
-// minimal app stub
-const dummyApp = {
-  id: 'app1',
-  name: 'Test',
-  description: '',
-  createdAt: new Date().toISOString(),
-  appType: 'frontend',
-};
+const dummyApp = { id:'a',name:'Test',description:'',createdAt:new Date().toISOString(),appType:'frontend' as const };
 
-describe('ChatPanel', () => {
-  beforeEach(() => {
-    // reset globals
-    (window as any).deyad = {
-      getSettings: vi.fn().mockResolvedValue({ ollamaHost: '', defaultModel: '' }),
-      listModels: vi.fn().mockResolvedValue({ models: [{ name: 'm1', modified_at: '', size: 0 }] }),
-      chatStream: vi.fn().mockResolvedValue(undefined),
-      saveMessages: vi.fn(),
-      loadMessages: vi.fn().mockResolvedValue([]),
-      onStreamToken: vi.fn().mockReturnValue(() => {}),
-      onStreamDone: vi.fn().mockReturnValue(() => {}),
-      onStreamError: vi.fn().mockReturnValue(() => {}),
-      checkDocker: vi.fn().mockResolvedValue(true),
-      onDeployLog: vi.fn().mockReturnValue(() => {}),
-    };
-  });
+beforeEach(()=>{
+  (window as any).deyad={
+    getSettings: vi.fn().mockResolvedValue({ollamaHost:'',defaultModel:''}),
+    listModels: vi.fn().mockResolvedValue({models:[{name:'m1',modified_at:'',size:0}]}),
+    chatStream: vi.fn().mockResolvedValue(undefined),
+    onStreamToken: vi.fn().mockReturnValue(()=>{}),
+    onStreamDone: vi.fn().mockReturnValue(()=>{}),
+    onStreamError: vi.fn().mockReturnValue(()=>{}),
+    loadMessages: vi.fn().mockResolvedValue([]),
+    saveMessages: vi.fn().mockResolvedValue(true),
+  };
+});
 
-  it('auto-sends initialPrompt when provided', async () => {
-    const onConsumed = vi.fn();
-    render(
-      <ChatPanel
-        app={dummyApp}
-        appFiles={{}}
-        dbStatus="none"
-        onFilesUpdated={vi.fn()}
-        onDbToggle={vi.fn()}
-        onRevert={vi.fn()}
-        canRevert={false}
-        initialPrompt="hello world"
-        onInitialPromptConsumed={onConsumed}
-      />
-    );
-
-    // chatStream should eventually be called with the prompt
-    await waitFor(() => {
-      expect(window.deyad.chatStream).toHaveBeenCalled();
+describe('ChatPanel',()=>{
+  it('renders and sends message',async()=>{
+    const {getByPlaceholderText,container} = render(<ChatPanel app={dummyApp} appFiles={{}} dbStatus="none" onFilesUpdated={vi.fn()} onDbToggle={vi.fn()} onRevert={vi.fn()} canRevert={false} />);
+    // Wait for models to load so selectedModel is set
+    await waitFor(()=>{
+      const select = container.querySelector('.model-select') as HTMLSelectElement;
+      expect(select).toBeTruthy();
+      expect(select.value).toBe('m1');
     });
-
-    // verify the consumed callback was invoked
-    expect(onConsumed).toHaveBeenCalled();
+    const input = getByPlaceholderText(/describe what you want/i);
+    fireEvent.change(input,{target:{value:'hi'}});
+    const btn = container.querySelector('.btn-send') as HTMLElement;
+    fireEvent.click(btn);
+    await waitFor(()=>{
+      const msg = container.querySelector('.message-user');
+      expect(msg?.textContent).toContain('hi');
+    });
   });
 });

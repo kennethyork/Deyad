@@ -152,7 +152,7 @@ export default function PreviewPanel({ app }: Props) {
             src={PREVIEW_URL}
             className="preview-iframe"
             title="App preview"
-            sandbox="allow-scripts allow-forms allow-popups allow-modals"
+            sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"
           />
         )}
       </div>

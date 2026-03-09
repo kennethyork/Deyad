@@ -135,6 +135,9 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('docker:db-status', handler);
   },
 
+  dbDescribe: (appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }> =>
+    ipcRenderer.invoke('db:describe', appId),
+
   // ── Settings ────────────────────────────────────────────────────────────
   getSettings: (): Promise<{
     ollamaHost: string;
@@ -208,6 +211,9 @@ contextBridge.exposeInMainWorld('deyad', {
 
   terminalResize: (termId: string, cols: number, rows: number): Promise<void> =>
     ipcRenderer.invoke('terminal:resize', { termId, cols, rows }),
+
+  terminalKill: (termId: string): Promise<void> =>
+    ipcRenderer.invoke('terminal:kill', termId),
 
   onTerminalData: (cb: (payload: { id: string; data: string }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, payload: { id: string; data: string }) => cb(payload);

@@ -31,6 +31,10 @@ export default function TerminalPanel({ appId }: Props) {
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [termId, setTermId] = useState<string | null>(null);
+  const termIdRef = useRef<string | null>(null);
+
+  // keep ref in sync
+  useEffect(() => { termIdRef.current = termId; }, [termId]);
 
   // initialise terminal once
   useEffect(() => {
@@ -45,8 +49,9 @@ export default function TerminalPanel({ appId }: Props) {
 
     const handleResize = () => {
       fit.fit();
-      if (termId) {
-        window.deyad.terminalResize(termId, term.cols, term.rows);
+      const tid = termIdRef.current;
+      if (tid) {
+        window.deyad.terminalResize(tid, term.cols, term.rows);
       }
     };
 
@@ -87,6 +92,9 @@ export default function TerminalPanel({ appId }: Props) {
     // cleanup will call removeClear later
     return () => {
       observer.disconnect();
+      // kill the pty process before disposing
+      const tid = termIdRef.current;
+      if (tid) window.deyad.terminalKill(tid).catch(() => {});
       term.dispose();
       containerRef.current?.removeEventListener('contextmenu', handleContext);
       if (term.element) {
@@ -125,10 +133,8 @@ process exited (${payload.exitCode})\r\n`);
       }
     };
 
-    const termListener = (_: any, payload: { id: string; data: string }) => dataHandler(payload);
-    const exitListener = (_: any, payload: { id: string; exitCode: number; signal: number }) => exitHandler(payload);
-    window.deyad.onTerminalData(dataHandler);
-    window.deyad.onTerminalExit(exitHandler);
+    const unsubData = window.deyad.onTerminalData(dataHandler);
+    const unsubExit = window.deyad.onTerminalExit(exitHandler);
 
     term.onData((d) => {
       window.deyad.terminalWrite(termId, d);
@@ -139,7 +145,8 @@ process exited (${payload.exitCode})\r\n`);
     window.deyad.terminalResize(termId, term.cols, term.rows);
 
     return () => {
-      // remove listeners by returning cleanup functions from expose? already returned above but we didn't store them
+      unsubData();
+      unsubExit();
     };
   }, [termId]);
 

@@ -163,6 +163,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
   // Local edit state
   const [editContent, setEditContent] = useState<string>('');
   const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = useRef(false);
+  const handleSaveRef = useRef<() => void>(() => {});
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
 
   // Reset edit content when selected file or its persisted content changes
@@ -183,6 +185,10 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     }
   }, [selectedFile, files, onFileEdit]);
 
+  // Keep refs in sync for use inside Monaco callbacks
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     // Add Ctrl+S / Cmd+S save action
@@ -192,11 +198,11 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
       run: () => handleSave(),
     });
-    // also save on blur
+    // also save on blur (use refs to avoid stale closure)
     editor.onDidBlurEditorText(() => {
-      if (isDirty) handleSave();
+      if (isDirtyRef.current) handleSaveRef.current();
     });
-  }, [handleSave, isDirty]);
+  }, []);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     const v = value ?? '';

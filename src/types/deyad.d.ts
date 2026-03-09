@@ -119,6 +119,7 @@ interface DeyadAPI {
   createTerminal(appId?: string): Promise<string>;
   terminalWrite(termId: string, data: string): Promise<void>;
   terminalResize(termId: string, cols: number, rows: number): Promise<void>;
+  terminalKill(termId: string): Promise<void>;
   onTerminalData(cb: (payload: { id: string; data: string }) => void): () => void;
   onTerminalExit(cb: (payload: { id: string; exitCode: number; signal: number }) => void): () => void;
   showContextMenu(type?: 'terminal' | 'global'): Promise<void>;

@@ -113,9 +113,10 @@ npm run dev          # http://localhost:5173
 ## Development
 
 ```bash
-npm start      # start Electron app
+npm start      # start Electron app (React/Vite renderer)
 npm test       # run unit tests (vitest)
 npm run lint   # lint TypeScript files
+npm run vanilla # start the minimal vanilla-JS/HTML/CSS version located in the `vanilla/` folder
 ```
 
 ## Packaging & CI/CD

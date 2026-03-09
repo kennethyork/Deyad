@@ -88,10 +88,8 @@ function getViteRoot(appId: string): string | null {
   return null;
 }
 
-// Vite injects these constants during build; declare them for TypeScript
-
-declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
-declare const MAIN_WINDOW_VITE_NAME: string;
+// Dev mode: set VITE_DEV_SERVER_URL env var to load from Vite dev server
+// Production: loads the built renderer from .vite/renderer/main_window/
 
 if (!fs.existsSync(APPS_DIR)) {
   fs.mkdirSync(APPS_DIR, { recursive: true });
@@ -191,13 +189,21 @@ const createWindow = () => {
     },
   });
 
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
-  }
+  // clear cache before loading to ensure latest CSS/JS is used
+  mainWindow.webContents.session.clearCache().then(() => {
+    // allow launching a specific HTML file (e.g. vanilla/index.html)
+    const customArg = process.argv.slice(1).find((a) => a.endsWith('.html'));
+    if (customArg) {
+      // relative paths supplied from project root
+      mainWindow.loadFile(path.resolve(customArg));
+    } else if (process.env.VITE_DEV_SERVER_URL) {
+      mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+    } else {
+      mainWindow.loadFile(
+        path.join(__dirname, '../renderer/main_window/index.html'),
+      );
+    }
+  });
 };
 
 // ── AI (Ollama) ───────────────────────────────────────────────────────────────
@@ -228,6 +234,13 @@ function streamOllama(event: Electron.IpcMainInvokeEvent, model: string, message
     const body = JSON.stringify({ model, messages, stream: true });
     const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/chat` });
     let buffer = '';
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done');
+      resolve();
+    };
     request.on('response', (response) => {
       response.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -237,21 +250,21 @@ function streamOllama(event: Electron.IpcMainInvokeEvent, model: string, message
           if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line);
-            if (parsed.message?.content) {
+            if (parsed.message?.content && !event.sender.isDestroyed()) {
               event.sender.send('ollama:stream-token', parsed.message.content);
             }
-            if (parsed.done) {
-              event.sender.send('ollama:stream-done');
-              resolve();
-            }
+            if (parsed.done) finish();
           } catch { /* skip malformed */ }
         }
       });
-      response.on('end', () => { event.sender.send('ollama:stream-done'); resolve(); });
+      response.on('end', () => finish());
     });
     request.on('error', (err: Error) => {
-      event.sender.send('ollama:stream-error', err.message);
-      reject(err);
+      if (!resolved) {
+        resolved = true;
+        if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', err.message);
+        reject(err);
+      }
     });
     request.setHeader('Content-Type', 'application/json');
     request.write(body);
@@ -300,6 +313,7 @@ ipcMain.handle('apps:create', async (_event, { name, description, appType, dbPro
     meta.dbProvider = dbProvider;
   }
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
+  await gitInit(id);
   return { id, ...meta };
 });
 
@@ -307,12 +321,13 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
   const dir = appDir(appId);
   if (!fs.existsSync(dir)) return {};
   const result: Record<string, string> = {};
+  const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.vite', '.next', '__pycache__']);
   const walk = (base: string, rel = '') => {
     for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
       const fullPath = path.join(base, entry.name);
       const relPath = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        walk(fullPath, relPath);
+        if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
       } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
         try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch { /* skip binary */ }
       }
@@ -325,7 +340,11 @@ ipcMain.handle('apps:read-files', (_event, appId: string) => {
 ipcMain.handle('apps:write-files', async (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
   const dir = appDir(appId);
   for (const [relPath, content] of Object.entries(files)) {
-    const fullPath = path.join(dir, relPath);
+    const fullPath = path.resolve(dir, relPath);
+    // Prevent path traversal — all files must stay inside the app directory
+    if (!fullPath.startsWith(dir + path.sep) && fullPath !== dir) {
+      throw new Error(`Invalid file path: ${relPath}`);
+    }
     fs.mkdirSync(path.dirname(fullPath), { recursive: true });
     fs.writeFileSync(fullPath, content, 'utf-8');
   }
@@ -403,8 +422,9 @@ ipcMain.handle('apps:dev-start', async (event, appId: string) => {
     };
   }
 
-  const sendLog = (data: string) =>
-    event.sender.send('apps:dev-log', { appId, data });
+  const sendLog = (data: string) => {
+    if (!event.sender.isDestroyed()) event.sender.send('apps:dev-log', { appId, data });
+  };
 
   // Run npm install if node_modules is absent
   if (!fs.existsSync(path.join(viteRoot, 'node_modules'))) {
@@ -618,7 +638,12 @@ function copyRecursiveSync(src: string, dest: string) {
 const terminals = new Map<string, any>();
 
 ipcMain.handle('terminal:start', (_event, { appId }: { appId?: string }) => {
-  const pty = require('node-pty');
+  let pty;
+  try {
+    pty = require('node-pty');
+  } catch {
+    throw new Error('node-pty is not available. Rebuild native modules with electron-rebuild.');
+  }
   const cwd = appId ? appDir(appId) : undefined;
   const shellPath = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
   const term = pty.spawn(shellPath, [], { cwd, env: process.env });
@@ -644,14 +669,25 @@ ipcMain.handle('terminal:resize', (_event, { termId, cols, rows }: { termId: str
   if (term) term.resize(cols, rows);
 });
 
+ipcMain.handle('terminal:kill', (_event, termId: string) => {
+  const term = terminals.get(termId);
+  if (term) {
+    term.kill();
+    terminals.delete(termId);
+  }
+});
+
 ipcMain.handle('show-context-menu', (event, type?: 'terminal' | 'global') => {
   const { Menu } = require('electron');
   const template: any[] = [
+    { label: 'Cut', role: 'cut' },
     { label: 'Copy', role: 'copy' },
     { label: 'Paste', role: 'paste' },
     { type: 'separator' },
+    { label: 'Select All', role: 'selectAll' },
   ];
   if (type === 'terminal') {
+    template.push({ type: 'separator' });
     template.push({ label: 'Clear', click: () => event.sender.send('terminal:clear') });
   }
   const menu = Menu.buildFromTemplate(template);

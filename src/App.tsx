@@ -261,19 +261,15 @@ export default function App() {
     }
   };
 
-  // persist when sizes change
-  useEffect(() => {
-    localStorage.setItem('sidebarWidth', sidebarWidth.toString());
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('rightWidth', rightWidth.toString());
-  }, [rightWidth]);
-
   return (
-    <div className="app-layout">
+    <div
+      className="app-layout"
+      style={{
+        gridTemplateColumns: `${sidebarWidth}px 4px 1fr 4px ${rightWidth}px`,
+      }}
+    >
       {/* sidebar */}
-      <aside className={`sidebar ${sidebarVisible ? '' : 'hidden'}`} style={{ width: sidebarWidth }}>
+      <aside className={`sidebar ${sidebarVisible ? '' : 'hidden'}`}>
         <Sidebar
           apps={apps}
           selectedApp={selectedApp}
@@ -287,14 +283,16 @@ export default function App() {
         />
       </aside>
 
-      {/* menu button for narrow screens */}
-      <button
-        className="btn-toggle-sidebar"
-        onClick={() => setSidebarVisible((v) => !v)}
-        title="Toggle sidebar"
-      >
-        ☰
-      </button>
+      {/* menu button for narrow screens (hidden while modals open) */}
+      {!(showNewAppModal || showSettings || showImportModal) && (
+        <button
+          className="btn-toggle-sidebar"
+          onClick={() => setSidebarVisible((v) => !v)}
+          title="Toggle sidebar"
+        >
+          ☰
+        </button>
+      )}
       {/* resizer between sidebar and centre */}
       <div
         className="resizer"
@@ -340,7 +338,7 @@ export default function App() {
       />
 
       {/* right panel (always present so widths are always measurable) */}
-      <div className="right-panel" style={{ width: rightWidth }}>
+      <div className="right-panel">
         {selectedApp && (
           <>
             <div className="right-panel-tabs">
