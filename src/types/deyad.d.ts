@@ -50,6 +50,21 @@ interface GitLogEntry {
   date: string;
 }
 
+export interface PluginTemplate {
+  name: string;
+  description: string;
+  icon: string;
+  appType: 'frontend' | 'fullstack';
+  prompt: string;
+}
+
+export interface PluginManifest {
+  name: string;
+  description?: string;
+  templates?: PluginTemplate[];
+  // future extension points: models, deployProviders, etc.
+}
+
 interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
@@ -90,7 +105,7 @@ interface DeyadAPI {
   setSettings(settings: Partial<DeyadSettings>): Promise<DeyadSettings>;
 
   // Export
-  exportApp(appId: string): Promise<{ success: boolean; error?: string; path?: string }>;
+  exportApp(appId: string, format?: 'zip' | 'mobile'): Promise<{ success: boolean; error?: string; path?: string }>;
 
   // Undo / Revert
   snapshotFiles(appId: string, files: Record<string, string>): Promise<boolean>;
@@ -106,7 +121,7 @@ interface DeyadAPI {
   terminalResize(termId: string, cols: number, rows: number): Promise<void>;
   onTerminalData(cb: (payload: { id: string; data: string }) => void): () => void;
   onTerminalExit(cb: (payload: { id: string; exitCode: number; signal: number }) => void): () => void;
-  showContextMenu(): Promise<void>;
+  showContextMenu(type?: 'terminal' | 'global'): Promise<void>;
   onTerminalClear(cb: () => void): () => void;
 
   // Capacitor (Mobile)
@@ -118,6 +133,12 @@ interface DeyadAPI {
   deploy(appId: string, provider: 'netlify' | 'vercel' | 'surge'): Promise<{ success: boolean; url?: string; error?: string }>;
   deployFullstack(appId: string, provider: 'railway' | 'flyio'): Promise<{ success: boolean; url?: string; error?: string }>;
   onDeployLog(cb: (payload: { appId: string; data: string }) => void): () => void;
+
+  // Plugins
+  listPlugins(): Promise<PluginManifest[]>;
+
+  // Database inspection
+  dbDescribe(appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }>;
 }
 
 declare global {

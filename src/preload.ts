@@ -1,5 +1,6 @@
 // Preload — exposes safe IPC bridges to the renderer (contextIsolation: true)
 import { contextBridge, ipcRenderer } from 'electron';
+import type { PluginManifest } from './types/deyad';
 
 export interface OllamaModel {
   name: string;
@@ -151,8 +152,8 @@ contextBridge.exposeInMainWorld('deyad', {
     ipcRenderer.invoke('settings:set', settings),
 
   // ── Export ──────────────────────────────────────────────────────────────
-  exportApp: (appId: string): Promise<{ success: boolean; error?: string; path?: string }> =>
-    ipcRenderer.invoke('apps:export', appId),
+  exportApp: (appId: string, format?: 'zip' | 'mobile'): Promise<{ success: boolean; error?: string; path?: string }> =>
+    ipcRenderer.invoke('apps:export', { appId, format }),
 
   // ── Undo / Revert ──────────────────────────────────────────────────────
   snapshotFiles: (appId: string, files: Record<string, string>): Promise<boolean> =>
@@ -191,6 +192,9 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('apps:deploy-log', handler);
   },
 
+  // Plugins
+  listPlugins: (): Promise<PluginManifest[]> => ipcRenderer.invoke('plugins:list'),
+
   // ── Git ────────────────────────────────────────────────────────────────
   gitLog: (appId: string): Promise<{ hash: string; message: string; date: string }[]> =>
     ipcRenderer.invoke('git:log', appId),
@@ -216,7 +220,7 @@ contextBridge.exposeInMainWorld('deyad', {
     ipcRenderer.on('terminal:exit', handler);
     return () => ipcRenderer.removeListener('terminal:exit', handler);
   },
-  showContextMenu: (): Promise<void> => ipcRenderer.invoke('terminal:show-menu'),
+  showContextMenu: (type?: 'terminal' | 'global'): Promise<void> => ipcRenderer.invoke('show-context-menu', type),
   onTerminalClear: (cb: () => void) => {
     const handler = () => cb();
     ipcRenderer.on('terminal:clear', handler);

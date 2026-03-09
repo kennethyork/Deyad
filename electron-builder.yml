@@ -11,9 +11,9 @@ linux:
     - deb
     - rpm
     - AppImage
-  artifactName: "${productName}-${version}-linux.${ext}"
+  artifactName: "${productName}-${arch}.${ext}"
 win:
   target:
     - nsis
     - portable
-  artifactName: "${productName}-${version}-win.${ext}"
+  artifactName: "${productName}-${arch}.${ext}"

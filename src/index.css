@@ -40,12 +40,49 @@ body {
 .app-layout {
   display: grid;
   /* allow sidebar and right area to shrink but not collapse completely */
-  grid-template-columns: minmax(100px, var(--sidebar-width)) 4px 1fr 4px minmax(200px, var(--editor-width));
+  grid-template-columns: minmax(60px, var(--sidebar-width)) 4px 1fr 4px minmax(120px, var(--editor-width));
   height: 100vh;
   min-width: 0; /* allow 1fr to shrink */
+  overflow: auto; /* enable scrollbars when content exceeds window */
 .chat-wrapper {
   height: 100%;
   overflow: hidden;
+}
+
+/* stacked layout on narrow screens */
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(100px, var(--sidebar-width)) 4px 1fr 4px minmax(200px, var(--editor-width));
+  }
+  .resizer {
+    width: 100%;
+    height: 4px;
+    cursor: row-resize;
+  }
+}
+
+/* hide sidebar when .hidden class applied (toggle) */
+.sidebar.hidden {
+  display: none;
+}
+
+/* toggle button style */
+.btn-toggle-sidebar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  z-index: 10;
+}
+.btn-toggle-sidebar:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .right-panel {
@@ -776,6 +813,7 @@ body {
   flex-shrink: 0;
   border-bottom: 1px solid var(--border);
   background: var(--bg-surface);
+  overflow-x: auto;
 }
 
 .right-tab {
@@ -982,6 +1020,7 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+  overflow: hidden; /* ensure inner body handles scrolling */
 }
 .modal-header {
   display: flex;
@@ -1325,11 +1364,14 @@ body {
   border-radius: var(--radius);
   padding: 8px;
   background: var(--bg-base);
+  /* allow horizontal scrolling when cards exceed width */
+  overflow-x: auto;
 }
 
 .template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* horizontal list instead of wrapping grid */
+  display: flex;
+  flex-wrap: nowrap;
   gap: 8px;
 }
 
@@ -1339,19 +1381,34 @@ body {
   align-items: center;
   gap: 6px;
   padding: 14px 10px 12px;
+  min-width: 140px;
+  max-width: 180px;
   background: var(--bg-surface);
   border: 2px solid transparent;
   border-radius: var(--radius);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.2s;
   text-align: center;
+  position: relative;
 }
 
 .template-card:hover {
   background: var(--bg-hover);
   border-color: var(--border);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+}
+
+.template-card.selected {
+  border-color: var(--accent);
+  background: rgba(99,102,241,0.1);
+  box-shadow: 0 10px 20px rgba(99,102,241,0.3);
+}
+
+.template-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .template-card.selected {
@@ -1392,6 +1449,9 @@ body {
   border-radius: 999px;
   background: rgba(99, 102, 241, 0.2);
   color: var(--accent);
+  position: absolute;
+  top: 6px;
+  right: 6px;
 }
 
 .template-badge-mobile {

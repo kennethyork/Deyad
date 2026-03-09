@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 // @ts-nocheck
 /// <reference types="vitest" />
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import App from './App';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Stub out heavy native modules that aren't needed for these tests
 vi.mock('@monaco-editor/react', () => ({ default: () => null }));
@@ -12,6 +12,8 @@ vi.mock('xterm', () => ({
     loadAddon: vi.fn(),
     open: vi.fn(),
     dispose: vi.fn(),
+    focus: vi.fn(),
+    attachCustomKeyEventHandler: vi.fn(),
     onData: vi.fn(() => ({ dispose: vi.fn() })),
     write: vi.fn(),
     cols: 80,
@@ -23,6 +25,8 @@ vi.mock('xterm-addon-fit', () => ({
 }));
 
 describe('App component', () => {
+  afterEach(() => cleanup());
+
   beforeEach(() => {
     // clear any persisted widths
     localStorage.clear();
@@ -46,9 +50,12 @@ describe('App component', () => {
       terminalResize: vi.fn(),
       onTerminalData: vi.fn().mockReturnValue(() => {}),
       onTerminalExit: vi.fn().mockReturnValue(() => {}),
+      onTerminalClear: vi.fn().mockReturnValue(() => {}),
       // other stubs may be needed but App won't call them in tests
     } as any;
   });
+
+  afterEach(() => cleanup());
 
   it('initializes sidebar and right panel widths from localStorage', () => {
     localStorage.setItem('sidebarWidth', '300');
@@ -130,5 +137,69 @@ describe('App component', () => {
     fireEvent.click(termBtn);
     // terminal panel should appear
     await waitFor(() => expect(container.querySelector('.terminal-panel')).toBeInTheDocument());
+  });
+
+  it('shows database tab and content for full-stack app', async () => {
+    const app = {
+      id: 'db-app',
+      name: 'DB Test App',
+      description: '',
+      createdAt: new Date().toISOString(),
+      appType: 'fullstack' as const,
+    };
+    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [{ name: 'Things', columns: ['a','b'] }] });
+
+    const { container } = render(<App />);
+    await screen.findByText('DB Test App');
+    fireEvent.click(screen.getByText('DB Test App'));
+
+    const dbBtn = await screen.findByText('Database');
+    expect(dbBtn).toBeInTheDocument();
+    fireEvent.click(dbBtn);
+
+    await waitFor(() => expect(container.querySelector('.db-table-name')).toHaveTextContent('Things'));
+  });
+
+  it('exports using mobile option when confirm returns true', async () => {
+    const app = {
+      id: 'exp-app',
+      name: 'Export Test',
+      description: '',
+      createdAt: new Date().toISOString(),
+      appType: 'frontend' as const,
+    };
+    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/mobile' });
+
+    // make confirm return true (mobile)
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<App />);
+    // wait for sidebar entry to appear
+    await screen.findByText('Export Test');
+    // click the first Export button that shows up
+    const exportBtns = screen.getAllByTitle('Export as ZIP');
+    fireEvent.click(exportBtns[0]);
+    await waitFor(() => expect(window.deyad.exportApp).toHaveBeenCalledWith('exp-app', 'mobile'));
+  });
+
+  it('exports as zip when confirm returns false', async () => {
+    const app = {
+      id: 'exp-app2',
+      name: 'Export Test 2',
+      description: '',
+      createdAt: new Date().toISOString(),
+      appType: 'frontend' as const,
+    };
+    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/zip' });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+    render(<App />);
+    await screen.findByText('Export Test 2');
+    const exportBtns2 = screen.getAllByTitle('Export as ZIP');
+    fireEvent.click(exportBtns2[0]);
+    await waitFor(() => expect(window.deyad.exportApp).toHaveBeenCalledWith('exp-app2', 'zip'));
   });
 });

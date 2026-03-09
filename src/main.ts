@@ -94,12 +94,91 @@ if (!fs.existsSync(APPS_DIR)) {
   fs.mkdirSync(APPS_DIR, { recursive: true });
 }
 
+
+// ── Plugin infrastructure ─────────────────────────────────────────────────
+
+interface PluginTemplate {
+  name: string;
+  description: string;
+  icon: string;
+  appType: 'frontend' | 'fullstack';
+  prompt: string;
+}
+interface PluginManifest {
+  name: string;
+  description?: string;
+  templates?: PluginTemplate[];
+}
+
+let loadedPlugins: PluginManifest[] = [];
+
+function loadPlugins() {
+  const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+  if (!fs.existsSync(pluginsDir)) {
+    fs.mkdirSync(pluginsDir, { recursive: true });
+    return;
+  }
+  const dirs = fs.readdirSync(pluginsDir, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => path.join(pluginsDir, d.name));
+  loadedPlugins = [];
+  for (const dir of dirs) {
+    const manifestPath = path.join(dir, 'plugin.json');
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as PluginManifest;
+        loadedPlugins.push(manifest);
+      } catch {
+        // ignore malformed
+      }
+    }
+  }
+}
+
+// call early
+app.whenReady().then(() => {
+  loadPlugins();
+});
+
+// IPC to expose list
+ipcMain.handle('plugins:list', () => loadedPlugins);
+
+// ── Database inspection ───────────────────────────────────────────────────
+ipcMain.handle('db:describe', (_event, appId: string) => {
+  const dir = appDir(appId);
+  const schemaPath = path.join(dir, 'backend', 'prisma', 'schema.prisma');
+  const result: { tables: { name: string; columns: string[] }[] } = { tables: [] };
+  if (!fs.existsSync(schemaPath)) return result;
+  const text = fs.readFileSync(schemaPath, 'utf-8');
+  const lines = text.split(/\r?\n/);
+  let current: { name: string; columns: string[] } | null = null;
+  for (const line of lines) {
+    const m = line.match(/^model\s+(\w+)/);
+    if (m) {
+      if (current) result.tables.push(current);
+      current = { name: m[1], columns: [] };
+      continue;
+    }
+    if (current) {
+      if (/^}$/.test(line.trim())) {
+        result.tables.push(current);
+        current = null;
+        continue;
+      }
+      const col = line.trim().split(' ')[0];
+      if (col) current.columns.push(col);
+    }
+  }
+  return result;
+});
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
-    minWidth: 900,
-    minHeight: 600,
+    // allow extremely small windows (e.g. tiny monitors / remote displays)
+    minWidth: 200,
+    minHeight: 300,
     backgroundColor: '#0f172a',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
@@ -446,7 +525,7 @@ ipcMain.handle('settings:set', (_event, settings: Partial<DeyadSettings>) => {
 
 // ── App Export (ZIP) ────────────────────────────────────────────────────────
 
-ipcMain.handle('apps:export', async (_event, appId: string) => {
+ipcMain.handle('apps:export', async (_event, { appId, format }: { appId: string; format?: 'zip' | 'mobile' }) => {
   const dir = appDir(appId);
   if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
@@ -461,6 +540,42 @@ ipcMain.handle('apps:export', async (_event, appId: string) => {
   }
 
   const sanitized = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  if (format === 'mobile') {
+    // For mobile export we want a directory rather than zip. Ask for folder.
+    const { filePaths, canceled } = await dialog.showOpenDialog({
+      title: 'Select output directory for mobile export',
+      properties: ['openDirectory', 'createDirectory'],
+      defaultPath: appName,
+    });
+    if (canceled || filePaths.length === 0) return { success: false, error: 'Cancelled' };
+    const outDir = filePaths[0];
+
+    try {
+      // copy all files from app dir to outDir/mobile (to avoid overwriting)
+      const target = path.join(outDir, `${sanitized}-mobile`);
+      fs.rmSync(target, { recursive: true, force: true });
+      copyRecursiveSync(dir, target);
+      // add minimal mobile boilerplate
+      const indexHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${appName}</title><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="manifest" href="manifest.json"></head><body><div id="root"></div><script src="index.js"></script></body></html>`;
+      fs.writeFileSync(path.join(target, 'index.html'), indexHtml, 'utf-8');
+      const manifest = JSON.stringify({
+        name: appName,
+        short_name: appName,
+        start_url: '.',
+        display: 'standalone',
+        background_color: '#ffffff',
+        description: appName,
+      }, null, 2);
+      fs.writeFileSync(path.join(target, 'manifest.json'), manifest, 'utf-8');
+      return { success: true, path: target };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
+    }
+  }
+
+  // default zip export
   const { filePath, canceled } = await dialog.showSaveDialog({
     defaultPath: `${sanitized}.zip`,
     filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
@@ -479,6 +594,21 @@ ipcMain.handle('apps:export', async (_event, appId: string) => {
     return { success: false, error: msg };
   }
 });
+
+// helper to copy recursively (synchronous)
+function copyRecursiveSync(src: string, dest: string) {
+  const exists = fs.existsSync(src);
+  const stats = exists && fs.statSync(src);
+  const isDirectory = exists && stats.isDirectory();
+  if (isDirectory) {
+    fs.mkdirSync(dest, { recursive: true });
+    fs.readdirSync(src).forEach((childItemName) => {
+      copyRecursiveSync(path.join(src, childItemName), path.join(dest, childItemName));
+    });
+  } else {
+    fs.copyFileSync(src, dest);
+  }
+}
 
 // ── Terminal support ───────────────────────────────────────────────────────
 // spawn a pseudo terminal and forward data events to renderer
@@ -511,14 +641,17 @@ ipcMain.handle('terminal:resize', (_event, { termId, cols, rows }: { termId: str
   if (term) term.resize(cols, rows);
 });
 
-ipcMain.handle('terminal:show-menu', (event) => {
+ipcMain.handle('show-context-menu', (event, type?: 'terminal' | 'global') => {
   const { Menu } = require('electron');
-  const menu = Menu.buildFromTemplate([
+  const template: any[] = [
     { label: 'Copy', role: 'copy' },
     { label: 'Paste', role: 'paste' },
     { type: 'separator' },
-    { label: 'Clear', click: () => event.sender.send('terminal:clear') },
-  ]);
+  ];
+  if (type === 'terminal') {
+    template.push({ label: 'Clear', click: () => event.sender.send('terminal:clear') });
+  }
+  const menu = Menu.buildFromTemplate(template);
   menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
 });
 

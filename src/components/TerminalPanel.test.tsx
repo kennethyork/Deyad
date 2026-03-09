@@ -12,6 +12,8 @@ describe('TerminalPanel', () => {
       terminalResize: vi.fn(),
       onTerminalData: vi.fn().mockReturnValue(() => {}),
       onTerminalExit: vi.fn().mockReturnValue(() => {}),
+      onTerminalClear: vi.fn().mockReturnValue(() => {}),
+      showContextMenu: vi.fn().mockResolvedValue(undefined),
     };
   });
 
@@ -24,8 +26,8 @@ describe('TerminalPanel', () => {
     expect(div).toBeTruthy();
     // event should be fired on inner element
     div.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
-    // menu isn't actually shown in tests, but handler should exist
-    expect(div).toBeTruthy();
+    // menu isn't actually shown in tests, but handler should exist and we should have attempted to open it
+    expect(window.deyad.showContextMenu).toHaveBeenCalledWith('terminal');
     // wait a tick for effect
     await Promise.resolve();
     expect(window.deyad.createTerminal).toHaveBeenCalledWith('foo');

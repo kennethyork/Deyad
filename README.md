@@ -120,12 +120,11 @@ npm run lint   # lint TypeScript files
 
 ## Packaging & CI/CD
 
-Automated GitHub Actions build Linux and Windows using electron-builder on every tag or manual dispatch. The workflow:
+Automated GitHub Actions build Linux and Windows using electron-builder on every push to `main` or via manual dispatch. The workflow:
 
 1. `npm ci` installs dependencies
 2. `npm run make` creates platform-specific installers and archives
-3. Artifacts are uploaded to the workflow run
-4. On tag pushes the job creates a GitHub Release and attaches the binaries.
+3. A GitHub release is created automatically with the built artifacts (no version tags required)
 
 You can manually package locally:
 
@@ -137,18 +136,8 @@ Artifacts land under `out/make/<platform>` (zip/exe) and, on Linux, you’ll als
 
 The script will invoke Forge’s make step which now creates `.deb` and `.rpm` packages in addition to the raw directory; after that it runs `appimagetool` to convert the directory into an AppImage. The tool must be installed (via your distro, or grab it from https://github.com/AppImage/AppImageKit) or you’ll see a message reminding you to install it.
 
-To publish a release, tag and push:
+Releases are created automatically by the CI workflow when runs are manually dispatched or triggered – you don’t need to manage version tags yourself.
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-(This requires the `GITHUB_TOKEN` secret; Actions handles it automatically.)
-
-Once the workflow completes a release page will contain installers for Linux and Windows.
-
-Automatic versioning is supported: pushing to `main` will bump the patch version, tag the commit, and trigger the build workflow (see CI section below).
 
 ## License
 

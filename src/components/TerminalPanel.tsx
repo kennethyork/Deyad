@@ -65,10 +65,10 @@ export default function TerminalPanel({ appId }: Props) {
       return true;
     });
 
-    // right-click context menu
+    // right-click context menu - tell main this is the terminal so it can add "Clear"
     const handleContext = (e: MouseEvent) => {
       e.preventDefault();
-      window.deyad.showContextMenu();
+      window.deyad.showContextMenu('terminal');
     };
     // attach to both the container and the actual xterm element to avoid missing clicks
     containerRef.current?.addEventListener('contextmenu', handleContext, { capture: true });
@@ -93,18 +93,6 @@ export default function TerminalPanel({ appId }: Props) {
         term.element.removeEventListener('contextmenu', handleContext);
       }
       removeClear();
-    };
-
-    // cleanup
-    return () => {
-      observer.disconnect();
-      term.dispose();
-      containerRef.current?.removeEventListener('contextmenu', handleContext);
-    };
-
-    return () => {
-      observer.disconnect();
-      term.dispose();
     };
   }, []);
 

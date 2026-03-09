@@ -4,6 +4,7 @@ import ChatPanel from './components/ChatPanel';
 import EditorPanel from './components/EditorPanel';
 import PreviewPanel from './components/PreviewPanel';
 import TerminalPanel from './components/TerminalPanel';
+import DatabasePanel from './components/DatabasePanel';
 import NewAppModal from './components/NewAppModal';
 import ImportModal from './components/ImportModal';
 import SettingsModal from './components/SettingsModal';
@@ -17,7 +18,7 @@ export interface AppProject {
   dbProvider?: 'mysql' | 'postgresql';
 }
 
-type RightTab = 'editor' | 'preview' | 'terminal';
+type RightTab = 'editor' | 'preview' | 'terminal' | 'database';
 
 export default function App() {
   const [apps, setApps] = useState<AppProject[]>([]);
@@ -39,6 +40,7 @@ export default function App() {
     const n = stored ? parseInt(stored, 10) : NaN;
     return isNaN(n) ? 220 : n;
   });
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [rightWidth, setRightWidth] = useState<number>(() => {
     const stored = localStorage.getItem('rightWidth');
     const n = stored ? parseInt(stored, 10) : NaN;
@@ -117,6 +119,21 @@ export default function App() {
   }, [selectedApp]);
 
 
+
+  // global context menu support
+  useEffect(() => {
+    const handleContext = (e: MouseEvent) => {
+      e.preventDefault();
+      // if right-click happened inside terminal, we let TerminalPanel handle it;
+      // otherwise show a generic global menu (copy/paste/select all).
+      const el = e.target as HTMLElement;
+      if (!el.closest('.terminal-panel')) {
+        window.deyad.showContextMenu('global');
+      }
+    };
+    window.addEventListener('contextmenu', handleContext);
+    return () => window.removeEventListener('contextmenu', handleContext);
+  }, []);
 
   // drag resizing helpers
   const startDrag = (type: 'sidebar' | 'right', startX: number) => {
@@ -230,9 +247,17 @@ export default function App() {
   };
 
   const handleExportApp = async (appId: string) => {
-    const result = await window.deyad.exportApp(appId);
-    if (!result.success && result.error !== 'Cancelled') {
-      alert(`Export failed: ${result.error}`);
+    // ask user whether they want a mobile/PWA export or a plain zip
+    const useMobile = window.confirm('Create mobile/PWA export? Press OK for mobile, Cancel for ZIP.');
+    const result = await window.deyad.exportApp(appId, useMobile ? 'mobile' : 'zip');
+    if (result.success && result.path) {
+      if (typeof alert === 'function') {
+        alert(`${useMobile ? 'Mobile export created at' : 'Exported to'} ${result.path}`);
+      }
+    } else if (!result.success && result.error !== 'Cancelled') {
+      if (typeof alert === 'function') {
+        alert(`Export failed: ${result.error}`);
+      }
     }
   };
 
@@ -248,7 +273,7 @@ export default function App() {
   return (
     <div className="app-layout">
       {/* sidebar */}
-      <aside className="sidebar" style={{ width: sidebarWidth }}>
+      <aside className={`sidebar ${sidebarVisible ? '' : 'hidden'}`} style={{ width: sidebarWidth }}>
         <Sidebar
           apps={apps}
           selectedApp={selectedApp}
@@ -262,6 +287,14 @@ export default function App() {
         />
       </aside>
 
+      {/* menu button for narrow screens */}
+      <button
+        className="btn-toggle-sidebar"
+        onClick={() => setSidebarVisible((v) => !v)}
+        title="Toggle sidebar"
+      >
+        ☰
+      </button>
       {/* resizer between sidebar and centre */}
       <div
         className="resizer"
@@ -329,6 +362,14 @@ export default function App() {
               >
                 Terminal
               </button>
+              {selectedApp?.appType === 'fullstack' && (
+                <button
+                  className={`right-tab ${rightTab === 'database' ? 'active' : ''}`}
+                  onClick={() => setRightTab('database')}
+                >
+                  Database
+                </button>
+              )}
             </div>
 
             {rightTab === 'editor' ? (
@@ -341,9 +382,11 @@ export default function App() {
               />
             ) : rightTab === 'preview' ? (
               <PreviewPanel app={selectedApp} />
-            ) : (
+            ) : rightTab === 'terminal' ? (
               <TerminalPanel appId={selectedApp.id} />
-            )}
+            ) : rightTab === 'database' ? (
+              <DatabasePanel app={selectedApp} />
+            ) : null}
           </>
         )}
       </div>

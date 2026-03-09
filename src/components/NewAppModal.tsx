@@ -27,6 +27,9 @@ const TEMPLATES: Template[] = [
   { name: 'Calculator', description: 'Scientific calculator with history', icon: '🔢', appType: 'frontend', prompt: 'Build a calculator app with basic arithmetic, scientific functions, calculation history, and a clean modern UI with button grid.' },
   { name: 'Notes App', description: 'Markdown notes with live preview', icon: '📝', appType: 'frontend', prompt: 'Create a notes app with markdown editing and live preview side by side. Include a sidebar for note list, search, and categories.' },
   { name: 'Kanban Board', description: 'Drag & drop task board', icon: '📋', appType: 'frontend', prompt: 'Build a Kanban board with columns (To Do, In Progress, Done), draggable task cards, add/edit/delete tasks, and column management.' },
+  // new mobile / web-focused templates
+  { name: 'Mobile App', description: 'Cordova/Capacitor mobile shell', icon: '📱', appType: 'frontend', prompt: 'Create a simple mobile app shell with a bottom navigation, responsive layout, and example screens. Prepare for Cordova or Capacitor packaging.' },
+  { name: 'PWA Dashboard', description: 'Progressive web app dashboard', icon: '🌐', appType: 'frontend', prompt: 'Build a progressive web app dashboard with offline caching, responsive grid, and install prompt support. Include service worker skeleton.' },
   { name: 'Blog', description: 'Blog with posts, categories & comments', icon: '✍️', appType: 'fullstack', prompt: 'Create a blog with posts, categories, and comments. Include CRUD for posts and a clean reading UI with pagination.' },
   { name: 'E-commerce', description: 'Product catalog with cart & checkout', icon: '🛒', appType: 'fullstack', prompt: 'Build an e-commerce app with product listings, shopping cart, checkout flow, and order history.' },
   { name: 'Social Feed', description: 'Social media feed with posts & likes', icon: '📱', appType: 'fullstack', prompt: 'Build a social media feed with user posts, like/unlike functionality, comments, and a create post form with image upload support.' },
@@ -40,6 +43,20 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const [dbProvider, setDbProvider] = useState<DbProvider>('postgresql');
   const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [pluginTemplates, setPluginTemplates] = useState<Template[]>([]);
+
+  // load plugin templates on mount
+  useEffect(() => {
+    window.deyad.listPlugins().then((plugins) => {
+      const pts: Template[] = [];
+      plugins.forEach((p) => {
+        if (p.templates) {
+          p.templates.forEach((t) => pts.push({ ...t }));
+        }
+      });
+      setPluginTemplates(pts);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     window.deyad.checkDocker().then(setDockerAvailable);
@@ -73,7 +90,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
             <label>Start from a template</label>
             <div className="template-grid-scroll">
               <div className="template-grid">
-                {TEMPLATES.map((t) => (
+                {(TEMPLATES.concat(pluginTemplates)).map((t) => (
                   <button
                     key={t.name}
                     type="button"
