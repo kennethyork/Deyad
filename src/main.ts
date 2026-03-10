@@ -191,6 +191,28 @@ const createWindow = () => {
 
   // clear cache before loading to ensure latest CSS/JS is used
   mainWindow.webContents.session.clearCache().then(() => {
+
+    // Strip X-Frame-Options & CSP frame-ancestors from local DB admin tools
+    // (phpMyAdmin :8080, pgAdmin :5050) so they can be embedded in iframes.
+    mainWindow.webContents.session.webRequest.onHeadersReceived(
+      { urls: ['http://localhost:8080/*', 'http://localhost:5050/*'] },
+      (details, callback) => {
+        const headers = { ...details.responseHeaders };
+        for (const key of Object.keys(headers)) {
+          const lk = key.toLowerCase();
+          if (lk === 'x-frame-options') delete headers[key];
+          if (lk === 'content-security-policy') {
+            // Remove only the frame-ancestors directive, keep the rest
+            headers[key] = headers[key].map((v: string) =>
+              v.replace(/frame-ancestors\s+[^;]+;?/gi, '').trim()
+            ).filter(Boolean);
+            if (headers[key].length === 0) delete headers[key];
+          }
+        }
+        callback({ responseHeaders: headers });
+      },
+    );
+
     // allow launching a specific HTML file (e.g. vanilla/index.html)
     const customArg = process.argv.slice(1).find((a) => a.endsWith('.html'));
     if (customArg) {
