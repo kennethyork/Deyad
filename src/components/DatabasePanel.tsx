@@ -115,11 +115,10 @@ export default function DatabasePanel({ app, dbStatus }: Props) {
               <div className="db-gui-credentials">
                 <span>Login: <strong>{pgEmail}</strong> / <strong>{pgPassword}</strong></span>
               </div>
-              <iframe
+              <webview
                 key={`pgadmin-${dbStatus}`}
                 src={guiUrl}
                 className="db-gui-iframe"
-                title="pgAdmin"
               />
             </>
           )}

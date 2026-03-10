@@ -262,6 +262,9 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${pgAdminEmail}
       PGADMIN_DEFAULT_PASSWORD: ${pgAdminPassword}
+      PGADMIN_CONFIG_WTF_CSRF_ENABLED: 'False'
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: 'False'
+      PGADMIN_CONFIG_WTF_CSRF_CHECK_DEFAULT: 'False'
     ports:
       - '${hostGuiPort}:80'
     depends_on:
