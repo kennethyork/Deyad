@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import type { editor as monacoEditor } from 'monaco-editor';
+import type { editor as monacoEditor, IDisposable } from 'monaco-editor';
 
 interface Props {
   files: Record<string, string>;
@@ -8,6 +8,8 @@ interface Props {
   onSelectFile: (path: string) => void;
   onOpenFolder: () => void;
   onFileEdit: (path: string, content: string) => void;
+  autocompleteEnabled?: boolean;
+  completionModel?: string;
 }
 
 function getLanguage(path: string): string {
@@ -127,10 +129,14 @@ function FileTree({
   );
 }
 
-export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenFolder, onFileEdit }: Props) {
+export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenFolder, onFileEdit, autocompleteEnabled, completionModel }: Props) {
   const fileCount = Object.keys(files).length;
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const completionProviderRef = useRef<IDisposable | null>(null);
+  const autocompleteEnabledRef = useRef(autocompleteEnabled);
+  const completionModelRef = useRef(completionModel);
+  const selectedFileRef = useRef(selectedFile);
 
   // Filter files by search query (matches path or content)
 
@@ -188,6 +194,9 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
   // Keep refs in sync for use inside Monaco callbacks
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+  useEffect(() => { autocompleteEnabledRef.current = autocompleteEnabled; }, [autocompleteEnabled]);
+  useEffect(() => { completionModelRef.current = completionModel; }, [completionModel]);
+  useEffect(() => { selectedFileRef.current = selectedFile; }, [selectedFile]);
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
@@ -202,6 +211,63 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     editor.onDidBlurEditorText(() => {
       if (isDirtyRef.current) handleSaveRef.current();
     });
+
+    // Register Ollama-powered inline completion provider
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    completionProviderRef.current = monaco.languages.registerInlineCompletionsProvider(
+      { pattern: '**' },
+      {
+        provideInlineCompletions: async (model, position, _context, token) => {
+          if (!autocompleteEnabledRef.current) return { items: [] };
+          const completionModelName = completionModelRef.current;
+          if (!completionModelName) return { items: [] };
+
+          // Debounce: wait 500ms of inactivity before requesting
+          if (debounceTimer) clearTimeout(debounceTimer);
+          const items = await new Promise<{ insertText: string }[]>((resolve) => {
+            debounceTimer = setTimeout(async () => {
+              if (token.isCancellationRequested) { resolve([]); return; }
+              try {
+                const textUntilPosition = model.getValueInRange({
+                  startLineNumber: Math.max(1, position.lineNumber - 50),
+                  startColumn: 1,
+                  endLineNumber: position.lineNumber,
+                  endColumn: position.column,
+                });
+                const textAfterPosition = model.getValueInRange({
+                  startLineNumber: position.lineNumber,
+                  startColumn: position.column,
+                  endLineNumber: Math.min(model.getLineCount(), position.lineNumber + 10),
+                  endColumn: model.getLineMaxColumn(Math.min(model.getLineCount(), position.lineNumber + 10)),
+                });
+
+                // Build FIM prompt with file path context
+                const filePath = selectedFileRef.current || '';
+                const prefix = `// File: ${filePath}\n${textUntilPosition}`;
+
+                if (token.isCancellationRequested) { resolve([]); return; }
+
+                const completion = await window.deyad.fimComplete(
+                  completionModelName,
+                  prefix,
+                  textAfterPosition || undefined,
+                );
+                if (token.isCancellationRequested || !completion.trim()) { resolve([]); return; }
+                resolve([{ insertText: completion }]);
+              } catch {
+                resolve([]);
+              }
+            }, 500);
+            token.onCancellationRequested(() => {
+              if (debounceTimer) clearTimeout(debounceTimer);
+              resolve([]);
+            });
+          });
+          return { items };
+        },
+        freeInlineCompletions() {},
+      } as any,
+    );
   }, []);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
@@ -225,6 +291,11 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
       if (isDirty) handleSave();
     };
   }, [selectedFile, isDirty, handleSave]);
+
+  // Cleanup inline completion provider on unmount
+  useEffect(() => {
+    return () => { completionProviderRef.current?.dispose(); };
+  }, []);
 
   return (
     <div className="editor-panel">
@@ -299,6 +370,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
                 tabSize: 2,
                 automaticLayout: true,
                 padding: { top: 8 },
+                inlineSuggest: { enabled: true },
+                quickSuggestions: true,
               }}
             />
           </>

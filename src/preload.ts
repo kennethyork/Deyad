@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('deyad', {
   chatStream: (model: string, messages: ChatMessage[]): Promise<void> =>
     ipcRenderer.invoke('ollama:chat-stream', { model, messages }),
 
+  fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
+    ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
+
+  embed: (model: string, input: string | string[]): Promise<{ embeddings: number[][] }> =>
+    ipcRenderer.invoke('ollama:embed', { model, input }),
+
   onStreamToken: (cb: (token: string) => void) => {
     const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token);
     ipcRenderer.on('ollama:stream-token', handler);
@@ -142,15 +148,21 @@ contextBridge.exposeInMainWorld('deyad', {
   getSettings: (): Promise<{
     ollamaHost: string;
     defaultModel: string;
+    autocompleteEnabled: boolean;
+    completionModel: string;
   }> =>
     ipcRenderer.invoke('settings:get'),
 
   setSettings: (settings: {
     ollamaHost?: string;
     defaultModel?: string;
+    autocompleteEnabled?: boolean;
+    completionModel?: string;
   }): Promise<{
     ollamaHost: string;
     defaultModel: string;
+    autocompleteEnabled: boolean;
+    completionModel: string;
   }> =>
     ipcRenderer.invoke('settings:set', settings),
 

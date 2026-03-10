@@ -276,6 +276,56 @@ ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model:
   return streamOllama(event, model, messages);
 });
 
+/** Fill-in-the-middle completion for inline autocomplete. */
+ipcMain.handle('ollama:fim-complete', async (_event, { model, prompt, suffix, stop }: { model: string; prompt: string; suffix?: string; stop?: string[] }) => {
+  return new Promise<string>((resolve, reject) => {
+    const body: Record<string, unknown> = {
+      model,
+      prompt,
+      stream: false,
+      options: { temperature: 0.2, num_predict: 128, stop: stop || ['\n\n', '```'] },
+    };
+    if (suffix) body.suffix = suffix;
+    const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/generate` });
+    let data = '';
+    request.on('response', (response) => {
+      response.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve(parsed.response || '');
+        } catch { resolve(''); }
+      });
+    });
+    request.on('error', (err: Error) => reject(err));
+    request.setHeader('Content-Type', 'application/json');
+    request.write(JSON.stringify(body));
+    request.end();
+  });
+});
+
+/** Generate embeddings via Ollama for codebase indexing. */
+ipcMain.handle('ollama:embed', async (_event, { model, input }: { model: string; input: string | string[] }) => {
+  return new Promise<{ embeddings: number[][] }>((resolve, reject) => {
+    const body = JSON.stringify({ model, input });
+    const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/embed` });
+    let data = '';
+    request.on('response', (response) => {
+      response.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      response.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          resolve({ embeddings: parsed.embeddings || [] });
+        } catch { resolve({ embeddings: [] }); }
+      });
+    });
+    request.on('error', (err: Error) => reject(err));
+    request.setHeader('Content-Type', 'application/json');
+    request.write(body);
+    request.end();
+  });
+});
+
 // ── Git Helpers ───────────────────────────────────────────────────────────────
 
 ipcMain.handle('git:show', async (_event, appId: string, hash: string, filePath: string) => {

@@ -7,6 +7,8 @@ interface Props {
 export default function SettingsModal({ onClose }: Props) {
   const [ollamaHost, setOllamaHost] = useState('http://localhost:11434');
   const [defaultModel, setDefaultModel] = useState('');
+  const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
+  const [completionModel, setCompletionModel] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -20,6 +22,8 @@ export default function SettingsModal({ onClose }: Props) {
     const settings = await window.deyad.getSettings();
     setOllamaHost(settings.ollamaHost);
     setDefaultModel(settings.defaultModel);
+    setAutocompleteEnabled(settings.autocompleteEnabled ?? false);
+    setCompletionModel(settings.completionModel ?? '');
     loadModels();
   };
 
@@ -36,6 +40,8 @@ export default function SettingsModal({ onClose }: Props) {
     await window.deyad.setSettings({
       ollamaHost: ollamaHost.trim(),
       defaultModel,
+      autocompleteEnabled,
+      completionModel,
     });
     setSaving(false);
     setSaved(true);
@@ -96,6 +102,38 @@ export default function SettingsModal({ onClose }: Props) {
               ))}
             </select>
           </div>
+
+          <hr className="settings-divider" />
+
+          <div className="form-field">
+            <label className="settings-toggle-label">
+              <input
+                type="checkbox"
+                checked={autocompleteEnabled}
+                onChange={(e) => setAutocompleteEnabled(e.target.checked)}
+              />
+              Enable inline autocomplete
+            </label>
+            <span className="settings-hint">AI-powered code suggestions as you type (uses Ollama FIM)</span>
+          </div>
+
+          {autocompleteEnabled && (
+            <div className="form-field">
+              <label htmlFor="completion-model">Completion Model</label>
+              <select
+                id="completion-model"
+                className="model-select settings-model-select"
+                value={completionModel}
+                onChange={(e) => setCompletionModel(e.target.value)}
+              >
+                <option value="">Same as default</option>
+                {models.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <span className="settings-hint">Smaller/faster models like qwen2.5-coder:1.5b work best for autocomplete</span>
+            </div>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>

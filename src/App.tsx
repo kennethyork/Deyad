@@ -48,6 +48,9 @@ export default function App() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'sidebar' | 'chat' | 'right'>('chat');
   const [pendingDiffFiles, setPendingDiffFiles] = useState<Record<string, string> | null>(null);
+  const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
+  const [completionModel, setCompletionModel] = useState('');
+  const [defaultModel, setDefaultModel] = useState('');
 
   // resizable panels (persist sizes in localStorage)
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -65,6 +68,12 @@ export default function App() {
   // Load app list on mount
   useEffect(() => {
     loadApps();
+    // Load autocomplete settings
+    window.deyad.getSettings().then((s) => {
+      setAutocompleteEnabled(s.autocompleteEnabled ?? false);
+      setCompletionModel(s.completionModel ?? '');
+      setDefaultModel(s.defaultModel ?? '');
+    }).catch(() => {});
   }, []);
 
   // Subscribe to task queue changes for activity badge
@@ -428,6 +437,8 @@ export default function App() {
                 onSelectFile={setSelectedFile}
                 onOpenFolder={() => window.deyad.openAppFolder(selectedApp.id)}
                 onFileEdit={handleFileEdit}
+                autocompleteEnabled={autocompleteEnabled}
+                completionModel={completionModel || defaultModel}
               />
             ) : rightTab === 'preview' ? (
               <PreviewPanel app={selectedApp} />
@@ -452,7 +463,15 @@ export default function App() {
       )}
 
       {showSettings && (
-        <SettingsModal onClose={() => setShowSettings(false)} />
+        <SettingsModal onClose={() => {
+          setShowSettings(false);
+          // Reload settings to pick up autocomplete changes
+          window.deyad.getSettings().then((s) => {
+            setAutocompleteEnabled(s.autocompleteEnabled ?? false);
+            setCompletionModel(s.completionModel ?? '');
+            setDefaultModel(s.defaultModel ?? '');
+          }).catch(() => {});
+        }} />
       )}
 
       {pendingDiffFiles && (

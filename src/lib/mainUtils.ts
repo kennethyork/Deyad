@@ -24,11 +24,15 @@ export function appDir(appsDir: string, appId: string): string {
 export interface DeyadSettings {
   ollamaHost: string;
   defaultModel: string;
+  autocompleteEnabled: boolean;
+  completionModel: string;
 }
 
 export const DEFAULT_SETTINGS: DeyadSettings = {
   ollamaHost: 'http://localhost:11434',
   defaultModel: '',
+  autocompleteEnabled: false,
+  completionModel: '',
 };
 
 export function loadSettings(settingsPath: string): DeyadSettings {

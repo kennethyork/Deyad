@@ -42,6 +42,8 @@ interface UiMessage {
 interface DeyadSettings {
   ollamaHost: string;
   defaultModel: string;
+  autocompleteEnabled: boolean;
+  completionModel: string;
 }
 
 interface GitLogEntry {
@@ -69,6 +71,8 @@ interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[]): Promise<void>;
+  fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
+  embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
   onStreamToken(cb: (token: string) => void): () => void;
   onStreamDone(cb: () => void): () => void;
   onStreamError(cb: (err: string) => void): () => void;

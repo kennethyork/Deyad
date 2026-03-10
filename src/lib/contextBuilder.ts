@@ -8,6 +8,8 @@
  * 4. Respects a total token budget
  */
 
+import { getOrBuildIndex, rankFilesByQuery } from './codebaseIndexer';
+
 /** Approximate tokens per character (conservative estimate for code). */
 const CHARS_PER_TOKEN = 3.5;
 
@@ -33,6 +35,8 @@ export interface ContextOptions {
   selectedFile?: string | null;
   /** The user's current message (used for keyword matching). */
   userMessage?: string;
+  /** App ID for TF-IDF index lookup. */
+  appId?: string;
 }
 
 interface ScoredFile {
@@ -123,20 +127,29 @@ function extractKeywords(message: string): string[] {
  * and providing summaries for the rest.
  */
 export function buildSmartContext(options: ContextOptions): string {
-  const { files, selectedFile, userMessage } = options;
+  const { files, selectedFile, userMessage, appId } = options;
   const entries = Object.entries(files);
 
   if (entries.length === 0) return '';
 
   const keywords = userMessage ? extractKeywords(userMessage) : [];
 
+  // Build TF-IDF relevance scores if we have a query
+  let tfidfScores = new Map<string, number>();
+  if (userMessage && appId) {
+    const index = getOrBuildIndex(appId, files);
+    tfidfScores = rankFilesByQuery(index, userMessage);
+  }
+
   // Score and sort all files
   const scored: ScoredFile[] = entries
-    .map(([path, content]) => ({
-      path,
-      content,
-      score: scoreFile(path, content, selectedFile, keywords),
-    }))
+    .map(([path, content]) => {
+      let score = scoreFile(path, content, selectedFile, keywords);
+      // Blend in TF-IDF score (up to +30 boost)
+      const tfidf = tfidfScores.get(path) || 0;
+      score += tfidf * 0.3;
+      return { path, content, score };
+    })
     .sort((a, b) => b.score - a.score);
 
   const parts: string[] = [];
