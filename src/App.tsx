@@ -123,6 +123,8 @@ export default function App() {
   const selectApp = useCallback(async (app: AppProject) => {
     setSelectedApp(app);
     setSelectedFile(null);
+    // Reset DB status immediately so the iframe doesn't render with a stale 'running' state
+    setDbStatus('none');
     // Always show the file editor when switching apps — the preview iframe always
     // points to localhost:5173 so it could show a stale/different app's preview.
     setRightTab('editor');
