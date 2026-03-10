@@ -28,6 +28,8 @@ export interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
+  pgAdminEmail: string;
+  pgAdminPassword: string;
 }
 
 export const DEFAULT_SETTINGS: DeyadSettings = {
@@ -37,6 +39,8 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   completionModel: '',
   embedModel: '',
   hasCompletedWizard: false,
+  pgAdminEmail: 'admin@admin.com',
+  pgAdminPassword: 'admin',
 };
 
 export function loadSettings(settingsPath: string): DeyadSettings {

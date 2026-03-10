@@ -191,6 +191,10 @@ export interface ScaffoldOptions {
   dbPort?: number;
   /** Host port for the admin GUI (pgAdmin, mapped to container 80). Auto-assigned if omitted. */
   guiPort?: number;
+  /** pgAdmin login email. Defaults to admin@admin.com. */
+  pgAdminEmail?: string;
+  /** pgAdmin login password. Defaults to admin. */
+  pgAdminPassword?: string;
 }
 
 /**
@@ -226,6 +230,8 @@ export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string,
   const dbPassword = opts.dbPassword;
   const hostDbPort = opts.dbPort ?? 5433;
   const hostGuiPort = opts.guiPort ?? 5050;
+  const pgAdminEmail = opts.pgAdminEmail || 'admin@admin.com';
+  const pgAdminPassword = opts.pgAdminPassword || 'admin';
 
   const dockerCompose = `version: '3.9'
 
@@ -254,8 +260,8 @@ services:
     container_name: ${sanitize(appName)}_pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: ${dbPassword}
+      PGADMIN_DEFAULT_EMAIL: ${pgAdminEmail}
+      PGADMIN_DEFAULT_PASSWORD: ${pgAdminPassword}
     ports:
       - '${hostGuiPort}:80'
     depends_on:
@@ -727,8 +733,8 @@ Frontend runs at **http://localhost:5173**
 pgAdmin is available at **http://localhost:${hostGuiPort}**
 
 Login with:
-- **Email:** admin@admin.com
-- **Password:** (your DB password)
+- **Email:** ${pgAdminEmail}
+- **Password:** (your pgAdmin password from Settings)
 
 ## Database connection
 

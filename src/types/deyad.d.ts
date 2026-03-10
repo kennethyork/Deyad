@@ -48,6 +48,8 @@ interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
+  pgAdminEmail: string;
+  pgAdminPassword: string;
 }
 
 interface GitLogEntry {
