@@ -49,9 +49,9 @@ describe('buildSmartContext', () => {
 
   it('provides summaries for files beyond the full-content limit', () => {
     const files: Record<string, string> = {};
-    // Create enough files to exceed MAX_FULL_FILES
-    for (let i = 0; i < 25; i++) {
-      files[`src/file${i}.tsx`] = `// File ${i}\n`.repeat(100);
+    // Create enough files to exceed MAX_FULL_FILES (25) and MAX_CONTEXT_CHARS
+    for (let i = 0; i < 40; i++) {
+      files[`src/file${i}.tsx`] = `// File ${i}\n`.repeat(200);
     }
     const ctx = buildSmartContext({ files });
     expect(ctx).toContain('summaries only');

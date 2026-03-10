@@ -11,7 +11,59 @@ import type { ToolResult } from './agentTools';
 import { buildSmartContext } from './contextBuilder';
 
 /** Maximum autonomous iterations before forcing a stop. */
-const MAX_ITERATIONS = 15;
+const MAX_ITERATIONS = 30;
+
+/** Approximate character budget for the full conversation (≈ 32k tokens at ~3.5 chars/token). */
+const MAX_CONVERSATION_CHARS = 112_000;
+
+/**
+ * Compact the conversation when it exceeds the character budget.
+ * Keeps system messages and the most recent turns, summarizing
+ * older assistant+tool_result pairs into a single summary message.
+ */
+function compactConversation(
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+): void {
+  const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
+  if (totalChars <= MAX_CONVERSATION_CHARS) return;
+
+  // Find where non-system messages begin
+  let firstNonSystem = 0;
+  while (firstNonSystem < messages.length && messages[firstNonSystem].role === 'system') {
+    firstNonSystem++;
+  }
+
+  // Keep at least the last 6 non-system messages
+  const keepRecent = 6;
+  const nonSystemCount = messages.length - firstNonSystem;
+  if (nonSystemCount <= keepRecent) return; // nothing to compact
+
+  const compactEnd = messages.length - keepRecent;
+  const toSummarize = messages.slice(firstNonSystem, compactEnd);
+
+  // Build a brief summary of the compacted turns
+  const summaryParts: string[] = [];
+  for (const msg of toSummarize) {
+    if (msg.role === 'assistant') {
+      const prose = stripToolMarkup(msg.content).slice(0, 200);
+      if (prose) summaryParts.push(`Agent: ${prose}`);
+    } else if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
+      // Tool results — just note tools used
+      const toolNames = [...msg.content.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1]);
+      if (toolNames.length) summaryParts.push(`Tools executed: ${toolNames.join(', ')}`);
+    } else if (msg.role === 'user') {
+      summaryParts.push(`User: ${msg.content.slice(0, 200)}`);
+    }
+  }
+
+  const summary = `[Earlier conversation compacted]\n${summaryParts.join('\n')}`;
+
+  // Splice: remove the old messages and insert the summary
+  messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
+    role: 'system' as const,
+    content: summary,
+  });
+}
 
 export interface AgentCallbacks {
   /** Called when the agent adds/updates its thinking or prose output. */
@@ -65,7 +117,7 @@ WORKFLOW:
 
 RULES:
 - Always explore the project structure before making changes.
-- Write complete file contents (not diffs or patches).
+- Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
 - Keep your prose explanations concise — focus on actions.
@@ -173,6 +225,9 @@ export function runAgentLoop(options: AgentOptions): () => void {
       while (iteration < MAX_ITERATIONS && !aborted) {
         iteration++;
 
+        // Compact conversation if it's getting too large for the context window
+        compactConversation(messages);
+
         // Stream one turn from Ollama
         const turnResponse = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
@@ -192,6 +247,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
 
         // Execute each tool call
         const results: ToolResult[] = [];
+        let filesChanged = false;
         for (const call of toolCalls) {
           if (aborted) break;
           callbacks.onToolStart(call.name, call.params);
@@ -202,6 +258,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
 
           // If files were written, notify parent
           if (call.name === 'write_files' && result.success) {
+            filesChanged = true;
             const fileMap: Record<string, string> = {};
             if (call.params.path && call.params.content !== undefined) {
               fileMap[call.params.path] = call.params.content;
@@ -216,6 +273,27 @@ export function runAgentLoop(options: AgentOptions): () => void {
               await callbacks.onFilesWritten(fileMap);
             }
           }
+
+          // edit_file also modifies files
+          if (call.name === 'edit_file' && result.success) {
+            filesChanged = true;
+          }
+        }
+
+        // Re-read project files after writes so the next iteration sees updated code
+        if (filesChanged) {
+          try {
+            const freshFiles = await window.deyad.readFiles(appId);
+            const freshContext = buildSmartContext({
+              files: freshFiles,
+              selectedFile,
+              userMessage,
+            });
+            // Replace the stale project files context message (index 1)
+            if (messages.length > 1 && messages[1].role === 'system' && messages[1].content.startsWith('Current project files:')) {
+              messages[1] = { role: 'system', content: `Current project files:\n\n${freshContext}` };
+            }
+          } catch { /* ignore — context stays as-is */ }
         }
 
         if (aborted) break;
@@ -225,9 +303,24 @@ export function runAgentLoop(options: AgentOptions): () => void {
           .map((r) => `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`)
           .join('\n\n');
 
+        // Auto-lint: after file changes, run a quick type-check and append errors
+        let autoLintText = '';
+        if (filesChanged && !aborted) {
+          try {
+            const lintResult = await executeTool(
+              { name: 'run_command', params: { command: 'npx tsc --noEmit --pretty false 2>&1 | head -40' } },
+              appId,
+            );
+            const lintOutput = lintResult.output.trim();
+            if (lintOutput && lintOutput !== '(no output)' && /error\s+TS/i.test(lintOutput)) {
+              autoLintText = `\n\n<auto_lint>\nTypeScript errors detected after your changes — please fix them:\n${lintOutput}\n</auto_lint>`;
+            }
+          } catch { /* ignore lint failures */ }
+        }
+
         // Add assistant response and tool results to conversation
         messages.push({ role: 'assistant', content: turnResponse });
-        messages.push({ role: 'user', content: resultsText });
+        messages.push({ role: 'user', content: resultsText + autoLintText });
 
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';

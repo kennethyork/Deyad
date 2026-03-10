@@ -12,13 +12,13 @@
 const CHARS_PER_TOKEN = 3.5;
 
 /** Maximum total characters to include as context (≈ 8k tokens). */
-const MAX_CONTEXT_CHARS = 28_000;
+const MAX_CONTEXT_CHARS = 60_000;
 
 /** Maximum characters for a single file in full-content mode. */
-const MAX_FILE_CHARS = 4_000;
+const MAX_FILE_CHARS = 8_000;
 
 /** Maximum files to include with full content. */
-const MAX_FULL_FILES = 15;
+const MAX_FULL_FILES = 25;
 
 /** Maximum files to include as summaries (path + first lines). */
 const MAX_SUMMARY_FILES = 40;

@@ -141,6 +141,31 @@ export async function executeTool(
         return { tool: call.name, success: true, output: text };
       }
 
+      case 'edit_file': {
+        const filePath = call.params.path;
+        const oldStr = call.params.old_string;
+        const newStr = call.params.new_string;
+        if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
+        if (oldStr === undefined) return { tool: call.name, success: false, output: 'Missing "old_string" parameter.' };
+        if (newStr === undefined) return { tool: call.name, success: false, output: 'Missing "new_string" parameter.' };
+
+        const files = await window.deyad.readFiles(appId);
+        const content = files[filePath];
+        if (content === undefined) {
+          return { tool: call.name, success: false, output: `File not found: ${filePath}` };
+        }
+        const occurrences = content.split(oldStr).length - 1;
+        if (occurrences === 0) {
+          return { tool: call.name, success: false, output: `old_string not found in ${filePath}. Make sure the string matches exactly (including whitespace).` };
+        }
+        if (occurrences > 1) {
+          return { tool: call.name, success: false, output: `old_string found ${occurrences} times in ${filePath}. It must match exactly once. Add more context to make it unique.` };
+        }
+        const updated = content.replace(oldStr, newStr);
+        await window.deyad.writeFiles(appId, { [filePath]: updated });
+        return { tool: call.name, success: true, output: `Edited ${filePath} (replaced 1 occurrence).` };
+      }
+
       default:
         return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
     }
@@ -245,6 +270,13 @@ Available tools:
 
 6. **db_schema** — Get the current database schema (Prisma models).
    No parameters.
+
+7. **edit_file** — Make a surgical edit to a file by replacing an exact string match.
+   <param name="path">relative/path/to/file</param>
+   <param name="old_string">exact text to find (must appear exactly once)</param>
+   <param name="new_string">replacement text</param>
+   Prefer edit_file over write_files when you only need to change a small part of a file.
+   Include enough surrounding context in old_string so it matches exactly once.
 
 After your tool calls, you will receive results in <tool_result> blocks.
 You can make multiple tool calls in a single response.
