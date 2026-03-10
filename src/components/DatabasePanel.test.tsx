@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // @ts-nocheck
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import DatabasePanel from './DatabasePanel';
 
@@ -29,9 +29,14 @@ describe('DatabasePanel', () => {
     (window as any).deyad = {
       dbDescribe: vi.fn().mockResolvedValue(simpleSchema),
     };
+    // Mock fetch to simulate port readiness
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response()));
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
 
   it('shows message for non-fullstack app', () => {
     render(<DatabasePanel app={{ ...fullApp, appType: 'frontend' }} dbStatus="none" />);
@@ -48,18 +53,28 @@ describe('DatabasePanel', () => {
     expect(screen.getByText(/start the database/i)).toBeTruthy();
   });
 
-  it('renders iframe when DB is running (mysql)', () => {
+  it('renders iframe when DB is running (mysql)', async () => {
     const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" />);
-    const iframe = container.querySelector('iframe');
-    expect(iframe).toBeTruthy();
-    expect(iframe?.src).toContain('18080');
+    await waitFor(() => {
+      const iframe = container.querySelector('iframe');
+      expect(iframe).toBeTruthy();
+      expect(iframe?.src).toContain('18080');
+    });
   });
 
-  it('renders iframe when DB is running (postgresql)', () => {
+  it('renders iframe when DB is running (postgresql)', async () => {
     const { container } = render(<DatabasePanel app={pgApp} dbStatus="running" />);
-    const iframe = container.querySelector('iframe');
-    expect(iframe).toBeTruthy();
-    expect(iframe?.src).toContain('15050');
+    await waitFor(() => {
+      const iframe = container.querySelector('iframe');
+      expect(iframe).toBeTruthy();
+      expect(iframe?.src).toContain('15050');
+    });
+  });
+
+  it('shows starting placeholder when port not ready', () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    render(<DatabasePanel app={fullApp} dbStatus="running" />);
+    expect(screen.getByText(/starting phpmyadmin/i)).toBeTruthy();
   });
 
   it('switches to schema view and shows tables', async () => {
