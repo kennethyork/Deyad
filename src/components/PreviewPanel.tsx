@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AppProject } from '../App';
 
-/** Port the Vite dev server listens on (matches vite.config.ts in both scaffolds). */
-const PREVIEW_URL = 'http://localhost:5173';
+const FALLBACK_URL = 'http://localhost:5173';
 
 type DevStatus = 'stopped' | 'starting' | 'running' | 'error';
 
@@ -16,6 +15,7 @@ export default function PreviewPanel({ app, onPublish }: Props) {
   const [logs, setLogs] = useState<string>('');
   const [showLogs, setShowLogs] = useState(false);
   const [startError, setStartError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(FALLBACK_URL);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,8 +24,12 @@ export default function PreviewPanel({ app, onPublish }: Props) {
     const unsubLog = window.deyad.onAppDevLog(({ appId, data }) => {
       if (appId !== app.id) return;
       setLogs((prev) => prev + data);
-      // Auto-detect "ready" from Vite output
-      if (data.includes('localhost') || data.includes('Local:')) {
+      // Auto-detect "ready" from Vite output and extract the actual URL
+      const urlMatch = data.match(/https?:\/\/localhost:\d+/);
+      if (urlMatch) {
+        setPreviewUrl(urlMatch[0]);
+        setStatus('running');
+      } else if (data.includes('Local:')) {
         setStatus('running');
       }
     });
@@ -53,6 +57,7 @@ export default function PreviewPanel({ app, onPublish }: Props) {
     setStatus('stopped');
     setLogs('');
     setStartError('');
+    setPreviewUrl(FALLBACK_URL);
   }, [app.id]);
 
   const handleStart = async () => {
@@ -73,7 +78,7 @@ export default function PreviewPanel({ app, onPublish }: Props) {
 
   const handleRefresh = () => {
     if (iframeRef.current) {
-      iframeRef.current.src = PREVIEW_URL;
+      iframeRef.current.src = previewUrl;
     }
   };
 
@@ -81,7 +86,7 @@ export default function PreviewPanel({ app, onPublish }: Props) {
     <div className="preview-panel">
       {/* Toolbar */}
       <div className="preview-toolbar">
-        <span className="preview-url">{PREVIEW_URL}</span>
+        <span className="preview-url">{previewUrl}</span>
 
         <div className="preview-toolbar-actions">
           {status === 'running' && (
@@ -157,7 +162,7 @@ export default function PreviewPanel({ app, onPublish }: Props) {
         ) : (
           <iframe
             ref={iframeRef}
-            src={PREVIEW_URL}
+            src={previewUrl}
             className="preview-iframe"
             title="App preview"
             sandbox="allow-scripts allow-forms allow-popups allow-modals allow-same-origin"

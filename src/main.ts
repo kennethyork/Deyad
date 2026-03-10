@@ -435,7 +435,7 @@ ipcMain.handle('apps:create', async (_event, { name, description, appType, dbPro
   if (resolvedAppType === 'fullstack') {
     meta.dbProvider = 'postgresql';
     // Allocate unique host ports so multiple apps don't collide
-    const [dbPort, guiPort] = allocateAppPorts(id);
+    const [dbPort, guiPort] = await allocateAppPorts(id);
     meta.dbPort = dbPort;
     meta.guiPort = guiPort;
   }
@@ -553,6 +553,56 @@ ipcMain.handle('apps:dev-start', async (event, appId: string) => {
     if (!event.sender.isDestroyed()) event.sender.send('apps:dev-log', { appId, data });
   };
 
+  const appRoot = appDir(appId);
+  const backendDir = path.join(appRoot, 'backend');
+  const isFullstack = fs.existsSync(backendDir) && fs.existsSync(path.join(appRoot, 'docker-compose.yml'));
+
+  // ── Fullstack: start DB containers, install backend deps, push schema, start backend ──
+  if (isFullstack) {
+    // Start containers
+    sendLog('Starting database containers…\n');
+    try {
+      await execFileAsync('podman', ['compose', 'up', '-d'], { cwd: appRoot, timeout: 120000 });
+      sendLog('Containers started\n');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sendLog(`Warning: container start failed: ${msg}\n`);
+    }
+
+    // Install backend deps if needed
+    if (!fs.existsSync(path.join(backendDir, 'node_modules'))) {
+      sendLog('Installing backend dependencies…\n');
+      try {
+        await execFileAsync('npm', ['install'], { cwd: backendDir, timeout: 180000 });
+        sendLog('Backend dependencies installed\n');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendLog(`Warning: backend npm install failed: ${msg}\n`);
+      }
+    }
+
+    // Push Prisma schema if prisma dir exists
+    if (fs.existsSync(path.join(backendDir, 'prisma'))) {
+      sendLog('Syncing database schema…\n');
+      try {
+        await execFileAsync('npx', ['--no-install', 'prisma', 'db', 'push', '--skip-generate'], { cwd: backendDir, timeout: 30000 });
+        await execFileAsync('npx', ['--no-install', 'prisma', 'generate'], { cwd: backendDir, timeout: 30000 });
+        sendLog('Database schema synced\n');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendLog(`Warning: prisma db push failed: ${msg}\n`);
+      }
+    }
+
+    // Start backend dev server
+    sendLog('Starting backend…\n');
+    const backendChild = spawn('npm', ['run', 'dev'], { cwd: backendDir, stdio: 'pipe' });
+    devProcesses.set(`${appId}:backend`, backendChild);
+    backendChild.stdout?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+    backendChild.stderr?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+    backendChild.on('close', () => { devProcesses.delete(`${appId}:backend`); });
+  }
+
   // Run npm install if node_modules is absent
   if (!fs.existsSync(path.join(viteRoot, 'node_modules'))) {
     sendLog('Installing dependencies…\n');
@@ -588,6 +638,12 @@ ipcMain.handle('apps:dev-stop', async (event, appId: string) => {
     proc.kill();
     devProcesses.delete(appId);
   }
+  // Also stop the backend process if running
+  const backendProc = devProcesses.get(`${appId}:backend`);
+  if (backendProc) {
+    backendProc.kill();
+    devProcesses.delete(`${appId}:backend`);
+  }
   event.sender.send('apps:dev-status', { appId, status: 'stopped' });
   return { success: true };
 });
@@ -598,15 +654,35 @@ ipcMain.handle('apps:dev-status', (_event, appId: string) => ({
 
 // ── Port Allocation ─────────────────────────────────────────────────────────
 
-/** Derive two unique host ports from an app ID so apps don't collide. */
-function allocateAppPorts(appId: string): [number, number] {
+/** Check if a port is available on localhost. */
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const srv = nodeNet.createServer();
+    srv.once('error', () => resolve(false));
+    srv.listen(port, '127.0.0.1', () => {
+      srv.close(() => resolve(true));
+    });
+  });
+}
+
+/** Derive two unique host ports from an app ID, reassigning if already in use. */
+async function allocateAppPorts(appId: string): Promise<[number, number]> {
   let h = 0;
   for (let i = 0; i < appId.length; i++) {
     h = ((h << 5) - h + appId.charCodeAt(i)) | 0;
   }
-  const dbPort = ((h >>> 0) % 50000) + 10000; // 10000–59999
-  const guiPort = dbPort + 1;
-  return [dbPort, guiPort];
+  let dbPort = ((h >>> 0) % 50000) + 10000; // 10000–59999
+
+  // Try up to 100 offsets to find a pair of free ports
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const guiPort = dbPort + 1;
+    const [dbFree, guiFree] = await Promise.all([isPortFree(dbPort), isPortFree(guiPort)]);
+    if (dbFree && guiFree) return [dbPort, guiPort];
+    dbPort = ((dbPort - 10000 + 2) % 50000) + 10000;
+  }
+
+  // Fallback: let the OS pick
+  throw new Error('Could not find two free consecutive ports after 100 attempts');
 }
 
 // ── Container Engine (Podman / Docker) ──────────────────────────────────────
