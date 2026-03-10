@@ -176,7 +176,7 @@ export default function ChatPanel({
 
   const saveMessages = useCallback(
     (msgs: UiMessage[]) => {
-      window.deyad.saveMessages(app.id, msgs).catch(() => {});
+      window.deyad.saveMessages(app.id, msgs).catch((err) => console.warn('Failed to save messages:', err));
     },
     [app.id],
   );

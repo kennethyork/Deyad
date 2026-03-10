@@ -217,7 +217,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     completionProviderRef.current = monaco.languages.registerInlineCompletionsProvider(
       { pattern: '**' },
       {
-        provideInlineCompletions: async (model, position, _context, token) => {
+        provideInlineCompletions: async (model: any, position: any, _context: any, token: any) => {
           if (!autocompleteEnabledRef.current) return { items: [] };
           const completionModelName = completionModelRef.current;
           if (!completionModelName) return { items: [] };

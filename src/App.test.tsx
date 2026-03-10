@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-// @ts-nocheck
 /// <reference types="vitest" />
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import App from './App';

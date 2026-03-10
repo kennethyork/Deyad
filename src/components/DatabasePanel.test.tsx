@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-// @ts-nocheck
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import DatabasePanel from './DatabasePanel';
@@ -27,6 +26,7 @@ describe('DatabasePanel', () => {
     (window as any).deyad = {
       dbDescribe: vi.fn().mockResolvedValue(simpleSchema),
       portCheck: vi.fn().mockResolvedValue(true),
+      getSettings: vi.fn().mockResolvedValue({ pgAdminEmail: 'admin@admin.com', pgAdminPassword: 'admin' }),
     };
   });
 
@@ -45,12 +45,12 @@ describe('DatabasePanel', () => {
     expect(screen.getByText(/start the database/i)).toBeTruthy();
   });
 
-  it('renders iframe when DB is running', async () => {
+  it('renders webview when DB is running', async () => {
     const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" />);
     await waitFor(() => {
-      const iframe = container.querySelector('iframe');
-      expect(iframe).toBeTruthy();
-      expect(iframe?.src).toContain('15050');
+      const webview = container.querySelector('webview');
+      expect(webview).toBeTruthy();
+      expect(webview?.getAttribute('src')).toContain('15050');
     });
   });
 

@@ -378,7 +378,7 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }));
 app.use(express.json());
 
 // ─── Health check ─────────────────────────────────────────────────────────
@@ -496,11 +496,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3001',
+        target: process.env.VITE_BACKEND_URL || 'http://localhost:3001',
         changeOrigin: true,
       },
     },

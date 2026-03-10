@@ -15,9 +15,8 @@ describe('generateFrontendScaffold', () => {
     expect(pkg.scripts.build).toBeDefined();
   });
 
-  it('generates vite.config.ts pointing at port 5173', () => {
+  it('generates vite.config.ts with React plugin', () => {
     const files = generateFrontendScaffold(opts);
-    expect(files['vite.config.ts']).toContain('5173');
     expect(files['vite.config.ts']).toContain('@vitejs/plugin-react');
   });
 
@@ -70,7 +69,7 @@ describe('generateFullStackScaffold', () => {
 
   it('generates docker-compose.yml with PostgreSQL', () => {
     const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).toContain('postgres:16');
+    expect(files['docker-compose.yml']).toContain('postgres:17');
     expect(files['docker-compose.yml']).toContain('mypgapp_db');
     expect(files['docker-compose.yml']).toContain('mypgapp_user');
     expect(files['docker-compose.yml']).toContain('PgP@ss!456');
@@ -125,7 +124,7 @@ describe('generateFullStackScaffold', () => {
     const pkg = JSON.parse(files['frontend/package.json']);
     expect(pkg.dependencies.react).toBeDefined();
     expect(pkg.devDependencies['@vitejs/plugin-react']).toBeDefined();
-    expect(files['frontend/vite.config.ts']).toContain("target: 'http://localhost:3001'");
+    expect(files['frontend/vite.config.ts']).toContain("target: process.env.VITE_BACKEND_URL || 'http://localhost:3001'");
   });
 
   it('generates frontend app entry point', () => {

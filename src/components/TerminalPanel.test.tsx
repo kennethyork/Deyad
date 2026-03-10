@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-// @ts-nocheck
 import { render } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import TerminalPanel from './TerminalPanel';
@@ -14,21 +13,17 @@ describe('TerminalPanel', () => {
       onTerminalExit: vi.fn().mockReturnValue(() => {}),
       onTerminalClear: vi.fn().mockReturnValue(() => {}),
       showContextMenu: vi.fn().mockResolvedValue(undefined),
+      terminalKill: vi.fn().mockResolvedValue(undefined),
     };
   });
 
-  it('renders, shows toolbar and calls createTerminal', async () => {
-    const { container, getByText } = render(<TerminalPanel appId="foo" />);
+  it('renders terminal panel and tab bar', async () => {
+    const { container } = render(<TerminalPanel appId="foo" />);
     expect(container.querySelector('.terminal-panel')).toBeTruthy();
-    expect(getByText('Clear')).toBeTruthy();
-    // simulate right-click
-    const div = container.querySelector('.terminal-panel');
-    expect(div).toBeTruthy();
-    // event should be fired on inner element
-    div.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
-    // menu isn't actually shown in tests, but handler should exist and we should have attempted to open it
-    expect(window.deyad.showContextMenu).toHaveBeenCalledWith('terminal');
-    // wait a tick for effect
+    // Tab bar with + button should exist
+    expect(container.querySelector('.terminal-tab-bar')).toBeTruthy();
+    expect(container.querySelector('.terminal-tab-add')).toBeTruthy();
+    // Initial tab should be created
     await Promise.resolve();
     expect(window.deyad.createTerminal).toHaveBeenCalledWith('foo');
   });

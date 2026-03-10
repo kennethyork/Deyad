@@ -11,6 +11,7 @@ import {
   loadSnapshot,
   deleteSnapshot,
   DEFAULT_SETTINGS,
+  type DeyadSettings,
 } from './mainUtils';
 
 let tmpDir: string;
@@ -75,7 +76,7 @@ describe('loadSettings / saveSettings', () => {
 
   it('round-trips settings', () => {
     const p = path.join(tmpDir, 'settings.json');
-    const custom = { ollamaHost: 'http://myhost:1234', defaultModel: 'llama3', autocompleteEnabled: true, completionModel: 'qwen2.5-coder:1.5b', embedModel: 'nomic-embed-text', hasCompletedWizard: true };
+    const custom: DeyadSettings = { ollamaHost: 'http://myhost:1234', defaultModel: 'llama3', autocompleteEnabled: true, completionModel: 'qwen2.5-coder:1.5b', embedModel: 'nomic-embed-text', hasCompletedWizard: true, pgAdminEmail: 'admin@admin.com', pgAdminPassword: 'admin' };
     saveSettings(p, custom);
     const loaded = loadSettings(p);
     expect(loaded).toEqual(custom);

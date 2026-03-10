@@ -52,7 +52,7 @@ export default function DatabasePanel({ app, dbStatus }: Props) {
     window.deyad.getSettings().then((s) => {
       setPgEmail(s.pgAdminEmail ?? 'admin@admin.com');
       setPgPassword(s.pgAdminPassword ?? 'admin');
-    }).catch(() => {});
+    }).catch((err) => console.warn('Failed to load settings:', err));
   }, []);
 
   useEffect(() => {

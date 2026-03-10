@@ -80,7 +80,7 @@ export default function App() {
       setCompletionModel(s.completionModel ?? '');
       setDefaultModel(s.defaultModel ?? '');
       if (!s.hasCompletedWizard) setShowWizard(true);
-    }).catch(() => {});
+    }).catch((err) => console.warn('Failed to load settings:', err));
   }, []);
 
   // Subscribe to task queue changes for activity badge

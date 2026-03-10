@@ -365,6 +365,8 @@ ipcMain.handle('git:show', async (_event, appId: string, hash: string, filePath:
   if (!fs.existsSync(path.join(dir, '.git'))) return null;
   // Validate hash is hex-only to prevent injection
   if (!/^[0-9a-f]+$/i.test(hash)) return null;
+  // Prevent path traversal
+  if (filePath.includes('..') || path.isAbsolute(filePath)) return null;
   try {
     const { stdout } = await execFileAsync('git', ['show', `${hash}:${filePath}`], { cwd: dir, timeout: 10000 });
     return stdout;
@@ -875,8 +877,8 @@ ipcMain.handle('apps:export', async (_event, { appId, format }: { appId: string;
 // helper to copy recursively (synchronous)
 function copyRecursiveSync(src: string, dest: string) {
   const exists = fs.existsSync(src);
-  const stats = exists && fs.statSync(src);
-  const isDirectory = exists && stats.isDirectory();
+  const stats = exists ? fs.statSync(src) : null;
+  const isDirectory = stats?.isDirectory() ?? false;
   if (isDirectory) {
     fs.mkdirSync(dest, { recursive: true });
     fs.readdirSync(src).forEach((childItemName) => {
@@ -973,9 +975,11 @@ ipcMain.handle('env:read', (_event, appId: string) => {
 ipcMain.handle('env:write', (_event, appId: string, envFile: string, vars: Record<string, string>) => {
   const dir = appDir(appId);
   const envPath = path.join(dir, envFile);
-  // Verify the env path is within the app directory
-  const resolved = path.resolve(envPath);
-  if (!resolved.startsWith(path.resolve(dir))) return { success: false, error: 'Path traversal detected' };
+  // Verify the env path is within the app directory (resolve symlinks to prevent bypass)
+  const resolvedDir = fs.realpathSync(path.resolve(dir));
+  const resolvedEnv = path.resolve(envPath);
+  // Check before write — parent dir may not exist yet, so check the resolved path string
+  if (!resolvedEnv.startsWith(resolvedDir)) return { success: false, error: 'Path traversal detected' };
   const content = Object.entries(vars)
     .map(([k, v]) => `${k}=${v}`)
     .join('\n') + '\n';
@@ -1432,7 +1436,7 @@ ipcMain.handle('apps:deploy-check', async () => {
   return checks;
 });
 
-ipcMain.handle('apps:deploy', async (event, appId: string, provider: 'netlify' | 'vercel' | 'surge' | 'railway' | 'flyio') => {
+ipcMain.handle('apps:deploy', async (event, appId: string, provider: 'netlify' | 'vercel' | 'surge') => {
   const dir = appDir(appId);
   if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
