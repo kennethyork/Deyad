@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { AppProject } from '../App';
 
 /** How long (ms) the delete confirmation button stays active before auto-cancelling. */
@@ -37,11 +37,17 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
     }
   };
 
+  useEffect(() => {
+    if (renamingId) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [renamingId]);
+
   const startRename = (e: React.MouseEvent, app: AppProject) => {
     e.stopPropagation();
     setRenamingId(app.id);
     setRenameValue(app.name);
-    setTimeout(() => renameInputRef.current?.select(), 0);
   };
 
   const commitRename = () => {
@@ -89,6 +95,7 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
                 ref={renameInputRef}
                 className="sidebar-rename-input"
                 value={renameValue}
+                autoFocus
                 onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={commitRename}
                 onKeyDown={handleRenameKeyDown}
