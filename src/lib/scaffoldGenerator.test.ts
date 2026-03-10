@@ -251,7 +251,7 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
     expect(files['docker-compose.yml']).toContain('mypgapp_db');
     expect(files['docker-compose.yml']).toContain('mypgapp_user');
     expect(files['docker-compose.yml']).toContain('PgP@ss!456');
-    expect(files['docker-compose.yml']).toContain("'5432:5432'");
+    expect(files['docker-compose.yml']).toContain("'5433:5432'");
   });
 
   it('includes pgAdmin service in PostgreSQL docker-compose', () => {
@@ -284,7 +284,7 @@ describe('generateFullStackScaffold (PostgreSQL)', () => {
   it('generates backend .env with correct PostgreSQL DATABASE_URL', () => {
     const files = generateFullStackScaffold(opts);
     expect(files['backend/.env']).toContain(
-      'postgresql://mypgapp_user:PgP@ss!456@localhost:5432/mypgapp_db',
+      'postgresql://mypgapp_user:PgP@ss!456@localhost:5433/mypgapp_db',
     );
   });
 

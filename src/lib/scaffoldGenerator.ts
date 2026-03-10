@@ -224,7 +224,7 @@ services:
       POSTGRES_USER: ${dbUser}
       POSTGRES_PASSWORD: ${dbPassword}
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -292,7 +292,7 @@ volumes:
   mysql_data:
 `;
 
-  const dbPort = isPostgres ? '5432' : '3306';
+  const dbPort = isPostgres ? '5433' : '3306';
   const dbProtocol = isPostgres ? 'postgresql' : 'mysql';
   const prismaProvider = isPostgres ? 'postgresql' : 'mysql';
   const dbLabel = isPostgres ? 'PostgreSQL 16' : 'MySQL 8';

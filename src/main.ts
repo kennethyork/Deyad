@@ -598,6 +598,16 @@ async function getContainerEngine(): Promise<string> {
   throw new Error('No container engine found (tried podman, docker)');
 }
 
+/** Build env for compose commands — sets DOCKER_HOST for podman so docker-compose v1 can connect. */
+function composeEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  if (_containerEngine === 'podman') {
+    const uid = process.getuid?.() ?? 1000;
+    env.DOCKER_HOST = `unix:///run/user/${uid}/podman/podman.sock`;
+  }
+  return env;
+}
+
 async function checkDockerAvailable(): Promise<boolean> {
   try {
     await getContainerEngine();
@@ -611,7 +621,7 @@ async function stopCompose(appId: string): Promise<void> {
   if (fs.existsSync(composeFile)) {
     try {
       const engine = await getContainerEngine();
-      await execFileAsync(engine, ['compose', '-f', composeFile, 'down'], { timeout: 30000 });
+      await execFileAsync(engine, ['compose', '-f', composeFile, 'down'], { timeout: 30000, env: composeEnv() });
     } catch { /* best-effort */ }
   }
 }
@@ -626,7 +636,7 @@ ipcMain.handle('docker:db-start', async (event, appId: string) => {
   }
   try {
     const engine = await getContainerEngine();
-    await execFileAsync(engine, ['compose', '-f', composeFile, 'up', '-d', '--wait'], { timeout: 120000 });
+    await execFileAsync(engine, ['compose', '-f', composeFile, 'up', '-d', '--wait'], { timeout: 120000, env: composeEnv() });
     event.sender.send('docker:db-status', { appId, status: 'running' });
     return { success: true };
   } catch (err: unknown) {
@@ -654,7 +664,7 @@ ipcMain.handle('docker:db-status', async (_event, appId: string) => {
     const engine = await getContainerEngine();
     const { stdout } = await execFileAsync(
       engine, ['compose', '-f', composeFile, 'ps', '--format', 'json'],
-      { timeout: 10000 },
+      { timeout: 10000, env: composeEnv() },
     );
     const lines = stdout.trim().split('\n').filter(Boolean);
     if (!lines.length) return { status: 'stopped' };
