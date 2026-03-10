@@ -582,11 +582,25 @@ ipcMain.handle('apps:dev-status', (_event, appId: string) => ({
   status: devProcesses.has(appId) ? 'running' : 'stopped',
 }));
 
-// ── Docker / MySQL ──────────────────────────────────────────────────────────
+// ── Container Engine (Podman / Docker) ──────────────────────────────────────
+
+/** Detect whether podman or docker is available (prefer podman). */
+let _containerEngine: string | null = null;
+async function getContainerEngine(): Promise<string> {
+  if (_containerEngine) return _containerEngine;
+  for (const cmd of ['podman', 'docker']) {
+    try {
+      await execFileAsync(cmd, ['info'], { timeout: DOCKER_CHECK_TIMEOUT_MS });
+      _containerEngine = cmd;
+      return cmd;
+    } catch { /* try next */ }
+  }
+  throw new Error('No container engine found (tried podman, docker)');
+}
 
 async function checkDockerAvailable(): Promise<boolean> {
   try {
-    await execFileAsync('docker', ['info'], { timeout: DOCKER_CHECK_TIMEOUT_MS });
+    await getContainerEngine();
     return true;
   } catch { return false; }
 }
@@ -596,7 +610,8 @@ async function stopCompose(appId: string): Promise<void> {
   const composeFile = path.join(dir, 'docker-compose.yml');
   if (fs.existsSync(composeFile)) {
     try {
-      await execFileAsync('docker', ['compose', '-f', composeFile, 'down'], { timeout: 30000 });
+      const engine = await getContainerEngine();
+      await execFileAsync(engine, ['compose', '-f', composeFile, 'down'], { timeout: 30000 });
     } catch { /* best-effort */ }
   }
 }
@@ -610,7 +625,8 @@ ipcMain.handle('docker:db-start', async (event, appId: string) => {
     return { success: false, error: 'No docker-compose.yml found in app directory' };
   }
   try {
-    await execFileAsync('docker', ['compose', '-f', composeFile, 'up', '-d', '--wait'], { timeout: 120000 });
+    const engine = await getContainerEngine();
+    await execFileAsync(engine, ['compose', '-f', composeFile, 'up', '-d', '--wait'], { timeout: 120000 });
     event.sender.send('docker:db-status', { appId, status: 'running' });
     return { success: true };
   } catch (err: unknown) {
@@ -635,8 +651,9 @@ ipcMain.handle('docker:db-status', async (_event, appId: string) => {
   const composeFile = path.join(dir, 'docker-compose.yml');
   if (!fs.existsSync(composeFile)) return { status: 'none' };
   try {
+    const engine = await getContainerEngine();
     const { stdout } = await execFileAsync(
-      'docker', ['compose', '-f', composeFile, 'ps', '--format', 'json'],
+      engine, ['compose', '-f', composeFile, 'ps', '--format', 'json'],
       { timeout: 10000 },
     );
     const lines = stdout.trim().split('\n').filter(Boolean);
