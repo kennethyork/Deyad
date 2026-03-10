@@ -1,146 +1,216 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white" alt="Electron" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Ollama-Local%20AI-000000" alt="Ollama" />
+  <img src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT" />
+</p>
+
 # Deyad
 
-**A local-first AI app builder — use [Ollama](https://ollama.ai), generate apps from chat.**
+**The open-source, local-first AI app builder.** Describe what you want, get a working app — frontend or full-stack — without sending a single byte to the cloud.
 
-Competes with [dyad.sh](https://dyad.sh) and [Base44](https://base44.com) with full privacy, and zero lock-in.
+Deyad runs [Ollama](https://ollama.ai) on your machine for AI inference, scaffolds real production stacks (React + Express + PostgreSQL + Prisma), and gives you a complete IDE with live preview, terminal, database admin, version history, and one-click deployment.
+
+**Your data stays on your machine. No API keys. No subscriptions. No token limits.**
 
 ---
 
-## Why Deyad?
+## How It Works
 
-### Privacy First — Local Only
+```
+You describe your app in chat
+    → Deyad's autonomous agent reads your codebase
+    → Plans the approach
+    → Writes/edits files across your project
+    → Runs shell commands to verify
+    → Auto-fixes errors from dev server logs
+    → Auto-commits every change to Git
+    → Repeats until done (up to 30 iterations)
+```
 
-- **Ollama** runs 100% on your machine — no cloud, no API keys, works offline
-- Your code never leaves your machine unless you choose to deploy it
+---
 
-### Powered by Ollama
+## Feature Comparison
 
-| Provider | Models | Auth |
-|----------|--------|------|
-| 🦙 **Ollama** (local) | Any model you pull (llama3.2, codellama, etc.) | None needed |
-
-### Full Feature Set
-
-| Feature | Deyad | dyad.sh | Base44 |
-|---------|-------|---------|--------|
-| Local AI (Ollama) | Yes | Yes | No |
-| Open source | Yes | Yes | No |
-| Desktop app | Yes | Yes | No |
-| Full-stack (React + Express + PostgreSQL/MySQL) | Yes | Supabase | Managed |
-| Git version control | Auto (yes) | Manual | No |
-| Project import | Yes | Yes | No |
-| Template library | Yes | Yes | Yes |
-| Export as ZIP | Yes | Yes | No |
-| Works offline | Yes | Partial | No |
-| $0 with local models | Yes | Yes | No |
+| Feature | **Deyad** | **Bolt.new** | **Lovable** | **Cursor** |
+|---|---|---|---|---|
+| 100% offline / local AI | Yes | No | No | No |
+| Free forever (no token limits) | Yes | No | No | No |
+| Full-stack with real database | Yes | No | Partial | No |
+| Autonomous agent (multi-step) | Yes | Partial | Partial | Yes |
+| Error auto-detect & self-fix | Yes | No | No | No |
+| Built-in database admin (pgAdmin) | Yes | No | No | No |
+| Git auto-commit every generation | Yes | No | No | No |
+| AI code completion (FIM) | Yes | No | No | Yes |
+| RAG with local embeddings | Yes | No | No | Yes |
+| Plan → Approve → Execute mode | Yes | No | No | No |
+| Diff preview before applying | Yes | No | No | Yes |
+| Image → Code (vision models) | Yes | Yes | Yes | Yes |
+| Live preview | Yes | Yes | Yes | No |
+| Integrated terminal | Yes | Partial | No | Yes |
+| Deploy (5 targets) | Yes | Yes | Yes | No |
+| Plugin system | Yes | No | No | No |
 
 ---
 
 ## Features
 
-- **Ollama-powered AI** — runs locally, no API keys needed
-- **Frontend apps** — React + Vite scaffolded instantly
-- **Full-stack apps** — React + Express + PostgreSQL or MySQL (Docker) + Prisma, one click
-- **Chat to build** — describe your app, get working code with streaming
-- **File editor** — view, edit, search generated files in-app
-- **Live preview** — built-in dev server with iframe preview
-- **DB management** — Start/Stop your PostgreSQL or MySQL container from inside the app
-- **Export as ZIP** — download your project as an archive
-- **Undo / Revert** — revert to before the last AI generation
-- **Git auto-commit** — every AI generation is versioned automatically
-- **Import projects** — bring existing codebases into Deyad
-- **Templates** — start from Todo, Dashboard, Landing Page, Chat UI, Blog, E-commerce
-- ⚙️ **Configurable** — Ollama host and default model in Settings
+### Autonomous AI Agent
+- **Multi-step agent loop** — reads code, writes files, runs commands, fixes errors, iterates up to 30 times
+- **8 agent tools**: `list_files`, `read_file`, `write_files`, `edit_file`, `multi_edit`, `run_command`, `search_files`, `db_schema`
+- **Error auto-detection** — watches Vite dev server logs, auto-sends up to 3 fix attempts
+- **Planning mode** — agent generates a plan for your approval before executing
+- **Context-aware** — injects live database schema, file summaries, and conversation history
+- **RAG retrieval** — semantic search with local Ollama embeddings + TF-IDF fallback
+- **AI code completion** — fill-in-the-middle completions using any FIM-capable model
+- **Vision support** — paste a screenshot or mockup, get working UI code
+- **Context compaction** — auto-summarizes older turns to stay within token limits (~32k)
 
-## Stack (full-stack mode)
+### Built-in IDE
+- **Monaco editor** — same engine as VS Code, syntax highlighting for 15+ languages
+- **File tree** — nested directory view with search (Ctrl/Cmd+P)
+- **Live preview** — embedded Vite dev server with run/stop/refresh controls
+- **Integrated terminal** — full xterm.js PTY with copy/paste and context menu
+- **Package manager** — install/uninstall npm packages from the UI
+- **Environment variables** — multi-file `.env` editor
+- **Diff preview** — review AI changes before accepting, with snapshot-based undo
 
-| Layer    | Technology                            |
-|----------|---------------------------------------|
-| Frontend | React 18 + Vite + TypeScript          |
-| Backend  | Node.js + Express + TypeScript        |
-| Database | **PostgreSQL 16** or **MySQL 8** via Docker Compose |
-| ORM      | **Prisma** (schema → type-safe client) |
+### Database
+- **PostgreSQL 17** — containerized via Docker/Podman, auto-configured
+- **Prisma ORM** — type-safe schema management
+- **pgAdmin** — embedded database admin UI inside the app
+- **One-click start/stop** — manage containers from the UI
+- **Schema introspection** — AI agent can query live table structure while coding
+
+### Version Control
+- **Auto-commit** — every AI generation is committed to Git automatically
+- **Version history** — browse all commits in a timeline
+- **One-click restore** — revert to any previous version
+- **File diff** — view changes per file at any commit
+- **Snapshot undo** — revert to the state before the last AI generation
+
+### Deployment
+Deploy to 5 targets directly from the app:
+
+| Provider | Type | Pricing |
+|---|---|---|
+| **Vercel** | Frontend & full-stack | Free tier |
+| **Netlify** | Frontend & full-stack | Free tier |
+| **Surge** | Static sites | Free |
+| **Railway** | Full-stack with database | Usage-based |
+| **Fly.io** | Container-based | Free tier |
+
+- CLI auto-detection — shows which deploy tools are installed and ready
+- Streaming deploy logs in real-time
+- **ZIP export** — download your project as an archive
+- **PWA export** — mobile-ready with Web App Manifest
+
+### Templates
+Start from a template or go blank:
+- Todo App · Dashboard · Landing Page · Chat UI · Blog · E-commerce
+
+### Plugins
+Drop custom templates into the `plugins/` directory with a `plugin.json` manifest. Auto-discovered on startup.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Desktop | Electron 40 + Vite |
+| Renderer | React 18 + TypeScript |
+| Editor | Monaco (VS Code engine) |
+| Terminal | xterm.js + node-pty |
+| AI | Ollama (any local model) |
+| Frontend scaffold | React + Vite + TypeScript |
+| Backend scaffold | Node.js + Express + TypeScript |
+| Database | PostgreSQL 17 (Docker/Podman) |
+| ORM | Prisma |
+| DB Admin | pgAdmin (latest) |
+| Version control | Git (auto-commit) |
+| Testing | Vitest |
+
+---
 
 ## Requirements
 
-| Requirement | Why |
-|-------------|-----|
-| [Node.js ≥ 18](https://nodejs.org) | Run the app |
-| [Ollama](https://ollama.ai) | Powers AI chat |
-| [Docker](https://docker.com) *(optional)* | Full-stack PostgreSQL/MySQL support |
-| [Git](https://git-scm.com) *(optional)* | Auto version control |
+| Requirement | Why | Required? |
+|---|---|---|
+| [Node.js >= 18](https://nodejs.org) | Run the app | Yes |
+| [Ollama](https://ollama.ai) | Local AI inference | Yes |
+| [Docker](https://docker.com) or [Podman](https://podman.io) | Database containers | For full-stack apps |
+| [Git](https://git-scm.com) | Auto version control | Recommended |
+
+---
 
 ## Getting Started
 
 ```bash
-# 1. Install dependencies
+# Clone and install
+git clone https://github.com/theKennethy/Deyad.git
+cd Deyad
 npm install
 
-# 2. Start Deyad
-npm start
+# Make sure Ollama is running with a model
+ollama pull llama3.2
 
-# 3. Make sure Ollama is running:
-#    ollama pull llama3.2
+# Start Deyad
+npm start
 ```
+
+On first launch, the **Welcome Wizard** walks you through connecting to Ollama and selecting a model.
+
+---
 
 ## Usage
 
-1. Click **+ New App** (or Import to import an existing project)
-2. Pick a **template** or start blank
-3. Choose **Frontend Only** (React + Vite) or **Full Stack** (adds PostgreSQL/MySQL + Express + Prisma)
-4. Chat with your chosen AI model to describe what you want to build
-5. Deyad generates the files, writes them to disk, and auto-commits via Git
-6. For full-stack apps, click **▶ Start DB** to spin up your database via Docker Compose
+1. **Create an app** — click **+ New App**, pick a template or start blank, choose Frontend or Full-Stack
+2. **Chat** — describe what you want in natural language. The agent reads your code, writes files, runs commands, and iterates autonomously.
+3. **Edit** — use the built-in Monaco editor to make manual changes
+4. **Preview** — click Run to start the Vite dev server and see your app live
+5. **Database** — toggle the DB on to start PostgreSQL + pgAdmin containers
+6. **Deploy** — click Publish, select a provider, and deploy
 
-### Full-stack workflow
+### Full-Stack Project Structure
 
-```bash
-# After Deyad generates the scaffold:
-
-# Start your database (or click "Start DB" in-app)
-docker compose up -d
-
-# Set up backend
-cd backend && npm install
-npx prisma db push   # applies Prisma schema to your database
-npm run dev          # http://localhost:3001
-
-# Start frontend
-cd ../frontend && npm install
-npm run dev          # http://localhost:5173
 ```
+your-app/
+├── frontend/           # React + Vite + TypeScript
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.ts
+├── backend/            # Express + Prisma + TypeScript
+│   ├── src/
+│   ├── prisma/
+│   └── package.json
+├── docker-compose.yml  # PostgreSQL + pgAdmin
+└── .git/               # Auto-initialized
+```
+
+---
 
 ## Development
 
 ```bash
-npm start      # start Electron app (React/Vite renderer)
-npm test       # run unit tests (vitest)
-npm run lint   # lint TypeScript files
-npm run vanilla # start the minimal vanilla-JS/HTML/CSS version located in the `vanilla/` folder
+npm start       # Start Electron app in dev mode
+npm test        # Run unit tests (Vitest)
+npm run lint    # Lint TypeScript files
 ```
 
-## Packaging & CI/CD
+## Packaging
 
-Automated GitHub Actions build Linux and Windows using electron-builder on every push to `main` or via manual dispatch. The workflow:
-
-1. `npm ci` installs dependencies
-2. `npm run make` creates platform-specific installers and archives
-3. A GitHub release is created automatically with the built artifacts (no version tags required)
-
-You can manually package locally:
+GitHub Actions builds Linux and Windows installers automatically on push to `main`.
 
 ```bash
-npm run make
+npm run make    # Build locally — outputs to out/make/
 ```
 
-Artifacts land under `out/make/<platform>` (zip/exe) and, on Linux, you’ll also get an AppImage generated separately.
+Produces `.deb`, `.rpm`, and AppImage on Linux, `.exe` on Windows.
 
-The script will invoke Forge’s make step which now creates `.deb` and `.rpm` packages in addition to the raw directory; after that it runs `appimagetool` to convert the directory into an AppImage. The tool must be installed (via your distro, or grab it from https://github.com/AppImage/AppImageKit) or you’ll see a message reminding you to install it.
-
-Releases are created automatically by the CI workflow when runs are manually dispatched or triggered – you don’t need to manage version tags yourself.
-
-
-## License
+---
 
 ## License
 
