@@ -6,14 +6,20 @@ directories:
 files:
   - "**/*"
   - "!node_modules/*/{CHANGELOG.md,README.md,*.d.ts}"
+npmRebuild: true
+nodeGypRebuild: false
 linux:
   target:
     - deb
     - rpm
     - AppImage
+  category: Development
   artifactName: "${productName}-${arch}.${ext}"
 win:
   target:
     - nsis
     - portable
   artifactName: "${productName}-${arch}.${ext}"
+nsis:
+  oneClick: true
+  allowToChangeInstallationDirectory: false
