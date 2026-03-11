@@ -1,5 +1,5 @@
 /** CRC-32 (ISO 3309) — used for ZIP file entries. */
-export function crc32(buf: Buffer): number {
+export function crc32(buf: Uint8Array): number {
   let crc = 0xFFFFFFFF;
   for (let i = 0; i < buf.length; i++) {
     crc ^= buf[i];

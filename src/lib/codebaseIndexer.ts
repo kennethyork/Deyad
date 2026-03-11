@@ -70,7 +70,7 @@ function tokenize(text: string): string[] {
 function computeHash(files: Record<string, string>): number {
   const keys = Object.keys(files).sort();
   const summary = keys.map((k) => `${k}:${files[k].length}`).join('|');
-  return crc32(Buffer.from(summary));
+  return crc32(new TextEncoder().encode(summary));
 }
 
 // ── Chunking ──────────────────────────────────────────────────────────────────
