@@ -127,6 +127,7 @@ RULES:
 - Do not ask the user questions; make reasonable decisions autonomously.
 - You can make multiple tool calls in a single response.
 - Use ### FILE: format inside write_files content param for code.
+- When the user asks for any git operation (push, pull, commit, branch, status, log, remote, etc.), use the dedicated git_* tools directly — do NOT use run_command with git. For example: use git_push instead of run_command "git push".
 
 When writing files with write_files, put the raw file content directly in the content param (no markdown fences).`;
 }

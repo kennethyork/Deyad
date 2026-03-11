@@ -483,7 +483,10 @@ export default function ChatPanel({
   };
 
   const handleSend = () => {
-    if (agentMode) sendAgentMessage();
+    const text = input.trim().toLowerCase();
+    // Auto-route git commands through the agent loop even when agent mode is off
+    const isGitCommand = /\bgit\b/.test(text) && /\b(push|pull|commit|branch|merge|status|log|remote|clone|init|checkout|stash|rebase|diff|reset|tag)\b/.test(text);
+    if (agentMode || isGitCommand) sendAgentMessage();
     else sendMessage();
   };
 
