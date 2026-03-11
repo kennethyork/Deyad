@@ -235,6 +235,27 @@ contextBridge.exposeInMainWorld('deyad', {
   gitCheckout: (appId: string, hash: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('git:checkout', appId, hash),
 
+  gitRemoteGet: (appId: string): Promise<string | null> =>
+    ipcRenderer.invoke('git:remote-get', appId),
+
+  gitRemoteSet: (appId: string, url: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:remote-set', appId, url),
+
+  gitPush: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:push', appId),
+
+  gitPull: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:pull', appId),
+
+  gitBranch: (appId: string): Promise<{ current: string; branches: string[] }> =>
+    ipcRenderer.invoke('git:branch', appId),
+
+  gitBranchCreate: (appId: string, name: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:branch-create', appId, name),
+
+  gitBranchSwitch: (appId: string, name: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('git:branch-switch', appId, name),
+
   // ── Package Manager ──────────────────────────────────────────────────────
   npmList: (appId: string): Promise<{ dependencies: Record<string, string>; devDependencies: Record<string, string> }> =>
     ipcRenderer.invoke('npm:list', appId),

@@ -141,6 +141,65 @@ export async function executeTool(
         return { tool: call.name, success: true, output: text };
       }
 
+      case 'git_status': {
+        const termId = await window.deyad.createTerminal(appId);
+        return await executeCommand(appId, 'git status --short');
+      }
+
+      case 'git_commit': {
+        const msg = call.params.message || 'Update files';
+        return await executeCommand(appId, `git add . && git commit -m "${msg.replace(/"/g, '\\"')}"`);
+      }
+
+      case 'git_remote_set': {
+        const url = call.params.url;
+        if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        const res = await window.deyad.gitRemoteSet(appId, url);
+        return { tool: call.name, success: res.success, output: res.success ? `Remote origin set to ${url}` : `Failed: ${res.error}` };
+      }
+
+      case 'git_remote_get': {
+        const remote = await window.deyad.gitRemoteGet(appId);
+        return { tool: call.name, success: true, output: remote || 'No remote configured.' };
+      }
+
+      case 'git_push': {
+        const res = await window.deyad.gitPush(appId);
+        return { tool: call.name, success: res.success, output: res.success ? 'Pushed successfully.' : `Push failed: ${res.error}` };
+      }
+
+      case 'git_pull': {
+        const res = await window.deyad.gitPull(appId);
+        return { tool: call.name, success: res.success, output: res.success ? 'Pulled successfully.' : `Pull failed: ${res.error}` };
+      }
+
+      case 'git_branch': {
+        const info = await window.deyad.gitBranch(appId);
+        const list = info.branches.map(b => b === info.current ? `* ${b}` : `  ${b}`).join('\n');
+        return { tool: call.name, success: true, output: `Current: ${info.current}\n${list}` };
+      }
+
+      case 'git_branch_create': {
+        const name = call.params.name;
+        if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
+        const res = await window.deyad.gitBranchCreate(appId, name);
+        return { tool: call.name, success: res.success, output: res.success ? `Created and switched to branch ${name}` : `Failed: ${res.error}` };
+      }
+
+      case 'git_branch_switch': {
+        const name = call.params.name;
+        if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
+        const res = await window.deyad.gitBranchSwitch(appId, name);
+        return { tool: call.name, success: res.success, output: res.success ? `Switched to branch ${name}` : `Failed: ${res.error}` };
+      }
+
+      case 'git_log': {
+        const entries = await window.deyad.gitLog(appId);
+        if (entries.length === 0) return { tool: call.name, success: true, output: 'No commits yet.' };
+        const log = entries.slice(0, 10).map(e => `${e.hash.slice(0, 7)} ${e.message} (${e.date})`).join('\n');
+        return { tool: call.name, success: true, output: log };
+      }
+
       case 'edit_file': {
         const filePath = call.params.path;
         const oldStr = call.params.old_string;
@@ -347,6 +406,36 @@ Available tools:
    <param name="edit_1_new_string">replacement for second file</param>
    Supports up to 20 edits. Edits to the same file are applied sequentially (each sees previous edits).
    Use this instead of multiple edit_file calls when you need to change several files at once.
+
+9. **git_status** — Show the current git status (changed/untracked files).
+   No parameters.
+
+10. **git_commit** — Stage all changes and commit.
+   <param name="message">commit message</param>
+
+11. **git_remote_get** — Get the current remote origin URL.
+   No parameters.
+
+12. **git_remote_set** — Set the remote origin URL (GitHub, GitLab, etc.).
+   <param name="url">https://github.com/user/repo.git</param>
+
+13. **git_push** — Push commits to the remote repository.
+   No parameters.
+
+14. **git_pull** — Pull latest changes from the remote repository.
+   No parameters.
+
+15. **git_branch** — List all branches and show the current one.
+   No parameters.
+
+16. **git_branch_create** — Create a new branch and switch to it.
+   <param name="name">feature-xyz</param>
+
+17. **git_branch_switch** — Switch to an existing branch.
+   <param name="name">main</param>
+
+18. **git_log** — Show recent commit history.
+   No parameters.
 
 After your tool calls, you will receive results in <tool_result> blocks.
 You can make multiple tool calls in a single response.

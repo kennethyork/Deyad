@@ -15,6 +15,7 @@ import DiffModal from './components/DiffModal';
 import VersionHistoryPanel from './components/VersionHistoryPanel';
 import PackageManagerPanel from './components/PackageManagerPanel';
 import EnvVarsPanel from './components/EnvVarsPanel';
+import GitPanel from './components/GitPanel';
 import { taskQueue } from './lib/taskQueue';
 
 export interface AppProject {
@@ -30,7 +31,7 @@ export interface AppProject {
   guiPort?: number;
 }
 
-type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages';
+type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git';
 
 export default function App() {
   const [apps, setApps] = useState<AppProject[]>([]);
@@ -444,6 +445,12 @@ export default function App() {
               >
                 Env
               </button>
+              <button
+                className={`right-tab ${rightTab === 'git' ? 'active' : ''}`}
+                onClick={() => setRightTab('git')}
+              >
+                Git
+              </button>
               {selectedApp?.appType === 'fullstack' && (
                 <button
                   className={`right-tab ${rightTab === 'database' ? 'active' : ''}`}
@@ -472,6 +479,14 @@ export default function App() {
               <PackageManagerPanel appId={selectedApp.id} />
             ) : rightTab === 'envvars' ? (
               <EnvVarsPanel appId={selectedApp.id} />
+            ) : rightTab === 'git' ? (
+              <GitPanel
+                appId={selectedApp.id}
+                onFilesChanged={async () => {
+                  const files = await window.deyad.readFiles(selectedApp.id);
+                  setAppFiles(files);
+                }}
+              />
             ) : rightTab === 'database' ? (
               <DatabasePanel app={selectedApp} dbStatus={dbStatus} />
             ) : null}

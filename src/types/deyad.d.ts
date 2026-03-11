@@ -145,6 +145,13 @@ interface DeyadAPI {
   gitShow(appId: string, hash: string, filePath: string): Promise<string | null>;
   gitDiffStat(appId: string, hash: string): Promise<{ status: string; path: string }[]>;
   gitCheckout(appId: string, hash: string): Promise<{ success: boolean; error?: string }>;
+  gitRemoteGet(appId: string): Promise<string | null>;
+  gitRemoteSet(appId: string, url: string): Promise<{ success: boolean; error?: string }>;
+  gitPush(appId: string): Promise<{ success: boolean; error?: string }>;
+  gitPull(appId: string): Promise<{ success: boolean; error?: string }>;
+  gitBranch(appId: string): Promise<{ current: string; branches: string[] }>;
+  gitBranchCreate(appId: string, name: string): Promise<{ success: boolean; error?: string }>;
+  gitBranchSwitch(appId: string, name: string): Promise<{ success: boolean; error?: string }>;
 
   // Package Manager
   npmList(appId: string): Promise<{ dependencies: Record<string, string>; devDependencies: Record<string, string> }>;

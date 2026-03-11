@@ -45,6 +45,8 @@ You describe your app in chat
 | Error auto-detect & self-fix | **Yes** | No | No | No | No | No |
 | Built-in database admin (pgAdmin) | **Yes** | No | No | No | No | No |
 | Git auto-commit every generation | **Yes** | No | No | No | No | No |
+| GitHub push/pull/branches | **Yes** | No | No | Yes | No | No |
+| AI handles git commands in chat | **Yes** | No | No | No | No | No |
 | AI code completion (FIM) | **Yes** | No | No | Yes | No | No |
 | RAG with local embeddings | **Yes** | No | No | Yes | No | No |
 | Plan → Approve → Execute mode | **Yes** | No | No | No | No | No |
@@ -66,7 +68,7 @@ You describe your app in chat
 ### Autonomous AI Agent
 
 - **Multi-step agent loop** — reads code, writes files, runs commands, fixes errors, iterates up to 30 times
-- **8 agent tools**: `list_files`, `read_file`, `write_files`, `edit_file`, `multi_edit`, `run_command`, `search_files`, `db_schema`
+- **18 agent tools**: `list_files`, `read_file`, `write_files`, `edit_file`, `multi_edit`, `run_command`, `search_files`, `db_schema`, `git_status`, `git_commit`, `git_push`, `git_pull`, `git_remote_get`, `git_remote_set`, `git_branch`, `git_branch_create`, `git_branch_switch`, `git_log`
 - **Error auto-detection** — watches Vite dev server logs, auto-sends up to 3 fix attempts
 - **Planning mode** — agent generates a plan for your approval before executing
 - **Context-aware** — injects live database schema, file summaries, and conversation history
@@ -93,9 +95,13 @@ You describe your app in chat
 - **One-click start/stop** — manage containers from the UI
 - **Schema introspection** — AI agent can query live table structure while coding
 
-### Version Control
+### Version Control & GitHub
 
 - **Auto-commit** — every AI generation is committed to Git automatically
+- **GitHub integration** — connect any project to a GitHub (or GitLab) repo
+- **Push / Pull** — sync with remote from the Git panel or just ask the AI
+- **Branching** — create, switch, and list branches from the UI
+- **AI git commands** — type "push to github", "create a feature branch", or "commit my changes" in chat and the agent handles it
 - **Version history** — browse all commits in a timeline
 - **One-click restore** — revert to any previous version
 - **File diff** — view changes per file at any commit
@@ -144,7 +150,7 @@ Drop custom templates into the `plugins/` directory with a `plugin.json` manifes
 | Database | PostgreSQL 17 (Docker/Podman) |
 | ORM | Prisma |
 | DB Admin | pgAdmin (latest) |
-| Version control | Git (auto-commit) |
+| Version control | Git (auto-commit + GitHub push/pull/branches) |
 | Testing | Vitest |
 
 ---

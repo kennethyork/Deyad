@@ -89,4 +89,94 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
   });
+
+  // ── Remote / GitHub ────────────────────────────────────────────────────
+
+  ipcMain.handle('git:remote-get', async (_event, appId: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return null;
+    try {
+      const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: dir, timeout: 10000 });
+      return stdout.trim() || null;
+    } catch { return null; }
+  });
+
+  ipcMain.handle('git:remote-set', async (_event, appId: string, url: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    // Validate URL format (HTTPS or SSH)
+    if (!/^https?:\/\/.+|^git@.+:.+/.test(url)) return { success: false, error: 'Invalid remote URL' };
+    try {
+      // Try set-url first (in case origin already exists), otherwise add
+      try {
+        await execFileAsync('git', ['remote', 'set-url', 'origin', url], { cwd: dir, timeout: 10000 });
+      } catch {
+        await execFileAsync('git', ['remote', 'add', 'origin', url], { cwd: dir, timeout: 10000 });
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('git:push', async (_event, appId: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    try {
+      // Get current branch name
+      const { stdout: branchOut } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, timeout: 10000 });
+      const branch = branchOut.trim();
+      // Push with --set-upstream for first push
+      await execFileAsync('git', ['push', '-u', 'origin', branch], { cwd: dir, timeout: 60000 });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('git:pull', async (_event, appId: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    try {
+      await execFileAsync('git', ['pull', '--rebase'], { cwd: dir, timeout: 60000 });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('git:branch', async (_event, appId: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { current: 'main', branches: [] };
+    try {
+      const { stdout: currentOut } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: dir, timeout: 10000 });
+      const { stdout: branchOut } = await execFileAsync('git', ['branch', '--format=%(refname:short)'], { cwd: dir, timeout: 10000 });
+      const branches = branchOut.trim().split('\n').filter(Boolean);
+      return { current: currentOut.trim(), branches };
+    } catch { return { current: 'main', branches: [] }; }
+  });
+
+  ipcMain.handle('git:branch-create', async (_event, appId: string, name: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    if (!/^[a-zA-Z0-9._\-/]+$/.test(name)) return { success: false, error: 'Invalid branch name' };
+    try {
+      await execFileAsync('git', ['checkout', '-b', name], { cwd: dir, timeout: 10000 });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('git:branch-switch', async (_event, appId: string, name: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    if (!/^[a-zA-Z0-9._\-/]+$/.test(name)) return { success: false, error: 'Invalid branch name' };
+    try {
+      await execFileAsync('git', ['checkout', name], { cwd: dir, timeout: 10000 });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
 }
