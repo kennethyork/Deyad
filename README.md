@@ -126,6 +126,8 @@ Deploy to 7 targets directly from the app:
 
 - **VPS deploy** — build your frontend and rsync the dist to any Linux server over SSH
   - Configure user, host, remote path, and SSH port from the UI
+  - Optional **custom domain** — auto-generates nginx config with SPA routing
+  - **Free SSL** — auto-runs Let’s Encrypt certbot for HTTPS + HTTP→HTTPS redirect
   - Input validation prevents shell injection
 - **Desktop packaging** — build a standalone Electron app with built-in Ollama AI bridge
   - Generated apps ship with `window.ollama` API for chat, generate, model listing
