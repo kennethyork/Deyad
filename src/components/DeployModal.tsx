@@ -49,6 +49,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
   const [vpsUser, setVpsUser] = useState('');
   const [vpsPath, setVpsPath] = useState('/var/www/html');
   const [vpsPort, setVpsPort] = useState('22');
+  const [vpsDomain, setVpsDomain] = useState('');
   const [vpsWorking, setVpsWorking] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<string | null>(null);
 
@@ -344,6 +345,20 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
               />
             </div>
 
+            <div className="deploy-mobile-row" style={{ gap: 6, marginTop: 6 }}>
+              <input
+                className="deploy-vps-input"
+                placeholder="domain (optional, e.g. myapp.com)"
+                value={vpsDomain}
+                onChange={(e) => setVpsDomain(e.target.value)}
+                disabled={vpsWorking}
+                style={{ flex: 1 }}
+              />
+              <span className="deploy-hint" style={{ margin: 0, fontSize: 11 }}>
+                Sets up nginx + free SSL via Let's Encrypt
+              </span>
+            </div>
+
             <div className="deploy-mobile-row" style={{ marginTop: 6 }}>
               <button
                 className="btn-primary"
@@ -357,6 +372,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                     user: vpsUser,
                     path: vpsPath,
                     port: parseInt(vpsPort, 10) || 22,
+                    domain: vpsDomain.trim() || undefined,
                   });
                   if (res.success) {
                     setVpsStatus(`Deployed! ${res.url}`);

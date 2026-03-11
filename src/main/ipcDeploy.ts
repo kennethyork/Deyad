@@ -191,7 +191,7 @@ CMD ["node", "backend/src/index.js"]
   });
 
   // ── VPS Deploy (SSH + rsync) ─────────────────────────────────────────────
-  ipcMain.handle('apps:deploy-vps', async (event, appId: string, opts: { host: string; user: string; path: string; port?: number }) => {
+  ipcMain.handle('apps:deploy-vps', async (event, appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }) => {
     const dir = appDir(appId);
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
@@ -199,9 +199,14 @@ CMD ["node", "backend/src/index.js"]
     if (!opts.host || !opts.user || !opts.path) {
       return { success: false, error: 'Host, user, and remote path are required' };
     }
-    // Basic validation: no shell metacharacters in host/user/path
-    if (/[;&|`$(){}]/.test(opts.host + opts.user + opts.path)) {
+    // Basic validation: no shell metacharacters in host/user/path/domain
+    const allInputs = opts.host + opts.user + opts.path + (opts.domain || '');
+    if (/[;&|`$(){}]/.test(allInputs)) {
       return { success: false, error: 'Invalid characters in connection details' };
+    }
+    // Validate domain format if provided
+    if (opts.domain && !/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(opts.domain)) {
+      return { success: false, error: 'Invalid domain format (e.g. example.com or app.example.com)' };
     }
 
     let appType = 'frontend';
@@ -238,7 +243,57 @@ CMD ["node", "backend/src/index.js"]
       const code = await spawnWithLogs('rsync', rsyncArgs, { cwd: dir, timeout: 300_000 }, sendLog);
       if (code !== 0) return { success: false, error: `rsync exited with code ${code}` };
 
-      const url = `http://${opts.host}`;
+      // 3. Set up nginx + SSL if domain provided
+      if (opts.domain) {
+        sendLog(`\nConfiguring nginx for ${opts.domain}…\n`);
+        const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=accept-new ${opts.user}@${opts.host}`;
+
+        const nginxConf = [
+          `server {`,
+          `    listen 80;`,
+          `    server_name ${opts.domain};`,
+          `    root ${opts.path};`,
+          `    index index.html;`,
+          `    location / {`,
+          `        try_files \\$uri \\$uri/ /index.html;`,
+          `    }`,
+          `}`,
+        ].join('\n');
+
+        // Write nginx config
+        const confPath = `/etc/nginx/sites-available/${opts.domain}`;
+        const enabledPath = `/etc/nginx/sites-enabled/${opts.domain}`;
+        const writeConf = await spawnWithLogs(
+          'ssh',
+          [`-p`, sshPort, `-o`, `StrictHostKeyChecking=accept-new`, `${opts.user}@${opts.host}`,
+           `echo '${nginxConf}' | sudo tee ${confPath} && sudo ln -sf ${confPath} ${enabledPath} && sudo nginx -t && sudo systemctl reload nginx`],
+          { cwd: dir, timeout: 30_000 },
+          sendLog,
+        );
+        if (writeConf !== 0) {
+          sendLog('\n⚠ Nginx config failed — files were uploaded but nginx was not configured.\n');
+          sendLog('Make sure the SSH user has sudo access and nginx is installed.\n');
+        } else {
+          sendLog('Nginx configured. Requesting SSL certificate…\n');
+
+          // Run certbot for HTTPS
+          const certCode = await spawnWithLogs(
+            'ssh',
+            [`-p`, sshPort, `-o`, `StrictHostKeyChecking=accept-new`, `${opts.user}@${opts.host}`,
+             `sudo certbot --nginx -d ${opts.domain} --non-interactive --agree-tos --redirect --register-unsafely-without-email || echo 'certbot failed — HTTPS not configured'`],
+            { cwd: dir, timeout: 120_000 },
+            sendLog,
+          );
+          if (certCode !== 0) {
+            sendLog('\n⚠ Certbot failed — site is live on HTTP but HTTPS was not configured.\n');
+            sendLog('Make sure certbot is installed: sudo apt install certbot python3-certbot-nginx\n');
+          } else {
+            sendLog('SSL certificate installed!\n');
+          }
+        }
+      }
+
+      const url = opts.domain ? `https://${opts.domain}` : `http://${opts.host}`;
       sendLog(`\nDeployed to VPS! ${url}\n`);
       return { success: true, url };
     } catch (err: unknown) {

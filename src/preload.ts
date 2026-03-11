@@ -216,7 +216,7 @@ contextBridge.exposeInMainWorld('deyad', {
   deployElectron: (appId: string, platform?: 'linux' | 'win' | 'mac'): Promise<{ success: boolean; outputDir?: string; error?: string }> =>
     ipcRenderer.invoke('apps:deploy-electron', appId, platform),
 
-  deployVps: (appId: string, opts: { host: string; user: string; path: string; port?: number }): Promise<{ success: boolean; url?: string; error?: string }> =>
+  deployVps: (appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }): Promise<{ success: boolean; url?: string; error?: string }> =>
     ipcRenderer.invoke('apps:deploy-vps', appId, opts),
 
   onDeployLog: (cb: (payload: { appId: string; data: string }) => void) => {
