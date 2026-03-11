@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface GitLogEntry {
   hash: string;
@@ -25,6 +26,8 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
   const [viewingFile, setViewingFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     loadHistory();
@@ -62,7 +65,12 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
 
   const handleRestore = useCallback(async () => {
     if (!selectedCommit) return;
-    if (!window.confirm(`Restore all files to commit "${selectedCommit.message}"? This will overwrite current files.`)) return;
+    setConfirmOpen(true);
+  }, [selectedCommit]);
+
+  const handleConfirmRestore = useCallback(async () => {
+    if (!selectedCommit) return;
+    setConfirmOpen(false);
     setRestoring(true);
     try {
       const result = await window.deyad.gitCheckout(appId, selectedCommit.hash);
@@ -70,10 +78,10 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
         onRestore();
         onClose();
       } else {
-        alert(`Restore failed: ${result.error}`);
+        setErrorMsg(`Restore failed: ${result.error}`);
       }
     } catch (err) {
-      alert(`Restore failed: ${err instanceof Error ? err.message : String(err)}`);
+      setErrorMsg(`Restore failed: ${err instanceof Error ? err.message : String(err)}`);
     }
     setRestoring(false);
   }, [appId, selectedCommit, onRestore, onClose]);
@@ -92,6 +100,22 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
           <h2>Version History</h2>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
+
+        {errorMsg && (
+          <div className="error-banner">
+            <span>{errorMsg}</span>
+            <button className="btn-retry" onClick={() => setErrorMsg(null)}>✕</button>
+          </div>
+        )}
+
+        <ConfirmDialog
+          open={confirmOpen}
+          title="Restore Version"
+          message={`Restore all files to commit "${selectedCommit?.message}"? This will overwrite current files.`}
+          confirmLabel="Restore"
+          onConfirm={handleConfirmRestore}
+          onCancel={() => setConfirmOpen(false)}
+        />
 
         <div className="modal-body version-history-body">
           {/* Timeline */}

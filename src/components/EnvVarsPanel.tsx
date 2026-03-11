@@ -60,16 +60,27 @@ export default function EnvVarsPanel({ appId }: Props) {
     handleSave(updated);
   };
 
+  const [newEnvFileName, setNewEnvFileName] = useState('');
+  const [showNewFileInput, setShowNewFileInput] = useState(false);
+  const [envError, setEnvError] = useState<string | null>(null);
+
   const handleNewFile = () => {
-    const name = prompt('Enter env file name (e.g. .env.local):');
-    if (!name) return;
-    // Only allow .env-prefixed names
+    if (!showNewFileInput) {
+      setShowNewFileInput(true);
+      setNewEnvFileName('.env.');
+      return;
+    }
+    const name = newEnvFileName.trim();
+    if (!name) { setShowNewFileInput(false); return; }
     if (!name.startsWith('.env')) {
-      alert('File name must start with .env');
+      setEnvError('File name must start with .env');
+      setTimeout(() => setEnvError(null), 3000);
       return;
     }
     setActiveFile(name);
     setEnvFiles((prev) => ({ ...prev, [name]: {} }));
+    setShowNewFileInput(false);
+    setNewEnvFileName('');
   };
 
   const fileNames = Object.keys(envFiles);
@@ -87,7 +98,20 @@ export default function EnvVarsPanel({ appId }: Props) {
           </button>
         ))}
         <button className="env-tab env-tab-add" onClick={handleNewFile}>+</button>
+        {showNewFileInput && (
+          <input
+            className="env-key-input"
+            value={newEnvFileName}
+            onChange={(e) => setNewEnvFileName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleNewFile(); if (e.key === 'Escape') setShowNewFileInput(false); }}
+            onBlur={() => setShowNewFileInput(false)}
+            placeholder=".env.local"
+            autoFocus
+          />
+        )}
       </div>
+
+      {envError && <div className="env-status" style={{ color: '#ef4444' }}>{envError}</div>}
 
       {status && <div className="env-status">{status}</div>}
 

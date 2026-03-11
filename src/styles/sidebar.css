@@ -1,0 +1,541 @@
+/* ─── Sidebar ────────────────────────────────────────────────────────────── */
+.sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  -webkit-app-region: drag;
+}
+.sidebar * { -webkit-app-region: no-drag; }
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 12px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent-light);
+}
+.btn-new-app {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.btn-new-app:hover { background: var(--accent-hover); }
+
+.sidebar-section-label {
+  padding: 10px 12px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+}
+.sidebar-empty {
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+}
+.sidebar-item:hover { background: var(--bg-elevated); }
+.sidebar-item.active { background: rgba(99,102,241,0.2); color: var(--accent-light); }
+.sidebar-item-icon { font-size: 14px; flex-shrink: 0; }
+.sidebar-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.sidebar-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  opacity: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: opacity 0.1s, background 0.1s;
+  flex-shrink: 0;
+}
+.sidebar-item:hover .sidebar-delete { opacity: 1; }
+.sidebar-delete:hover { background: var(--danger-bg); color: var(--danger); }
+.sidebar-delete.confirm { opacity: 1; background: var(--danger); color: #fff; }
+
+.sidebar-rename-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-focus);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 1px 6px;
+  outline: none;
+  min-width: 0;
+}
+
+.sidebar-footer {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.sidebar-footer-link {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.sidebar-footer-link:hover { color: var(--text-secondary); }
+
+
+/* ─── Sidebar Settings Button ────────────────────────────────────────────── */
+.sidebar-settings-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 0;
+  transition: color 0.15s;
+  text-align: left;
+}
+.sidebar-settings-btn:hover {
+  color: var(--text-primary);
+}
+
+
+/* ─── Sidebar Export Button ──────────────────────────────────────────────── */
+.sidebar-export {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.sidebar-item:hover .sidebar-export { opacity: 1; }
+.sidebar-export:hover { color: var(--accent-light); }
+
+
+/* ─── Revert Button ──────────────────────────────────────────────────────── */
+.btn-revert {
+  background: var(--bg-elevated);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-revert:hover {
+  background: rgba(245, 158, 11, 0.15);
+}
+
+
+/* ─── Mobile / Capacitor Button ──────────────────────────────────────────── */
+.btn-mobile {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-mobile:hover { background: var(--bg-input); border-color: var(--accent); color: var(--text-primary); }
+.btn-mobile:disabled { opacity: 0.6; cursor: wait; }
+.btn-mobile.ready { border-color: var(--success); color: var(--success); }
+.btn-mobile.ready:hover { background: rgba(34, 197, 94, 0.1); }
+
+
+/* ─── Deploy Button & Menu ───────────────────────────────────────────────── */
+.deploy-wrapper {
+  position: relative;
+}
+.btn-deploy {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btn-deploy:hover { background: var(--bg-input); border-color: var(--accent); color: var(--text-primary); }
+.btn-deploy:disabled { opacity: 0.6; cursor: wait; }
+.btn-deploy.done { border-color: var(--success); color: var(--success); }
+.btn-deploy.done:hover { background: rgba(34, 197, 94, 0.1); }
+
+.deploy-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 50;
+  min-width: 140px;
+  overflow: hidden;
+}
+.deploy-menu-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 8px 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.deploy-menu-item:hover { background: var(--bg-elevated); }
+.deploy-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+.deploy-menu-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 4px 14px 2px;
+}
+
+/* ── Deploy Log Panel ─────────────────────────────────────────────────── */
+.deploy-log-panel {
+  border-top: 1px solid var(--border);
+  background: #0c1220;
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  flex-shrink: 0;
+}
+.deploy-log-header {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-light);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+}
+.deploy-log-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.deploy-log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── Provider Cards (Settings) ──────────────────────────────────────────── */
+
+.provider-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.provider-card {
+  padding: 10px 12px;
+  background: var(--bg-base);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: center;
+  font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.provider-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.provider-card.selected {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+/* ── Template Grid (New App Modal) ──────────────────────────────────────── */
+
+.template-grid-scroll {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  background: var(--bg-base);
+  /* allow horizontal scrolling when cards exceed width */
+  overflow-x: auto;
+}
+
+.template-grid {
+  /* horizontal list instead of wrapping grid */
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px 12px;
+  min-width: 140px;
+  max-width: 180px;
+  background: var(--bg-surface);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.2s;
+  text-align: center;
+  position: relative;
+}
+
+.template-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+}
+
+.template-card.selected {
+  border-color: var(--accent);
+  background: rgba(99,102,241,0.1);
+  box-shadow: 0 10px 20px rgba(99,102,241,0.3);
+}
+
+.template-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.template-card.selected {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.template-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.template-card.disabled:hover {
+  transform: none;
+}
+
+.template-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.template-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.template-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+.template-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: var(--accent);
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.template-badge-mobile {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+/* ── type-cards — 3-column layout when there are 3 or more cards ─────────── */
+
+.type-cards:has(> :nth-child(3)) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* ── Expo preview steps ─────────────────────────────────────────────────── */
+
+.preview-expo-steps {
+  margin: 8px 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.preview-expo-steps li code {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
+/* ── Sidebar header actions ─────────────────────────────────────────────── */
+
+.sidebar-header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-import-app {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-import-app:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.sidebar-footer-powered {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  display: block;
+  padding: 2px 0;
+}
+
+
+/* ─── Sidebar Deploy Button ──────────────────────────────────────────────── */
+.sidebar-deploy {
+  background: none;
+  border: none;
+  color: #10b981;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px 4px;
+  line-height: 1;
+  font-weight: 600;
+}
+.sidebar-item:hover .sidebar-deploy,
+.sidebar-item.active .sidebar-deploy { opacity: 1; }
+.sidebar-deploy:hover { color: #34d399; }
+
+
+/* ─── Sidebar Tasks Button ───────────────────────────────────────────────── */
+.sidebar-tasks-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 0;
+  transition: color 0.15s;
+  text-align: left;
+  position: relative;
+}
+.sidebar-tasks-btn:hover { color: var(--text-primary); }
+
+.task-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f59e0b;
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+
+/* ─── Sidebar History Button ─────────────────────────────────────────── */
+.sidebar-history-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.sidebar-history-btn:hover {
+  border-color: var(--accent-light);
+  color: var(--text-primary);
+}

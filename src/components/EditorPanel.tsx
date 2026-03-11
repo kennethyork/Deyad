@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import type { editor as monacoEditor, IDisposable } from 'monaco-editor';
+import type { editor as monacoEditor, languages, IDisposable, CancellationToken } from 'monaco-editor';
 
 interface Props {
   files: Record<string, string>;
@@ -164,7 +164,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
   }, [files, searchQuery]);
 
   const filteredCount = Object.keys(filteredFiles).length;
-  const tree = buildTree(filteredFiles);
+  const tree = useMemo(() => buildTree(filteredFiles), [filteredFiles]);
 
   // Local edit state
   const [editContent, setEditContent] = useState<string>('');
@@ -217,7 +217,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     completionProviderRef.current = monaco.languages.registerInlineCompletionsProvider(
       { pattern: '**' },
       {
-        provideInlineCompletions: async (model: any, position: any, _context: any, token: any) => {
+        provideInlineCompletions: async (model: monacoEditor.ITextModel, position: { lineNumber: number; column: number }, _context: languages.InlineCompletionContext, token: CancellationToken) => {
           if (!autocompleteEnabledRef.current) return { items: [] };
           const completionModelName = completionModelRef.current;
           if (!completionModelName) return { items: [] };
@@ -293,8 +293,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
           });
           return { items };
         },
-        freeInlineCompletions() {},
-      } as any,
+        disposeInlineCompletions() {},
+      },
     );
   }, []);
 

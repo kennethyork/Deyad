@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
   appId: string;
@@ -11,6 +12,7 @@ export default function PackageManagerPanel({ appId }: Props) {
   const [isDev, setIsDev] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
   const loadDeps = useCallback(async () => {
     try {
@@ -40,7 +42,13 @@ export default function PackageManagerPanel({ appId }: Props) {
   };
 
   const handleUninstall = async (name: string) => {
-    if (!window.confirm(`Uninstall ${name}?`)) return;
+    setConfirmTarget(name);
+  };
+
+  const handleConfirmUninstall = async () => {
+    const name = confirmTarget;
+    if (!name) return;
+    setConfirmTarget(null);
     setStatus(`Removing ${name}…`);
     const result = await window.deyad.npmUninstall(appId, name);
     if (result.success) {
@@ -58,6 +66,14 @@ export default function PackageManagerPanel({ appId }: Props) {
 
   return (
     <div className="package-manager-panel">
+      <ConfirmDialog
+        open={confirmTarget !== null}
+        title="Uninstall Package"
+        message={`Uninstall ${confirmTarget}?`}
+        confirmLabel="Uninstall"
+        onConfirm={handleConfirmUninstall}
+        onCancel={() => setConfirmTarget(null)}
+      />
       <div className="pm-install-row">
         <input
           className="pm-install-input"

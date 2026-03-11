@@ -34,24 +34,32 @@ You describe your app in chat
 
 ## Feature Comparison
 
-| Feature | **Deyad** | **Bolt.new** | **Lovable** | **Cursor** |
-|---|---|---|---|---|
-| 100% offline / local AI | Yes | No | No | No |
-| Free forever (no token limits) | Yes | No | No | No |
-| Full-stack with real database | Yes | No | Partial | No |
-| Autonomous agent (multi-step) | Yes | Partial | Partial | Yes |
-| Error auto-detect & self-fix | Yes | No | No | No |
-| Built-in database admin (pgAdmin) | Yes | No | No | No |
-| Git auto-commit every generation | Yes | No | No | No |
-| AI code completion (FIM) | Yes | No | No | Yes |
-| RAG with local embeddings | Yes | No | No | Yes |
-| Plan → Approve → Execute mode | Yes | No | No | No |
-| Diff preview before applying | Yes | No | No | Yes |
-| Image → Code (vision models) | Yes | Yes | Yes | Yes |
-| Live preview | Yes | Yes | Yes | No |
-| Integrated terminal | Yes | Partial | No | Yes |
-| Deploy (5 targets) | Yes | Yes | Yes | No |
-| Plugin system | Yes | No | No | No |
+| Feature | **Deyad** | **Bolt.new** | **Lovable** | **Cursor** | **Base44** | **v0** |
+|---|---|---|---|---|---|---|
+| **AI Platform** | **Ollama (local)** | Cloud LLM | Cloud LLM | Cloud LLM | Cloud LLM | Cloud LLM |
+| 100% offline / local AI | **Yes** | No | No | No | No | No |
+| Free forever (no token limits) | **Yes** | No | No | No | No | No |
+| Your data stays on your machine | **Yes** | No | No | No | No | No |
+| No API key / account required | **Yes** | No | No | No | No | No |
+| Open source | **Yes** | No | No | No | No | No |
+| Full-stack with real database | **Yes** | No | Partial | No | Partial | No |
+| Autonomous agent (multi-step) | **Yes** | Partial | Partial | Yes | Partial | No |
+| Error auto-detect & self-fix | **Yes** | No | No | No | No | No |
+| Built-in database admin (pgAdmin) | **Yes** | No | No | No | No | No |
+| Git auto-commit every generation | **Yes** | No | No | No | No | No |
+| AI code completion (FIM) | **Yes** | No | No | Yes | No | No |
+| RAG with local embeddings | **Yes** | No | No | Yes | No | No |
+| Plan → Approve → Execute mode | **Yes** | No | No | No | No | No |
+| Diff preview before applying | **Yes** | No | No | Yes | No | No |
+| Image → Code (vision models) | **Yes** | Yes | Yes | Yes | No | Yes |
+| Live preview | **Yes** | Yes | Yes | No | Yes | Yes |
+| Integrated terminal | **Yes** | Partial | No | Yes | No | No |
+| Deploy (5 targets) | **Yes** | Yes | Yes | No | Yes | Vercel only |
+| Mobile preview (Capacitor) | **Yes** | No | No | No | No | No |
+| Plugin system | **Yes** | No | No | Yes | No | No |
+| Works without internet | **Yes** | No | No | No | No | No |
+
+> **Why Ollama-only matters:** Every other AI app builder sends your code and prompts to a cloud API — you pay per token, you need an account, and your proprietary code leaves your machine. Deyad runs inference entirely on your hardware via Ollama. **Zero cloud dependency. Zero cost. Zero data leakage.**
 
 ---
 

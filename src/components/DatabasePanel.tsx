@@ -62,7 +62,7 @@ export default function DatabasePanel({ app, dbStatus }: Props) {
       .then((res) => setTables(res.tables))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
-  }, [app]);
+  }, [app.id, app.appType]);
 
   if (app.appType !== 'fullstack') {
     return <div className="db-panel">Database info is available only for full-stack apps.</div>;

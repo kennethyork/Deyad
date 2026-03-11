@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import type { AppProject } from '../App';
 import { buildSmartContext } from '../lib/contextBuilder';
 import { extractFilesFromResponse, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPrompt, PLANNING_SYSTEM_PROMPT, PLAN_EXECUTION_PROMPT } from '../lib/codeParser';
@@ -9,6 +7,9 @@ import { stripToolMarkup } from '../lib/agentTools';
 import type { ToolResult } from '../lib/agentTools';
 import { detectErrors, buildErrorFixPrompt } from '../lib/errorDetector';
 import type { DetectedError } from '../lib/errorDetector';
+import MessageList from './MessageList';
+import AgentStepsList from './AgentStepsList';
+import ChatInput from './ChatInput';
 
 interface UiMessage {
   id: string;
@@ -54,7 +55,6 @@ export default function ChatPanel({
   const [agentSteps, setAgentSteps] = useState<Array<{ type: 'tool' | 'result'; text: string }>>([]);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [imageAttachment, setImageAttachment] = useState<string | null>(null); // base64 data URI
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const streamBuf = useRef('');
@@ -202,14 +202,6 @@ export default function ChatPanel({
         break;
       }
     }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setImageAttachment(reader.result as string);
-    reader.readAsDataURL(file);
   };
 
   const sendMessage = async (overrideText?: string) => {
@@ -490,12 +482,9 @@ export default function ChatPanel({
     agentAbortRef.current = abort;
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (agentMode) sendAgentMessage();
-      else sendMessage();
-    }
+  const handleSend = () => {
+    if (agentMode) sendAgentMessage();
+    else sendMessage();
   };
 
   const handleApprovePlan = () => {
@@ -666,48 +655,16 @@ export default function ChatPanel({
           </div>
         )}
 
-        {messages.map((m) => (
-          <div key={m.id} className={`message message-${m.role}`}>
-            <div className="message-avatar">{m.role === 'user' ? '👤' : '🤖'}</div>
-            <div className="message-body">
-              {m.model && <span className="model-badge">{m.model}</span>}
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
-              {m.filesGenerated && m.filesGenerated.length > 0 && (
-                <div className="files-generated">
-                  <span className="files-generated-label">Files:</span>
-                  {m.filesGenerated.map((f) => (
-                    <span key={f} className="file-chip">
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {/* Plan approval buttons */}
-              {pendingPlan && m.content === pendingPlan && (
-                <div className="plan-actions">
-                  <button className="btn-approve-plan" onClick={handleApprovePlan} disabled={streaming}>
-                    ✓ Approve &amp; Execute
-                  </button>
-                  <button className="btn-reject-plan" onClick={handleRejectPlan} disabled={streaming}>
-                    ✗ Reject
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
+        <MessageList
+          messages={messages}
+          pendingPlan={pendingPlan}
+          streaming={streaming}
+          onApprovePlan={handleApprovePlan}
+          onRejectPlan={handleRejectPlan}
+        />
 
-        {/* Agent mode action log */}
         {agentMode && agentSteps.length > 0 && (
-          <div className="agent-steps">
-            <div className="agent-steps-header">Agent Actions</div>
-            {agentSteps.map((step, i) => (
-              <div key={i} className={`agent-step agent-step-${step.type}`}>
-                <span className="agent-step-icon">{step.type === 'tool' ? '🔧' : '📋'}</span>
-                <span className="agent-step-text">{step.text}</span>
-              </div>
-            ))}
-          </div>
+          <AgentStepsList steps={agentSteps} />
         )}
 
         {streaming && (
@@ -722,44 +679,16 @@ export default function ChatPanel({
         </div>
       </div>
 
-      {/* Input area */}
-      <div className="chat-input-area">
-        {imageAttachment && (
-          <div className="image-preview">
-            <img src={imageAttachment} alt="Attached" />
-            <button className="btn-remove-image" onClick={() => setImageAttachment(null)}>✕</button>
-          </div>
-        )}
-        <div className="chat-input-row">
-          <button
-            className="btn-attach-image"
-            onClick={() => imageInputRef.current?.click()}
-            title="Attach image (or paste screenshot)"
-          >
-            📎
-          </button>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleImageUpload}
-          />
-          <textarea
-            className="chat-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handleImagePaste}
-            rows={2}
-            placeholder={streaming ? 'AI is responding…' : imageAttachment ? 'Describe what to build from this image…' : 'Describe what you want to build…'}
-            disabled={streaming}
-          />
-          <button className="btn-send" onClick={() => agentMode ? sendAgentMessage() : sendMessage()} disabled={streaming || !input.trim()}>
-            {agentMode ? '⚡' : '↑'}
-          </button>
-        </div>
-      </div>
+      <ChatInput
+        input={input}
+        setInput={setInput}
+        streaming={streaming}
+        agentMode={agentMode}
+        imageAttachment={imageAttachment}
+        setImageAttachment={setImageAttachment}
+        onSend={handleSend}
+        onImagePaste={handleImagePaste}
+      />
     </div>
   );
 }

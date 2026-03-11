@@ -1,0 +1,354 @@
+/* ─── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:       #0f172a;
+  --bg-surface:    #1e293b;
+  --bg-elevated:   #263352;
+  --bg-input:      #1a2540;
+  --border:        #2d3f5c;
+  --border-focus:  #6366f1;
+  --text-primary:  #e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-muted:    #64748b;
+  --accent:        #6366f1;
+  --accent-hover:  #4f46e5;
+  --accent-light:  #818cf8;
+  --success:       #22c55e;
+  --danger:        #ef4444;
+  --danger-bg:     #450a0a;
+  --warning:       #f59e0b;
+  --sidebar-width: 220px;
+  --editor-width:  340px;
+  --radius:        0.5rem;
+  --font-mono:     'Fira Code', 'Cascadia Code', Menlo, monospace;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-app-region: no-drag;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+
+/* ─── Layout ─────────────────────────────────────────────────────────────── */
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(60px, var(--sidebar-width)) 4px 1fr 4px minmax(120px, var(--editor-width));
+  grid-template-rows: 100%;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* stacked layout on narrow screens */
+@media (max-width: 768px) {
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* override inline grid-template-columns on mobile */
+  .app-layout[style] {
+    grid-template-columns: unset !important;
+  }
+  /* hide resizers on mobile */
+  .app-layout > .resizer { display: none; }
+  /* hide all 3 main panels by default */
+  .sidebar,
+  .chat-wrapper,
+  .empty-state,
+  .right-panel { display: none; flex: 1; min-height: 0; overflow: hidden; }
+  /* show the active mobile panel */
+  .mobile-show-sidebar .sidebar { display: flex; }
+  .mobile-show-chat .chat-wrapper,
+  .mobile-show-chat .empty-state { display: flex; }
+  .mobile-show-right .right-panel { display: flex; }
+  /* make active panel fill the screen above the nav bar */
+  .mobile-show-sidebar .sidebar,
+  .mobile-show-chat .chat-wrapper,
+  .mobile-show-chat .empty-state,
+  .mobile-show-right .right-panel {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+  }
+  /* sidebar takes full width, remove border */
+  .sidebar { border-right: none; width: 100%; }
+  .right-panel { border-left: none; width: 100%; }
+  /* show mobile bottom nav */
+  .mobile-nav { display: flex !important; }
+  /* hide desktop sidebar toggle */
+  .btn-toggle-sidebar { display: none !important; }
+  /* chat header: stack on small screens */
+  .chat-header { flex-wrap: wrap; padding: 8px 10px; min-height: unset; gap: 6px; }
+  .chat-header-left { width: 100%; }
+  .chat-header-right { width: 100%; flex-wrap: wrap; gap: 6px; }
+  /* model select full width on mobile */
+  .model-select { max-width: 100%; flex: 1; }
+  /* editor: stack file tree above code on mobile */
+  .editor-panel {
+    grid-template-columns: 1fr;
+    grid-template-rows: 160px 1fr;
+  }
+  .file-tree { border-right: none; border-bottom: 1px solid var(--border); }
+  /* bigger touch targets */
+  .sidebar-item { padding: 10px 10px; }
+  .right-tab { padding: 10px 8px; font-size: 13px; }
+  .btn-send { width: 44px; height: 44px; }
+  .chat-input { font-size: 16px; /* prevent iOS zoom */ }
+  /* modal full-width on mobile */
+  .modal { width: 100%; border-radius: 12px 12px 0 0; max-height: 85vh; }
+  .modal-overlay { align-items: flex-end; }
+}
+
+/* medium screens: auto-hide sidebar */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .btn-toggle-sidebar { display: block; }
+  .chat-header-right { flex-wrap: wrap; }
+  .model-select { max-width: 140px; }
+  .editor-panel {
+    grid-template-columns: 140px 1fr;
+  }
+}
+
+/* hide sidebar when .hidden class applied (toggle) */
+.sidebar.hidden {
+  display: none;
+}
+
+/* toggle button style */
+.btn-toggle-sidebar {
+  position: fixed; /* stick to viewport */
+  top: 8px;
+  left: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  z-index: 1000; /* above sidebar */
+  display: none; /* visible only on small screens */
+}
+.btn-toggle-sidebar:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+/* show toggle on medium-narrow windows (not mobile — mobile uses bottom nav) */
+@media (min-width: 769px) and (max-width: 900px) {
+  .btn-toggle-sidebar { display: block; }
+  /* if a modal is open, hide the toggle so it doesn't intercept clicks */
+  .modal-overlay ~ .btn-toggle-sidebar {
+    display: none;
+  }
+}
+
+
+/* ─── Mobile Bottom Navigation ───────────────────────────────────────────── */
+.mobile-nav {
+  display: none; /* shown only in <=768px media query */
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  justify-content: space-around;
+  align-items: center;
+  padding: 4px 0 max(4px, env(safe-area-inset-bottom));
+}
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 6px 16px;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+.mobile-nav-btn:hover { color: var(--text-secondary); }
+.mobile-nav-btn.active {
+  color: var(--accent-light);
+  background: rgba(99,102,241,0.12);
+}
+.mobile-nav-icon { font-size: 18px; line-height: 1; }
+.mobile-nav-label { font-weight: 600; }
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* resizer bars between panels */
+.resizer {
+  width: 12px; /* thicker for scrollbar-like feel */
+  background: rgba(0,0,0,0.1);
+  cursor: col-resize;
+  z-index: 2;
+}
+.resizer:hover {
+  background: rgba(0,0,0,0.2);
+}
+
+
+/* ─── Empty State ────────────────────────────────────────────────────────── */
+.empty-state {
+  /* centre column only — right panel now always rendered separately */
+  grid-column: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.empty-state-content {
+  text-align: center;
+  max-width: 380px;
+  padding: 2rem;
+}
+.empty-logo { font-size: 4rem; margin-bottom: 1rem; }
+.empty-state-content h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+.empty-state-content p { color: var(--text-secondary); margin-bottom: 0.25rem; }
+.empty-hint { margin-top: 1rem !important; color: var(--text-muted) !important; font-size: 13px; }
+.empty-state-content .btn-primary { margin-top: 1.5rem; }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.4rem;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+/* terminal styling */
+.terminal-multi-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-tab-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-elevated, #1e1e2e);
+  border-bottom: 1px solid var(--border, #333);
+  padding: 0 4px;
+  gap: 2px;
+  height: 32px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  white-space: nowrap;
+  user-select: none;
+  transition: background 0.1s, color 0.1s;
+}
+
+.terminal-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #ccc);
+}
+
+.terminal-tab.active {
+  background: #000;
+  color: var(--text-primary, #fff);
+}
+
+.terminal-tab-label {
+  pointer-events: none;
+}
+
+.terminal-tab-close {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.1s;
+}
+
+.terminal-tab-close:hover {
+  opacity: 1;
+}
+
+.terminal-tab-add {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  font-size: 16px;
+  padding: 2px 8px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.1s;
+}
+
+.terminal-tab-add:hover {
+  opacity: 1;
+  color: var(--text-primary, #fff);
+}
+
+.terminal-panel {
+  font-family: var(--font-mono);
+}
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 1.4rem;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover { background: var(--border); }
+
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }

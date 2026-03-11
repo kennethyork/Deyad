@@ -12,6 +12,10 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
     return { hasError: true, error };
   }
 
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[ErrorBoundary]', error, info.componentStack);
+  }
+
   handleReload = () => {
     window.location.reload();
   };

@@ -24,14 +24,7 @@ export function detectErrors(text: string): DetectedError[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Vite / TypeScript errors: "ERROR(TS2345): ..." or "src/App.tsx(12,5): error TS..."
-    const tsMatch = trimmed.match(/(?:ERROR|error)\s*\(?TS(\d+)\)?[:\s]+(.+)/i);
-    if (tsMatch) {
-      errors.push({ type: 'typescript', message: tsMatch[2].trim(), raw: trimmed });
-      continue;
-    }
-
-    // File-based TS error: "src/file.tsx(line,col): error TS..."
+    // File-based TS error: "src/file.tsx(line,col): error TS..." (check before generic TS match)
     const tsFileMatch = trimmed.match(/^(.+?)\((\d+),(\d+)\):\s*error\s+(TS\d+:\s*.+)/);
     if (tsFileMatch) {
       errors.push({
@@ -42,6 +35,13 @@ export function detectErrors(text: string): DetectedError[] {
         message: tsFileMatch[4],
         raw: trimmed,
       });
+      continue;
+    }
+
+    // Vite / TypeScript errors: "ERROR(TS2345): ..." or "error TS..."
+    const tsMatch = trimmed.match(/(?:ERROR|error)\s*\(?TS(\d+)\)?[:\s]+(.+)/i);
+    if (tsMatch) {
+      errors.push({ type: 'typescript', message: tsMatch[2].trim(), raw: trimmed });
       continue;
     }
 

@@ -5,7 +5,6 @@ app.commandLine.appendSwitch('log-level', '3');
 
 // disable hardware acceleration to avoid GPU spikes when rendering chat
 app.disableHardwareAcceleration();
-import os from 'os';
 // pty will be required at runtime to avoid bundler issues
 import { v4 as uuidv4 } from 'uuid';
 import path from 'node:path';
@@ -27,6 +26,9 @@ import {
   DEFAULT_SETTINGS,
 } from './lib/mainUtils';
 import type { DeyadSettings } from './lib/mainUtils';
+import { gitInit, gitCommit, registerGitHandlers } from './main/ipcGit';
+import { registerCapacitorHandlers } from './main/ipcCapacitor';
+import { registerDeployHandlers } from './main/ipcDeploy';
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 // update-electron-app checks for updates from GitHub Releases by default.
@@ -45,7 +47,6 @@ const APPS_DIR = path.join(app.getPath('userData'), 'deyad-apps');
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'deyad-settings.json');
 const SNAPSHOTS_DIR = path.join(app.getPath('userData'), 'deyad-snapshots');
 const DOCKER_CHECK_TIMEOUT_MS = 5000;
-const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.json\n';
 
 // ── Security: appId sanitization ──────────────────────────────────────────────
 // safeAppId and appDir imported from ./lib/mainUtils
@@ -358,48 +359,10 @@ ipcMain.handle('ollama:embed', async (_event, { model, input }: { model: string;
   });
 });
 
-// ── Git Helpers ───────────────────────────────────────────────────────────────
-
-ipcMain.handle('git:show', async (_event, appId: string, hash: string, filePath: string) => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(path.join(dir, '.git'))) return null;
-  // Validate hash is hex-only to prevent injection
-  if (!/^[0-9a-f]+$/i.test(hash)) return null;
-  // Prevent path traversal
-  if (filePath.includes('..') || path.isAbsolute(filePath)) return null;
-  try {
-    const { stdout } = await execFileAsync('git', ['show', `${hash}:${filePath}`], { cwd: dir, timeout: 10000 });
-    return stdout;
-  } catch { return null; }
-});
-
-ipcMain.handle('git:diff-stat', async (_event, appId: string, hash: string) => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(path.join(dir, '.git'))) return [];
-  if (!/^[0-9a-f]+$/i.test(hash)) return [];
-  try {
-    const { stdout } = await execFileAsync(
-      'git', ['diff-tree', '--no-commit-id', '-r', '--name-status', hash],
-      { cwd: dir, timeout: 10000 },
-    );
-    return stdout.trim().split('\n').filter(Boolean).map((line) => {
-      const [status, ...parts] = line.split('\t');
-      return { status, path: parts.join('\t') };
-    });
-  } catch { return []; }
-});
-
-ipcMain.handle('git:checkout', async (_event, appId: string, hash: string) => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
-  if (!/^[0-9a-f]+$/i.test(hash)) return { success: false, error: 'Invalid hash' };
-  try {
-    await execFileAsync('git', ['checkout', hash, '--', '.'], { cwd: dir, timeout: 10000 });
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
-  }
-});
+// ── Git / Capacitor / Deploy handlers (extracted to src/main/) ──────────────
+registerGitHandlers(appDir);
+registerCapacitorHandlers(appDir);
+registerDeployHandlers(appDir);
 
 // ── App Projects ────────────────────────────────────────────────────────────
 
@@ -442,7 +405,7 @@ ipcMain.handle('apps:create', async (_event, { name, description, appType, dbPro
     meta.guiPort = guiPort;
   }
   fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
-  await gitInit(id);
+  await gitInit(appDir, id);
   return { id, ...meta };
 });
 
@@ -478,7 +441,7 @@ ipcMain.handle('apps:write-files', async (_event, { appId, files }: { appId: str
     fs.writeFileSync(fullPath, content, 'utf-8');
   }
   // Auto-commit if git is initialized
-  await gitCommit(appId, `Update ${Object.keys(files).length} file(s)`);
+  await gitCommit(appDir, appId, `Update ${Object.keys(files).length} file(s)`);
   return true;
 });
 
@@ -1193,404 +1156,6 @@ ipcMain.handle('apps:revert', async (_event, appId: string) => {
   return { success: true };
 });
 
-// ── Git Version Control ─────────────────────────────────────────────────────
-
-async function gitInit(appId: string): Promise<void> {
-  const dir = appDir(appId);
-  if (fs.existsSync(path.join(dir, '.git'))) return;
-  try {
-    await execFileAsync('git', ['init'], { cwd: dir, timeout: 10000 });
-    // Create a .gitignore
-    fs.writeFileSync(path.join(dir, '.gitignore'), DEFAULT_GITIGNORE, 'utf-8');
-    await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
-    await execFileAsync('git', ['commit', '-m', 'Initial scaffold'], { cwd: dir, timeout: 10000 });
-  } catch { /* git may not be installed */ }
-}
-
-async function gitCommit(appId: string, message: string): Promise<void> {
-  const dir = appDir(appId);
-  if (!fs.existsSync(path.join(dir, '.git'))) return;
-  try {
-    await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
-    // Check if there are changes to commit
-    const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: dir, timeout: 10000 });
-    if (stdout.trim()) {
-      await execFileAsync('git', ['commit', '-m', message], { cwd: dir, timeout: 10000 });
-    }
-  } catch { /* git may not be installed */ }
-}
-
-ipcMain.handle('git:log', async (_event, appId: string) => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(path.join(dir, '.git'))) return [];
-  try {
-    const { stdout } = await execFileAsync(
-      'git', ['log', '--oneline', '--format=%H|%s|%ci', '-20'],
-      { cwd: dir, timeout: 10000 },
-    );
-    return stdout.trim().split('\n').filter(Boolean).map((line) => {
-      const [hash, message, date] = line.split('|');
-      return { hash, message, date };
-    });
-  } catch { return []; }
-});
-
-// ── Capacitor (Mobile) ──────────────────────────────────────────────────────
-
-ipcMain.handle('apps:capacitor-init', async (_event, appId: string) => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
-
-  // Read app name from deyad.json
-  let appName = 'MyApp';
-  let appType = 'frontend';
-  try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
-    appName = meta.name || appName;
-    appType = meta.appType || appType;
-  } catch { /* use default */ }
-
-  // For fullstack apps, Capacitor wraps the frontend/ subdirectory
-  const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
-  if (!fs.existsSync(webDir)) return { success: false, error: 'Frontend directory not found' };
-
-  const capId = appName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '') || 'com.deyad.app';
-
-  // Check if already initialized
-  if (fs.existsSync(path.join(webDir, 'capacitor.config.ts'))) {
-    return { success: true, alreadyInitialized: true };
-  }
-
-  try {
-    // Install Capacitor core + CLI + platforms
-    await execFileAsync('npm', ['install', '@capacitor/core', '@capacitor/cli', '@capacitor/android', '@capacitor/ios'], { cwd: webDir, timeout: 120_000 });
-
-    // Write capacitor.config.ts
-    const capConfig = `import type { CapacitorConfig } from '@capacitor/cli';
-
-const config: CapacitorConfig = {
-  appId: 'com.deyad.${capId}',
-  appName: ${JSON.stringify(appName)},
-  webDir: 'dist',
-  server: {
-    androidScheme: 'https',
-  },
-};
-
-export default config;
-`;
-    fs.writeFileSync(path.join(webDir, 'capacitor.config.ts'), capConfig);
-
-    // Build the web app first
-    await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });
-
-    // Add Android and iOS platforms
-    await execFileAsync('npx', ['cap', 'add', 'android'], { cwd: webDir, timeout: 60_000 });
-    await execFileAsync('npx', ['cap', 'add', 'ios'], { cwd: webDir, timeout: 60_000 }).catch(() => {
-      // iOS only works on macOS — ignore the error on other platforms
-    });
-
-    // Sync web assets to native projects
-    await execFileAsync('npx', ['cap', 'sync'], { cwd: webDir, timeout: 60_000 });
-
-    return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
-});
-
-ipcMain.handle('apps:capacitor-open', async (_event, appId: string, platform: 'android' | 'ios') => {
-  const dir = appDir(appId);
-
-  // Determine working directory (fullstack uses frontend/ subdir)
-  let webDir = dir;
-  try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
-    if (meta.appType === 'fullstack') webDir = path.join(dir, 'frontend');
-  } catch { /* use root */ }
-
-  try {
-    // Rebuild and sync before opening
-    await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });
-    await execFileAsync('npx', ['cap', 'sync'], { cwd: webDir, timeout: 60_000 });
-    await execFileAsync('npx', ['cap', 'open', platform], { cwd: webDir, timeout: 30_000 });
-    return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
-});
-
-/** Helper: resolve the Capacitor working directory for an app */
-function capWebDir(appId: string): string {
-  const dir = appDir(appId);
-  try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
-    if (meta.appType === 'fullstack') return path.join(dir, 'frontend');
-  } catch { /* default */ }
-  return dir;
-}
-
-/** Helper: get the first non-internal IPv4 address */
-function getLocalIp(): string {
-  const ifaces = os.networkInterfaces();
-  for (const ifaceList of Object.values(ifaces)) {
-    if (!ifaceList) continue;
-    for (const iface of ifaceList) {
-      if (iface.family === 'IPv4' && !iface.internal) return iface.address;
-    }
-  }
-  return '127.0.0.1';
-}
-
-ipcMain.handle('apps:capacitor-list-devices', async (_event, appId: string, platform: 'android' | 'ios') => {
-  const webDir = capWebDir(appId);
-  try {
-    const { stdout } = await execFileAsync('npx', ['cap', 'run', platform, '--list'], { cwd: webDir, timeout: 30_000 });
-    // Parse device lines — each non-empty line after header is a device
-    const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
-    const devices: Array<{ id: string; name: string }> = [];
-    for (const line of lines) {
-      // Skip header/info lines that don't look like device entries
-      if (line.startsWith('--') || line.toLowerCase().includes('name') && line.toLowerCase().includes('api')) continue;
-      // Device lines typically: "Pixel_7_API_34 (emulator)" or "adb:XXXXX"
-      const id = line.split(/\s+/)[0];
-      if (id) devices.push({ id, name: line });
-    }
-    return { success: true, devices };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, devices: [], error: msg };
-  }
-});
-
-ipcMain.handle('apps:capacitor-run', async (_event, appId: string, platform: 'android' | 'ios', target: string) => {
-  const webDir = capWebDir(appId);
-  try {
-    // Build and sync first
-    await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });
-    await execFileAsync('npx', ['cap', 'sync'], { cwd: webDir, timeout: 60_000 });
-    // Deploy to the specific device/emulator
-    await execFileAsync('npx', ['cap', 'run', platform, '--target', target], { cwd: webDir, timeout: 180_000 });
-    return { success: true };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
-});
-
-ipcMain.handle('apps:capacitor-live-reload', async (_event, appId: string, platform: 'android' | 'ios', enable: boolean, devPort?: number) => {
-  const webDir = capWebDir(appId);
-  const configPath = path.join(webDir, 'capacitor.config.ts');
-  if (!fs.existsSync(configPath)) return { success: false, error: 'Capacitor not initialized. Run Initialize first.' };
-
-  try {
-    let config = fs.readFileSync(configPath, 'utf-8');
-
-    if (enable) {
-      const ip = getLocalIp();
-      const port = devPort || 5173;
-      const serverBlock = `  server: {\n    url: 'http://${ip}:${port}',\n    cleartext: true,\n  },`;
-
-      // Replace existing server block or insert before closing brace
-      if (config.includes('server:')) {
-        config = config.replace(/\s*server:\s*\{[^}]*\},?/s, '\n' + serverBlock);
-      } else {
-        config = config.replace(/(webDir:\s*'[^']*',?)/, `$1\n${serverBlock}`);
-      }
-    } else {
-      // Remove the live-reload server.url — restore to default androidScheme-only
-      const defaultServer = `  server: {\n    androidScheme: 'https',\n  },`;
-      config = config.replace(/\s*server:\s*\{[^}]*\},?/s, '\n' + defaultServer);
-    }
-
-    fs.writeFileSync(configPath, config);
-    // Sync the config change to native projects
-    await execFileAsync('npx', ['cap', 'sync'], { cwd: webDir, timeout: 60_000 });
-    return { success: true, ip: enable ? getLocalIp() : undefined };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { success: false, error: msg };
-  }
-});
-
-// ── Deploy ──────────────────────────────────────────────────────────────────
-
-ipcMain.handle('apps:deploy-check', async () => {
-  // Check which deploy CLIs are available
-  const checks: Record<string, boolean> = { netlify: false, vercel: false, surge: false, railway: false, flyio: false };
-  const cliMap: Record<string, string[]> = {
-    netlify: ['netlify', '--version'],
-    vercel: ['vercel', '--version'],
-    surge: ['surge', '--version'],
-    railway: ['railway', '--version'],
-    flyio: ['fly', 'version'],
-  };
-  for (const [key, cmd] of Object.entries(cliMap)) {
-    try {
-      await execFileAsync(cmd[0], cmd.slice(1), { timeout: 15_000 });
-      checks[key] = true;
-    } catch { /* not available */ }
-  }
-  return checks;
-});
-
-ipcMain.handle('apps:deploy', async (event, appId: string, provider: 'netlify' | 'vercel' | 'surge') => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
-
-  // Read app metadata
-  let appType = 'frontend';
-  let appName = 'deyad-app';
-  try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
-    appType = meta.appType || appType;
-    appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-  } catch { /* use defaults */ }
-
-  const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
-
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
-
-  try {
-    // Step 1: Build
-    sendLog('Building project...\n');
-    await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });
-    sendLog('Build complete.\n');
-
-    const distDir = path.join(webDir, 'dist');
-    if (!fs.existsSync(distDir)) return { success: false, error: 'Build output (dist/) not found' };
-
-    // Step 2: Deploy based on provider
-    let url = '';
-
-    if (provider === 'netlify') {
-      sendLog('Deploying to Netlify...\n');
-      const { stdout } = await execFileAsync('npx', ['netlify', 'deploy', '--dir=dist', '--prod', '--json'], { cwd: webDir, timeout: 120_000 });
-      try {
-        const result = JSON.parse(stdout);
-        url = result.deploy_url || result.url || '';
-      } catch {
-        // Try to extract URL from non-JSON output
-        const match = stdout.match(/https:\/\/[^\s]+\.netlify\.app[^\s]*/);
-        url = match?.[0] || '';
-      }
-    } else if (provider === 'vercel') {
-      sendLog('Deploying to Vercel...\n');
-      const { stdout } = await execFileAsync('npx', ['vercel', '--prod', '--yes'], { cwd: distDir, timeout: 120_000 });
-      url = stdout.trim().split('\n').pop() || '';
-    } else if (provider === 'surge') {
-      sendLog('Deploying to Surge...\n');
-      // Surge needs an index.html in the dir — copy index to 200.html for SPA routing
-      const indexPath = path.join(distDir, 'index.html');
-      const spaPath = path.join(distDir, '200.html');
-      if (fs.existsSync(indexPath) && !fs.existsSync(spaPath)) {
-        fs.copyFileSync(indexPath, spaPath);
-      }
-      const domain = `deyad-${appId.slice(0, 12)}.surge.sh`;
-      const { stdout } = await execFileAsync('npx', ['surge', distDir, domain], { cwd: webDir, timeout: 120_000 });
-      url = `https://${domain}`;
-      sendLog(stdout);
-    }
-
-    sendLog(`\nDeployed! ${url}\n`);
-    return { success: true, url };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    sendLog(`\nDeploy failed: ${msg}\n`);
-    return { success: false, error: msg };
-  }
-});
-
-// ── Fullstack Deploy (Railway / Fly.io) ─────────────────────────────────────
-
-ipcMain.handle('apps:deploy-fullstack', async (event, appId: string, provider: 'railway' | 'flyio') => {
-  const dir = appDir(appId);
-  if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
-
-  let appName = 'deyad-app';
-  try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
-    appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-  } catch { /* use default */ }
-
-  const win = BrowserWindow.fromWebContents(event.sender);
-  const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
-
-  try {
-    let url = '';
-
-    if (provider === 'railway') {
-      sendLog('Deploying fullstack app to Railway...\n');
-
-      // Check if railway project already linked
-      const hasRailway = fs.existsSync(path.join(dir, '.railway'));
-      if (!hasRailway) {
-        sendLog('Initializing Railway project...\n');
-        await execFileAsync('railway', ['init', '--name', appName], { cwd: dir, timeout: 30_000 });
-      }
-
-      sendLog('Pushing to Railway (this may take a few minutes)...\n');
-      const { stdout } = await execFileAsync('railway', ['up', '--detach'], { cwd: dir, timeout: 300_000 });
-      sendLog(stdout);
-
-      // Try to get the deployment URL
-      try {
-        const { stdout: domainOut } = await execFileAsync('railway', ['domain'], { cwd: dir, timeout: 15_000 });
-        url = domainOut.trim();
-        if (url && !url.startsWith('http')) url = `https://${url}`;
-      } catch {
-        url = '(check Railway dashboard for URL)';
-      }
-    } else if (provider === 'flyio') {
-      sendLog('Deploying fullstack app to Fly.io...\n');
-
-      // Check if fly.toml exists
-      const hasFlyToml = fs.existsSync(path.join(dir, 'fly.toml'));
-      if (!hasFlyToml) {
-        sendLog('Launching new Fly.io app...\n');
-        // Write a basic Dockerfile if none exists
-        if (!fs.existsSync(path.join(dir, 'Dockerfile'))) {
-          const dockerfile = `FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN cd frontend && npm ci && npx vite build
-
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=build /app/backend ./backend
-COPY --from=build /app/frontend/dist ./frontend/dist
-COPY --from=build /app/package*.json ./
-RUN cd backend && npm ci --production
-EXPOSE 3001
-CMD ["node", "backend/src/index.js"]
-`;
-          fs.writeFileSync(path.join(dir, 'Dockerfile'), dockerfile);
-          sendLog('Generated Dockerfile.\n');
-        }
-
-        await execFileAsync('fly', ['launch', '--name', appName, '--no-deploy', '--yes'], { cwd: dir, timeout: 60_000 });
-      }
-
-      sendLog('Deploying to Fly.io (this may take a few minutes)...\n');
-      const { stdout } = await execFileAsync('fly', ['deploy'], { cwd: dir, timeout: 300_000 });
-      sendLog(stdout);
-      url = `https://${appName}.fly.dev`;
-    }
-
-    sendLog(`\nDeployed! ${url}\n`);
-    return { success: true, url };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    sendLog(`\nDeploy failed: ${msg}\n`);
-    return { success: false, error: msg };
-  }
-});
-
 // ── Project Import ──────────────────────────────────────────────────────────
 
 ipcMain.handle('apps:import', async (_event, name: string) => {
@@ -1630,7 +1195,7 @@ ipcMain.handle('apps:import', async (_event, name: string) => {
   fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
   // Initialize git for the imported project
-  await gitInit(id);
+  await gitInit(appDir, id);
 
   return { id, ...meta };
 });
