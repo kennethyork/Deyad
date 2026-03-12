@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session } from 'electron';
+import { app, BrowserWindow, session, Menu, shell } from 'electron';
 
 // Suppress GLib-GObject signal handler warnings on Linux (harmless Chromium/GTK noise)
 app.commandLine.appendSwitch('log-level', '3');
@@ -83,6 +83,34 @@ registerGitHandlers(appDir);
 registerCapacitorHandlers(appDir);
 registerDeployHandlers(appDir);
 
+
+// ── Application Menu ────────────────────────────────────────────────────────
+
+function buildAppMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'GitHub Repository',
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad'),
+        },
+        {
+          label: 'Report an Issue',
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/issues'),
+        },
+        {
+          label: 'Releases',
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/releases'),
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 // ── Window Creation ─────────────────────────────────────────────────────────
 
@@ -176,7 +204,10 @@ const createWindow = () => {
 
 // ── Lifecycle ───────────────────────────────────────────────────────────────
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  buildAppMenu();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   const devProcesses = getDevProcesses();
