@@ -1,4 +1,4 @@
-import { app, BrowserWindow, session, Menu, shell } from 'electron';
+import { app, BrowserWindow, session, Menu, shell, dialog } from 'electron';
 
 // Suppress GLib-GObject signal handler warnings on Linux (harmless Chromium/GTK noise)
 app.commandLine.appendSwitch('log-level', '3');
@@ -105,6 +105,18 @@ function buildAppMenu(): void {
         {
           label: 'Releases',
           click: () => shell.openExternal('https://github.com/theKennethy/Deyad/releases'),
+        },
+        { type: 'separator' },
+        {
+          label: 'About Deyad',
+          click: () => {
+            dialog.showMessageBox({
+              type: 'info',
+              title: 'About Deyad',
+              message: 'Deyad',
+              detail: 'Local AI app builder powered by Ollama models.\n\nhttps://github.com/theKennethy/Deyad',
+            });
+          },
         },
       ],
     },
