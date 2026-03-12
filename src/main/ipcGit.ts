@@ -36,6 +36,21 @@ export async function gitCommit(appDir: (id: string) => string, appId: string, m
 }
 
 export function registerGitHandlers(appDir: (id: string) => string): void {
+  ipcMain.handle('git:commit', async (_event, appId: string, message: string) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(path.join(dir, '.git'))) return { success: false, error: 'No git repo' };
+    try {
+      await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
+      const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: dir, timeout: 10000 });
+      if (!stdout.trim()) return { success: true, output: 'Nothing to commit.' };
+      const result = await execFileAsync('git', ['commit', '-m', message], { cwd: dir, timeout: 10000 });
+      return { success: true, output: result.stdout.trim() };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
+    }
+  });
+
   ipcMain.handle('git:log', async (_event, appId: string) => {
     const dir = appDir(appId);
     if (!fs.existsSync(path.join(dir, '.git'))) return [];

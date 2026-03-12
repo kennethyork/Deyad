@@ -148,7 +148,8 @@ export async function executeTool(
 
       case 'git_commit': {
         const msg = call.params.message || 'Update files';
-        return await executeCommand(appId, `git add . && git commit -m "${msg.replace(/"/g, '\\"')}"`);
+        const res = await window.deyad.gitCommitAgent(appId, msg);
+        return { tool: call.name, success: res.success, output: res.output || res.error || 'Committed.' };
       }
 
       case 'git_remote_set': {
@@ -321,7 +322,7 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
       clearTimeout(timeout);
       unsubData();
       unsubExit();
-      window.deyad.terminalKill(termId).catch(() => {});
+      window.deyad.terminalKill(termId).catch((err) => console.warn('terminalKill:', err));
       // Strip ANSI escape codes for cleaner output
       const cleaned = output.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim();
       // Truncate to avoid blowing up context

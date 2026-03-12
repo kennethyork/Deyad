@@ -152,7 +152,7 @@ export default function TerminalPanel({ appId }: Props) {
   useEffect(() => {
     return () => {
       for (const tab of tabsRef.current) {
-        window.deyad.terminalKill(tab.termId).catch(() => {});
+        window.deyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
         tab.term.dispose();
       }
     };
@@ -163,7 +163,7 @@ export default function TerminalPanel({ appId }: Props) {
     const tab = tabsRef.current.find(t => t.id === tabId);
     if (!tab) return;
 
-    window.deyad.terminalKill(tab.termId).catch(() => {});
+    window.deyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
     tab.term.dispose();
 
     // remove the DOM wrapper

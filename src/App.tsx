@@ -285,7 +285,7 @@ export default function App() {
 
   const handleDeleteApp = async (appId: string) => {
     // Stop dev server if running before deleting
-    await window.deyad.appDevStop(appId).catch(() => {});
+    await window.deyad.appDevStop(appId).catch((err) => console.warn('appDevStop:', err));
     await window.deyad.deleteApp(appId);
     if (selectedApp?.id === appId) {
       setSelectedApp(null);
@@ -529,7 +529,7 @@ export default function App() {
               setCompletionModel(s.completionModel ?? '');
               setDefaultModel(s.defaultModel ?? '');
               if (s.theme) setTheme(s.theme);
-            }).catch(() => {});
+            }).catch((err) => console.warn('getSettings:', err));
           }}
         />
       )}
@@ -618,7 +618,7 @@ export default function App() {
             setShowWizard(false);
             window.deyad.setSettings({ hasCompletedWizard: true }).then((s) => {
               setDefaultModel(s.defaultModel ?? '');
-            }).catch(() => {});
+            }).catch((err) => console.warn('setSettings:', err));
           }}
           onCreateApp={() => setShowNewAppModal(true)}
         />

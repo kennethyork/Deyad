@@ -264,7 +264,7 @@ export function registerAppHandlers(
       proc.kill();
       devProcesses.delete(appId);
     }
-    await stopCompose(appDir, appId).catch(() => {});
+    await stopCompose(appDir, appId).catch((err) => console.warn('stopCompose:', err));
     const dir = appDir(appId);
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
     deleteSnapshot(appId);

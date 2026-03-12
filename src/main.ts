@@ -186,7 +186,7 @@ const createWindow = () => {
     registerHeaderStripping(pgadminSession);
 
     // Ensure the pgAdmin partition permits all cookies (no third-party blocking)
-    pgadminSession.cookies.flushStore().catch(() => {});
+    pgadminSession.cookies.flushStore().catch((err) => console.warn('flushStore:', err));
 
     // When a webview is attached, ensure its session allows all cookies from
     // localhost so pgAdmin login works reliably inside the Electron webview.

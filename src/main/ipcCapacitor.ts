@@ -75,7 +75,7 @@ export default config;
 
       await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });
       await execFileAsync('npx', ['cap', 'add', 'android'], { cwd: webDir, timeout: 60_000 });
-      await execFileAsync('npx', ['cap', 'add', 'ios'], { cwd: webDir, timeout: 60_000 }).catch(() => {});
+      await execFileAsync('npx', ['cap', 'add', 'ios'], { cwd: webDir, timeout: 60_000 }).catch((err) => console.warn('cap add ios:', err));
       await execFileAsync('npx', ['cap', 'sync'], { cwd: webDir, timeout: 60_000 });
 
       return { success: true };

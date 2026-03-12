@@ -229,6 +229,9 @@ contextBridge.exposeInMainWorld('deyad', {
   listPlugins: (): Promise<PluginManifest[]> => ipcRenderer.invoke('plugins:list'),
 
   // ── Git ────────────────────────────────────────────────────────────────
+  gitCommitAgent: (appId: string, message: string): Promise<{ success: boolean; output?: string; error?: string }> =>
+    ipcRenderer.invoke('git:commit', appId, message),
+
   gitLog: (appId: string): Promise<{ hash: string; message: string; date: string }[]> =>
     ipcRenderer.invoke('git:log', appId),
 

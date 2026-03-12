@@ -142,6 +142,7 @@ interface DeyadAPI {
   revertFiles(appId: string): Promise<{ success: boolean; error?: string }>;
 
   // Git
+  gitCommitAgent(appId: string, message: string): Promise<{ success: boolean; output?: string; error?: string }>;
   gitLog(appId: string): Promise<GitLogEntry[]>;
   gitShow(appId: string, hash: string, filePath: string): Promise<string | null>;
   gitDiffStat(appId: string, hash: string): Promise<{ status: string; path: string }[]>;

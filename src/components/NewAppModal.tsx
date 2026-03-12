@@ -66,7 +66,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
         }
       });
       setPluginTemplates(pts);
-    }).catch(() => {});
+    }).catch((err) => console.warn('listPlugins:', err));
   }, []);
 
   useEffect(() => {

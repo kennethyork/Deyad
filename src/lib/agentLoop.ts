@@ -186,7 +186,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
     try {
       // Trigger embedding of chunks in background (non-blocking for first run)
       if (embedModel) {
-        embedChunks(appId, appFiles, embedModel).catch(() => {});
+        embedChunks(appId, appFiles, embedModel).catch((err) => console.warn('embedChunks:', err));
       }
 
       // Build initial context (with RAG chunks if embeddings are available)
@@ -362,6 +362,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
       if (iteration >= MAX_ITERATIONS && !aborted) {
         fullOutput += '\n\n*Agent stopped after reaching the maximum iteration limit.*';
         callbacks.onContent(fullOutput);
+        callbacks.onError(`Agent stopped after reaching the maximum iteration limit (${MAX_ITERATIONS}). You can continue the conversation to pick up where it left off.`);
+        return;
       }
 
       callbacks.onDone();
