@@ -17,7 +17,8 @@ export function registerTerminalHandlers(appDir: (id: string) => string): void {
     let pty;
     try {
       pty = require('node-pty');
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       throw new Error('node-pty is not available. Rebuild native modules with electron-rebuild.');
     }
     const cwd = appId ? appDir(appId) : undefined;

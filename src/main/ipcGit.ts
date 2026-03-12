@@ -20,7 +20,7 @@ export async function gitInit(appDir: (id: string) => string, appId: string): Pr
     fs.writeFileSync(path.join(dir, '.gitignore'), DEFAULT_GITIGNORE, 'utf-8');
     await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
     await execFileAsync('git', ['commit', '-m', 'Initial scaffold'], { cwd: dir, timeout: 10000 });
-  } catch { /* git may not be installed */ }
+  } catch (err) { console.debug('git may not be installed:', err); }
 }
 
 export async function gitCommit(appDir: (id: string) => string, appId: string, message: string): Promise<void> {
@@ -32,7 +32,7 @@ export async function gitCommit(appDir: (id: string) => string, appId: string, m
     if (stdout.trim()) {
       await execFileAsync('git', ['commit', '-m', message], { cwd: dir, timeout: 10000 });
     }
-  } catch { /* git may not be installed */ }
+  } catch (err) { console.debug('git may not be installed:', err); }
 }
 
 export function registerGitHandlers(appDir: (id: string) => string): void {
@@ -63,7 +63,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
         const [hash, message, date] = line.split('|');
         return { hash, message, date };
       });
-    } catch { return []; }
+    } catch (err) { console.debug('Handled error:', err); return []; }
   });
 
   ipcMain.handle('git:show', async (_event, appId: string, hash: string, filePath: string) => {
@@ -74,7 +74,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
     try {
       const { stdout } = await execFileAsync('git', ['show', `${hash}:${filePath}`], { cwd: dir, timeout: 10000 });
       return stdout;
-    } catch { return null; }
+    } catch (err) { console.debug('Handled error:', err); return null; }
   });
 
   ipcMain.handle('git:diff-stat', async (_event, appId: string, hash: string) => {
@@ -90,7 +90,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
         const [status, ...parts] = line.split('\t');
         return { status, path: parts.join('\t') };
       });
-    } catch { return []; }
+    } catch (err) { console.debug('Handled error:', err); return []; }
   });
 
   ipcMain.handle('git:checkout', async (_event, appId: string, hash: string) => {
@@ -113,7 +113,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
     try {
       const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd: dir, timeout: 10000 });
       return stdout.trim() || null;
-    } catch { return null; }
+    } catch (err) { console.debug('Handled error:', err); return null; }
   });
 
   ipcMain.handle('git:remote-set', async (_event, appId: string, url: string) => {
@@ -125,7 +125,8 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
       // Try set-url first (in case origin already exists), otherwise add
       try {
         await execFileAsync('git', ['remote', 'set-url', 'origin', url], { cwd: dir, timeout: 10000 });
-      } catch {
+      } catch (err) {
+        console.debug('Handled error:', err);
         await execFileAsync('git', ['remote', 'add', 'origin', url], { cwd: dir, timeout: 10000 });
       }
       return { success: true };
@@ -168,7 +169,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
       const { stdout: branchOut } = await execFileAsync('git', ['branch', '--format=%(refname:short)'], { cwd: dir, timeout: 10000 });
       const branches = branchOut.trim().split('\n').filter(Boolean);
       return { current: currentOut.trim(), branches };
-    } catch { return { current: 'main', branches: [] }; }
+    } catch (err) { console.debug('Handled error:', err); return { current: 'main', branches: [] }; }
   });
 
   ipcMain.handle('git:branch-create', async (_event, appId: string, name: string) => {

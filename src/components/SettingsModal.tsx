@@ -39,7 +39,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     try {
       const { models: list } = await window.deyad.listModels();
       setModels(list.map((m) => m.name));
-    } catch { /* not available */ }
+    } catch (err) { console.debug('not available:', err); }
   };
 
   const handleSave = async () => {
@@ -75,7 +75,8 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
       const { models: list } = await window.deyad.listModels();
       setModels(list.map((m) => m.name));
       setTestResult('success');
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       setTestResult('error');
     }
     setTimeout(() => setTestResult('idle'), 3000);

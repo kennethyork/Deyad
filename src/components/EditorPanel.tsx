@@ -282,7 +282,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
                 );
                 if (token.isCancellationRequested || !completion.trim()) { resolve([]); return; }
                 resolve([{ insertText: completion }]);
-              } catch {
+              } catch (err) {
+                console.debug('Handled error:', err);
                 resolve([]);
               }
             }, 400);

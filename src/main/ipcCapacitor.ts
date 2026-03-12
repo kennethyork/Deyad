@@ -17,7 +17,7 @@ function capWebDir(appDirFn: (id: string) => string, appId: string): string {
   try {
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
     if (meta.appType === 'fullstack') return path.join(dir, 'frontend');
-  } catch { /* default */ }
+  } catch (err) { console.debug('default:', err); }
   return dir;
 }
 
@@ -44,7 +44,7 @@ export function registerCapacitorHandlers(appDir: (id: string) => string): void 
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appName = meta.name || appName;
       appType = meta.appType || appType;
-    } catch { /* use default */ }
+    } catch (err) { console.debug('use default:', err); }
 
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
     if (!fs.existsSync(webDir)) return { success: false, error: 'Frontend directory not found' };
@@ -92,7 +92,7 @@ export default config;
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       if (meta.appType === 'fullstack') webDir = path.join(dir, 'frontend');
-    } catch { /* use root */ }
+    } catch (err) { console.debug('use root:', err); }
 
     try {
       await execFileAsync('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 });

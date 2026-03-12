@@ -136,7 +136,8 @@ export default function ChatPanel({
       try {
         const saved = await window.deyad.loadMessages(app.id);
         setMessages(saved || []);
-      } catch {
+      } catch (err) {
+        console.debug('Handled error:', err);
         setMessages([]);
       }
     })();
@@ -169,7 +170,8 @@ export default function ChatPanel({
       if (settings.embedModel) {
         embedModelRef.current = settings.embedModel;
       }
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       setError('Could not connect to Ollama. Make sure it is running.');
     }
   };
@@ -258,8 +260,8 @@ export default function ChatPanel({
             content: `The database is running (PostgreSQL). Current schema:\n${schemaText}\n\nUse this schema when generating backend code, API routes, or Prisma queries.`,
           });
         }
-      } catch {
-        // DB describe failed — continue without schema context
+      } catch (err) {
+        console.debug('DB describe failed — continue without schema context:', err);
       }
     }
 

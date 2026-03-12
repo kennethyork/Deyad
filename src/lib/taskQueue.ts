@@ -77,7 +77,7 @@ class TaskQueue {
         steps: t.steps.slice(-30),
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(serializable));
-    } catch { /* storage full — ignore */ }
+    } catch (err) { console.debug('storage full — ignore:', err); }
   }
 
   private load() {
@@ -86,7 +86,8 @@ class TaskQueue {
       if (raw) {
         this.queue = JSON.parse(raw);
       }
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       this.queue = [];
     }
   }

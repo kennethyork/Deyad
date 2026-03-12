@@ -23,7 +23,7 @@ async function getContainerEngine(): Promise<string> {
       await execFileAsync(cmd, ['info'], { timeout: DOCKER_CHECK_TIMEOUT_MS });
       _containerEngine = cmd;
       return cmd;
-    } catch { /* try next */ }
+    } catch (err) { console.debug('try next:', err); }
   }
   throw new Error('No container engine found (tried podman, docker)');
 }
@@ -42,7 +42,7 @@ async function checkDockerAvailable(): Promise<boolean> {
   try {
     await getContainerEngine();
     return true;
-  } catch { return false; }
+  } catch (err) { console.debug('Handled error:', err); return false; }
 }
 
 export async function stopCompose(appDir: (id: string) => string, appId: string): Promise<void> {
@@ -52,7 +52,7 @@ export async function stopCompose(appDir: (id: string) => string, appId: string)
     try {
       const engine = await getContainerEngine();
       await execFileAsync(engine, ['compose', '-f', composeFile, 'down'], { timeout: 30000, env: composeEnv() });
-    } catch { /* best-effort */ }
+    } catch (err) { console.debug('best-effort:', err); }
   }
 }
 
@@ -130,11 +130,11 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       const lines = stdout.trim().split('\n').filter(Boolean);
       if (!lines.length) return { status: 'stopped' };
       const containers = lines
-        .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+        .map((l) => { try { return JSON.parse(l); } catch (err) { console.debug('JSON parse failed:', err); return null; } })
         .filter(Boolean);
       const running = containers.some((c: { State?: string }) => c?.State === 'running');
       return { status: running ? 'running' : 'stopped' };
-    } catch { return { status: 'stopped' }; }
+    } catch (err) { console.debug('Handled error:', err); return { status: 'stopped' }; }
   });
 
   ipcMain.handle('docker:port-check', (_event, port: number) => {

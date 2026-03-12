@@ -20,7 +20,7 @@ export default function EnvVarsPanel({ appId }: Props) {
       if (files.length > 0 && !result[activeFile]) {
         setActiveFile(files[0]);
       }
-    } catch { /* ignore */ }
+    } catch (err) { console.debug('ignore:', err); }
   }, [appId, activeFile]);
 
   useEffect(() => { loadEnv(); }, [loadEnv]);

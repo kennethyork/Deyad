@@ -25,7 +25,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
       setInputUrl(remote || '');
       setCurrentBranch(branchInfo.current);
       setBranches(branchInfo.branches);
-    } catch { /* ignore */ }
+    } catch (err) { console.debug('ignore:', err); }
   }, [appId]);
 
   useEffect(() => { refresh(); }, [refresh]);

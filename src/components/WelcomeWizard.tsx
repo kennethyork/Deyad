@@ -28,7 +28,8 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
       if (res.models?.length) {
         setSelectedModel(res.models[0].name);
       }
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       setOllamaOk(false);
       setModels([]);
     }

@@ -50,7 +50,7 @@ export function loadSettings(settingsPath: string): DeyadSettings {
     if (fs.existsSync(settingsPath)) {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) };
     }
-  } catch { /* ignore corrupt file */ }
+  } catch (err) { console.debug('ignore corrupt file:', err); }
   return { ...DEFAULT_SETTINGS };
 }
 
@@ -69,10 +69,10 @@ export function loadSnapshot(snapshotsDir: string, appId: string): Record<string
   const filePath = path.join(snapshotsDir, `${safeAppId(appId)}.json`);
   if (!fs.existsSync(filePath)) return null;
   try { return JSON.parse(fs.readFileSync(filePath, 'utf-8')); }
-  catch { return null; }
+  catch (err) { console.debug('Handled error:', err); return null; }
 }
 
 export function deleteSnapshot(snapshotsDir: string, appId: string): void {
   const filePath = path.join(snapshotsDir, `${safeAppId(appId)}.json`);
-  try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+  try { fs.unlinkSync(filePath); } catch (err) { console.debug('ignore:', err); }
 }

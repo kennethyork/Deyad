@@ -19,7 +19,7 @@ export default function PackageManagerPanel({ appId }: Props) {
       const result = await window.deyad.npmList(appId);
       setDeps(result.dependencies || {});
       setDevDeps(result.devDependencies || {});
-    } catch { /* ignore */ }
+    } catch (err) { console.debug('ignore:', err); }
   }, [appId]);
 
   useEffect(() => { loadDeps(); }, [loadDeps]);

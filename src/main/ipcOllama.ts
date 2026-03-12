@@ -12,7 +12,7 @@ async function listOllamaModels(baseUrl: string): Promise<{ models: { name: stri
       response.on('data', (chunk) => { data += chunk; });
       response.on('end', () => {
         try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('Failed to parse Ollama response')); }
+        catch (err) { console.debug('Handled error:', err); reject(new Error('Failed to parse Ollama response')); }
       });
     });
     request.on('error', (err: Error) => reject(new Error(`Ollama not reachable: ${err.message}`)));
@@ -46,7 +46,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
               event.sender.send('ollama:stream-token', parsed.message.content);
             }
             if (parsed.done) finish();
-          } catch { /* skip malformed */ }
+          } catch (err) { console.debug('skip malformed:', err); }
         }
       });
       response.on('end', () => finish());
@@ -91,7 +91,7 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
           try {
             const parsed = JSON.parse(data);
             resolve(parsed.response || '');
-          } catch { resolve(''); }
+          } catch (err) { console.debug('Handled error:', err); resolve(''); }
         });
       });
       request.on('error', (err: Error) => reject(err));
@@ -113,7 +113,7 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
           try {
             const parsed = JSON.parse(data);
             resolve({ embeddings: parsed.embeddings || [] });
-          } catch { resolve({ embeddings: [] }); }
+          } catch (err) { console.debug('Handled error:', err); resolve({ embeddings: [] }); }
         });
       });
       request.on('error', (err: Error) => reject(err));

@@ -85,7 +85,7 @@ async function buildZipBuffer(baseDir: string): Promise<Buffer> {
       } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
         try {
           entries.push({ name: relPath, data: fs.readFileSync(fullPath) });
-        } catch { /* skip unreadable */ }
+        } catch (err) { console.debug('skip unreadable:', err); }
       }
     }
   };
@@ -192,14 +192,14 @@ export function registerAppHandlers(
           const metaPath = path.join(APPS_DIR, e.name, 'deyad.json');
           let meta: Record<string, unknown> = { name: e.name, description: '', createdAt: '', appType: 'frontend' };
           if (fs.existsSync(metaPath)) {
-            try { meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf-8')) }; } catch { /* ignore */ }
+            try { meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf-8')) }; } catch (err) { console.debug('ignore:', err); }
           }
           if (!meta.appType && 'isFullStack' in meta) {
             meta.appType = meta.isFullStack ? 'fullstack' : 'frontend';
           }
           return { id: e.name, ...meta };
         });
-    } catch { return []; }
+    } catch (err) { console.debug('Handled error:', err); return []; }
   });
 
   ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider }: { name: string; description: string; appType: string; dbProvider?: string }) => {
@@ -236,7 +236,7 @@ export function registerAppHandlers(
         if (entry.isDirectory()) {
           if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
         } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
-          try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch { /* skip binary */ }
+          try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch (err) { console.debug('skip binary:', err); }
         }
       }
     };
@@ -288,7 +288,7 @@ export function registerAppHandlers(
       meta.name = newName;
       fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
       return true;
-    } catch { return false; }
+    } catch (err) { console.debug('Handled error:', err); return false; }
   });
 
   ipcMain.handle('apps:save-messages', (_event, { appId, messages }: { appId: string; messages: unknown[] }) => {
@@ -297,14 +297,14 @@ export function registerAppHandlers(
     try {
       fs.writeFileSync(path.join(dir, 'deyad-messages.json'), JSON.stringify(messages), 'utf-8');
       return true;
-    } catch { return false; }
+    } catch (err) { console.debug('Handled error:', err); return false; }
   });
 
   ipcMain.handle('apps:load-messages', (_event, appId: string) => {
     const file = path.join(appDir(appId), 'deyad-messages.json');
     if (!fs.existsSync(file)) return [];
     try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
-    catch { return []; }
+    catch (err) { console.debug('Handled error:', err); return []; }
   });
 
   // ── Dev Server (Preview) ──────────────────────────────────────────────────
@@ -431,7 +431,7 @@ export function registerAppHandlers(
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
         if (meta.name) appName = meta.name;
-      } catch { /* ignore */ }
+      } catch (err) { console.debug('ignore:', err); }
     }
 
     const sanitized = appName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -508,7 +508,7 @@ export function registerAppHandlers(
         if (entry.isDirectory()) {
           walk(fullPath);
         } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
-          try { fs.unlinkSync(fullPath); } catch { /* skip */ }
+          try { fs.unlinkSync(fullPath); } catch (err) { console.debug('skip:', err); }
         }
       }
     };

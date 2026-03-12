@@ -219,8 +219,8 @@ export async function buildSmartContextWithRAG(options: ContextOptions): Promise
           .join('\n\n');
         return `### Relevant code snippets (RAG):\n\`\`\`\n${chunkSection}\n\`\`\`\n\n${base}`;
       }
-    } catch {
-      // Fall back to base context
+    } catch (err) {
+      console.debug('Fall back to base context:', err);
     }
   }
 

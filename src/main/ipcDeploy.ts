@@ -41,7 +41,7 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       try {
         await execFileAsync(cmd[0], cmd.slice(1), { timeout: 15_000 });
         checks[key] = true;
-      } catch { /* not available */ }
+      } catch (err) { console.debug('not available:', err); }
     }
     return checks;
   });
@@ -56,7 +56,7 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appType = meta.appType || appType;
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-    } catch { /* use defaults */ }
+    } catch (err) { console.debug('use defaults:', err); }
 
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
 
@@ -79,7 +79,8 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
         try {
           const result = JSON.parse(stdout);
           url = result.deploy_url || result.url || '';
-        } catch {
+        } catch (err) {
+          console.debug('Handled error:', err);
           const match = stdout.match(/https:\/\/[^\s]+\.netlify\.app[^\s]*/);
           url = match?.[0] || '';
         }
@@ -117,7 +118,7 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-    } catch { /* use default */ }
+    } catch (err) { console.debug('use default:', err); }
 
     const win = BrowserWindow.fromWebContents(event.sender);
     const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
@@ -142,7 +143,8 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
           const { stdout: domainOut } = await execFileAsync('railway', ['domain'], { cwd: dir, timeout: 15_000 });
           url = domainOut.trim();
           if (url && !url.startsWith('http')) url = `https://${url}`;
-        } catch {
+        } catch (err) {
+          console.debug('Handled error:', err);
           url = '(check Railway dashboard for URL)';
         }
       } else if (provider === 'flyio') {
@@ -213,7 +215,7 @@ CMD ["node", "backend/src/index.js"]
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appType = meta.appType || appType;
-    } catch { /* use default */ }
+    } catch (err) { console.debug('use default:', err); }
 
     const win = BrowserWindow.fromWebContents(event.sender);
     const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
@@ -316,7 +318,7 @@ CMD ["node", "backend/src/index.js"]
       displayName = meta.name || displayName;
       appName = displayName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
       appType = meta.appType || appType;
-    } catch { /* use defaults */ }
+    } catch (err) { console.debug('use defaults:', err); }
 
     const win = BrowserWindow.fromWebContents(event.sender);
     const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
@@ -380,7 +382,7 @@ function ollamaRequest(urlPath, body) {
       res.on('data', (c) => (data += c));
       res.on('end', () => {
         try { resolve(JSON.parse(data)); }
-        catch { resolve({ raw: data }); }
+        catch (err) { console.debug('Handled error:', err); resolve({ raw: data }); }
       });
     });
     req.on('error', (e) => reject(e));
@@ -394,12 +396,12 @@ ipcMain.handle('ollama:check', async () => {
   try {
     const res = await ollamaRequest('/api/version');
     return { available: true, version: res.version || 'unknown' };
-  } catch { return { available: false }; }
+  } catch (err) { console.debug('Handled error:', err); return { available: false }; }
 });
 
 ipcMain.handle('ollama:models', async () => {
   try { return await ollamaRequest('/api/tags'); }
-  catch { return { models: [] }; }
+  catch (err) { console.debug('Handled error:', err); return { models: [] }; }
 });
 
 ipcMain.handle('ollama:chat', async (_event, { model, messages }) => {

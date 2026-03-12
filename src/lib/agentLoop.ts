@@ -225,7 +225,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
               content: `Database schema:\n${schemaText}`,
             });
           }
-        } catch { /* ignore */ }
+        } catch (err) { console.debug('ignore:', err); }
       }
 
       // Add conversation history (last 6 messages)
@@ -325,7 +325,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
             if (messages.length > 1 && messages[1].role === 'system' && messages[1].content.startsWith('Current project files:')) {
               messages[1] = { role: 'system', content: `Current project files:\n\n${freshContext}` };
             }
-          } catch { /* ignore — context stays as-is */ }
+          } catch (err) { console.debug('ignore — context stays as-is:', err); }
         }
 
         if (aborted) break;
@@ -347,7 +347,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
             if (lintOutput && lintOutput !== '(no output)' && /error\s+TS/i.test(lintOutput)) {
               autoLintText = `\n\n<auto_lint>\nTypeScript errors detected after your changes — please fix them:\n${lintOutput}\n</auto_lint>`;
             }
-          } catch { /* ignore lint failures */ }
+          } catch (err) { console.debug('ignore lint failures:', err); }
         }
 
         // Add assistant response and tool results to conversation

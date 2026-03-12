@@ -45,8 +45,8 @@ function loadPlugins() {
       try {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as PluginManifest;
         loadedPlugins.push(manifest);
-      } catch {
-        // ignore malformed
+      } catch (err) {
+        console.debug('ignore malformed:', err);
       }
     }
   }

@@ -32,7 +32,7 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const updateElectronApp = require('update-electron-app');
   updateElectronApp({ updateInterval: '1 hour' });
-} catch { /* auto-updater not available in dev — ignore */ }
+} catch (err) { console.debug('auto-updater not available in dev — ignore:', err); }
 
 if (started) { app.quit(); }
 
@@ -139,6 +139,7 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
       webviewTag: true,
     },
   });

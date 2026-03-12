@@ -37,7 +37,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     try {
       const log = await window.deyad.gitLog(appId);
       setCommits(log);
-    } catch { setCommits([]); }
+    } catch (err) { console.debug('Handled error:', err); setCommits([]); }
   };
 
   const selectCommit = useCallback(async (commit: GitLogEntry) => {
@@ -48,7 +48,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     try {
       const files = await window.deyad.gitDiffStat(appId, commit.hash);
       setChangedFiles(files);
-    } catch { setChangedFiles([]); }
+    } catch (err) { console.debug('Handled error:', err); setChangedFiles([]); }
     setLoading(false);
   }, [appId]);
 
@@ -59,7 +59,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     try {
       const content = await window.deyad.gitShow(appId, selectedCommit.hash, filePath);
       setFileContent(content);
-    } catch { setFileContent(null); }
+    } catch (err) { console.debug('Handled error:', err); setFileContent(null); }
     setLoading(false);
   }, [appId, selectedCommit]);
 
@@ -90,7 +90,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     try {
       const d = new Date(dateStr);
       return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch { return dateStr; }
+    } catch (err) { console.debug('Handled error:', err); return dateStr; }
   };
 
   return (

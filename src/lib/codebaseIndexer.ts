@@ -251,8 +251,8 @@ export async function embedChunks(
           batch[j].embedding = result.embeddings[j];
         }
       }
-    } catch {
-      // Partial failure is OK — chunks without embeddings are skipped
+    } catch (err) {
+      console.debug('Partial failure is OK — chunks without embeddings are skipped:', err);
       break;
     }
   }
@@ -287,7 +287,8 @@ export async function retrieveChunks(
         if (index.queryCache.size > 50) index.queryCache.clear();
         index.queryCache.set(query, queryVec);
       }
-    } catch {
+    } catch (err) {
+      console.debug('Handled error:', err);
       return [];
     }
   }
