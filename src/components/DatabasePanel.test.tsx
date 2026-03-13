@@ -36,17 +36,17 @@ describe('DatabasePanel', () => {
   });
 
   it('shows message for non-fullstack app', () => {
-    render(<DatabasePanel app={{ ...fullApp, appType: 'frontend' }} dbStatus="none" />);
+    render(<DatabasePanel app={{ ...fullApp, appType: 'frontend' }} dbStatus="none" onDbToggle={vi.fn()} />);
     expect(screen.getByText(/only for full-stack apps/i)).toBeTruthy();
   });
 
   it('shows placeholder when DB stopped', () => {
-    render(<DatabasePanel app={fullApp} dbStatus="stopped" />);
+    render(<DatabasePanel app={fullApp} dbStatus="stopped" onDbToggle={vi.fn()} />);
     expect(screen.getByText(/start the database/i)).toBeTruthy();
   });
 
   it('renders webview when DB is running', async () => {
-    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" />);
+    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
     await waitFor(() => {
       const webview = container.querySelector('webview');
       expect(webview).toBeTruthy();
@@ -56,12 +56,12 @@ describe('DatabasePanel', () => {
 
   it('shows starting placeholder when port not ready', () => {
     (window as any).deyad.portCheck = vi.fn().mockResolvedValue(false);
-    render(<DatabasePanel app={fullApp} dbStatus="running" />);
+    render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
     expect(screen.getByText(/starting pgadmin/i)).toBeTruthy();
   });
 
   it('switches to schema view and shows tables', async () => {
-    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" />);
+    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
     const schemaBtn = container.querySelector('.db-toolbar-tab:nth-child(2)');
     fireEvent.click(schemaBtn!);
     expect(await screen.findByText('User')).toBeTruthy();

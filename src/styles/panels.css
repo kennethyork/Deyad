@@ -630,6 +630,45 @@
   font-size: 13px;
 }
 
+.btn-db-start-large {
+  margin-top: 16px;
+  padding: 10px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--success);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-db-start-large:hover {
+  opacity: 0.85;
+}
+
+.db-toolbar-status .btn-db {
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.db-toolbar-status .btn-db:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.db-toolbar-status .btn-db.running {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.db-toolbar-status .btn-db.stopped {
+  color: var(--success);
+  border-color: var(--success);
+}
+
 .db-gui-hint {
   font-size: 11px !important;
   color: var(--text-muted) !important;

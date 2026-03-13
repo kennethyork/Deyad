@@ -11,11 +11,12 @@ type ViewMode = 'gui' | 'schema';
 interface Props {
   app: AppProject;
   dbStatus: 'none' | 'running' | 'stopped';
+  onDbToggle: () => void;
 }
 
 const DEFAULT_GUI_PORT = 5050;
 
-export default function DatabasePanel({ app, dbStatus }: Props) {
+export default function DatabasePanel({ app, dbStatus, onDbToggle }: Props) {
   const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +90,11 @@ export default function DatabasePanel({ app, dbStatus }: Props) {
         <div className="db-toolbar-status">
           <span className={`db-status-dot ${dbStatus}`} />
           {dbStatus === 'running' ? 'Running' : dbStatus === 'stopped' ? 'Stopped' : 'No DB'}
+          {dbStatus !== 'none' && (
+            <button className={`btn-db ${dbStatus}`} onClick={onDbToggle}>
+              {dbStatus === 'running' ? '⏹ Stop' : '▶ Start'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -98,11 +104,11 @@ export default function DatabasePanel({ app, dbStatus }: Props) {
           {dbStatus !== 'running' ? (
             <div className="db-gui-placeholder">
               <div className="db-gui-placeholder-icon">🐘</div>
-              <h3>pgAdmin</h3>
+              <h3>PostgreSQL + pgAdmin</h3>
               <p>Start the database to access pgAdmin.</p>
-              <p className="db-gui-hint">
-                Use the <strong>DB toggle</strong> in the chat panel or run <code>docker compose up -d</code> in the terminal.
-              </p>
+              <button className="btn-db-start-large" onClick={onDbToggle}>
+                ▶ Start Database
+              </button>
             </div>
           ) : !portReady ? (
             <div className="db-gui-placeholder">

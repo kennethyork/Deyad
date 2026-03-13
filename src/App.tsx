@@ -516,7 +516,7 @@ export default function App() {
                 }}
               />
             ) : rightTab === 'database' ? (
-              <DatabasePanel app={selectedApp} dbStatus={dbStatus} />
+              <DatabasePanel app={selectedApp} dbStatus={dbStatus} onDbToggle={handleDbToggle} />
             ) : null}
           </>
         )}
