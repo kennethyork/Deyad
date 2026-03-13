@@ -93,6 +93,11 @@ export default function ChatPanel({
     return unsub;
   }, [app.id]);
 
+  // Reset auto-fix counter when agent mode is toggled
+  useEffect(() => {
+    autoFixAttemptsRef.current = 0;
+  }, [agentMode]);
+
   // Auto-verify: in agent mode, automatically send detected errors to AI for fixing
   useEffect(() => {
     if (!agentMode || streaming || detectedErrors.length === 0) return;
@@ -100,9 +105,11 @@ export default function ChatPanel({
 
     // Debounce 2s to batch errors from dev server
     if (autoFixTimerRef.current) clearTimeout(autoFixTimerRef.current);
-    autoFixTimerRef.current = setTimeout(() => {
+    autoFixTimerRef.current = setTimeout(async () => {
       autoFixAttemptsRef.current++;
-      const prompt = buildErrorFixPrompt(detectedErrors, appFiles);
+      // Re-read files from disk to avoid stale closure data
+      const freshFiles = await window.deyad.readFiles(app.id);
+      const prompt = buildErrorFixPrompt(detectedErrors, freshFiles);
       setDetectedErrors([]);
       sendAgentMessage(prompt);
     }, 2000);
@@ -110,7 +117,7 @@ export default function ChatPanel({
     return () => {
       if (autoFixTimerRef.current) clearTimeout(autoFixTimerRef.current);
     };
-  }, [agentMode, streaming, detectedErrors, appFiles]);
+  }, [agentMode, streaming, detectedErrors, app.id]);
 
   // Estimate token count from conversation
   useEffect(() => {

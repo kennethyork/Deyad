@@ -340,7 +340,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         if (filesChanged && !aborted) {
           try {
             const lintResult = await executeTool(
-              { name: 'run_command', params: { command: 'npx tsc --noEmit --pretty false 2>&1 | head -40' } },
+              { name: 'run_command', params: { command: 'timeout 5 npx tsc --noEmit --pretty false 2>&1 | head -40' } },
               appId,
             );
             const lintOutput = lintResult.output.trim();

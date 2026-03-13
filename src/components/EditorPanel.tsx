@@ -181,15 +181,18 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     }
   }, [selectedFile, files]);
 
+  const filesRef = useRef(files);
+  useEffect(() => { filesRef.current = files; }, [files]);
+
   const handleSave = useCallback(() => {
     if (selectedFile && editorRef.current) {
       const value = editorRef.current.getValue();
-      if (value !== (files[selectedFile] ?? '')) {
+      if (value !== (filesRef.current[selectedFile] ?? '')) {
         onFileEdit(selectedFile, value);
         setIsDirty(false);
       }
     }
-  }, [selectedFile, files, onFileEdit]);
+  }, [selectedFile, onFileEdit]);
 
   // Keep refs in sync for use inside Monaco callbacks
   useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
@@ -214,6 +217,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
 
     // Register Ollama-powered inline completion provider
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
     completionProviderRef.current = monaco.languages.registerInlineCompletionsProvider(
       { pattern: '**' },
       {
@@ -224,9 +228,10 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
 
           // Debounce: wait 400ms of inactivity before requesting
           if (debounceTimer) clearTimeout(debounceTimer);
+          cancelled = false;
           const items = await new Promise<{ insertText: string }[]>((resolve) => {
             debounceTimer = setTimeout(async () => {
-              if (token.isCancellationRequested) { resolve([]); return; }
+              if (token.isCancellationRequested || cancelled) { resolve([]); return; }
               try {
                 // Gather prefix: up to 100 lines before cursor
                 const prefixRange = {
@@ -280,7 +285,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
                   textAfterPosition || undefined,
                   stop,
                 );
-                if (token.isCancellationRequested || !completion.trim()) { resolve([]); return; }
+                if (token.isCancellationRequested || cancelled || !completion.trim()) { resolve([]); return; }
                 resolve([{ insertText: completion }]);
               } catch (err) {
                 console.debug('Handled error:', err);
@@ -288,13 +293,17 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
               }
             }, 400);
             token.onCancellationRequested(() => {
+              cancelled = true;
               if (debounceTimer) clearTimeout(debounceTimer);
               resolve([]);
             });
           });
           return { items };
         },
-        disposeInlineCompletions() {},
+        disposeInlineCompletions() {
+          cancelled = true;
+          if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+        },
       },
     );
   }, []);
