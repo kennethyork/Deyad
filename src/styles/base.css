@@ -18,6 +18,9 @@
   --danger:        #ef4444;
   --danger-bg:     #450a0a;
   --warning:       #f59e0b;
+  --text-dim:      #475569;
+  --bg-hover:      rgba(255,255,255,0.04);
+  --text-tertiary:  #94a3b8;
   --sidebar-width: 220px;
   --editor-width:  340px;
   --radius:        0.5rem;
@@ -42,6 +45,9 @@
   --danger:        #dc2626;
   --danger-bg:     #fef2f2;
   --warning:       #d97706;
+  --text-dim:      #94a3b8;
+  --bg-hover:      rgba(0,0,0,0.04);
+  --text-tertiary:  #64748b;
 }
 
 body {
