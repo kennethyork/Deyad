@@ -312,7 +312,8 @@ export default function ChatPanel({
     setMessages((prev) => [...prev, assistantMsg]);
 
     // Set up stream listeners
-    const unsubToken = window.deyad.onStreamToken((token: string) => {
+    const requestId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
       streamBuf.current += token;
       const currentContent = streamBuf.current;
       setMessages((prev) =>
@@ -368,9 +369,9 @@ export default function ChatPanel({
       setStreaming(false);
     };
 
-    const unsubDone = window.deyad.onStreamDone(onDone);
+    const unsubDone = window.deyad.onStreamDone(requestId, onDone);
 
-    const unsubError = window.deyad.onStreamError((err: string) => {
+    const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
       cleanup();
       setError(`Ollama error: ${err}`);
       setStreaming(false);
@@ -378,7 +379,7 @@ export default function ChatPanel({
 
     streamCleanupRef.current = cleanup;
 
-    window.deyad.chatStream(selectedModel, ollamaMessages).catch((err) => {
+    window.deyad.chatStream(selectedModel, ollamaMessages, requestId).catch((err) => {
       cleanup();
       setError(`Failed to connect to Ollama: ${err instanceof Error ? err.message : String(err)}`);
       setStreaming(false);

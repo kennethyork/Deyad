@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import EditorPanel from './components/EditorPanel';
@@ -34,11 +34,34 @@ export interface AppProject {
 
 type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git';
 
+/** Per-app state that persists across app switches. */
+interface PerAppState {
+  appFiles: Record<string, string>;
+  selectedFile: string | null;
+  dbStatus: 'none' | 'running' | 'stopped';
+  rightTab: RightTab;
+  canRevert: boolean;
+  pendingDiffFiles: Record<string, string> | null;
+  preAgentFiles: Record<string, string> | null;
+}
+
+const defaultPerAppState: PerAppState = {
+  appFiles: {},
+  selectedFile: null,
+  dbStatus: 'none',
+  rightTab: 'editor',
+  canRevert: false,
+  pendingDiffFiles: null,
+  preAgentFiles: null,
+};
+
 export default function App() {
   const [apps, setApps] = useState<AppProject[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppProject | null>(null);
-  const [appFiles, setAppFiles] = useState<Record<string, string>>({});
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [perApp, setPerApp] = useState<Record<string, PerAppState>>({});
+  const perAppRef = useRef(perApp);
+  perAppRef.current = perApp;
+  const [openedApps, setOpenedApps] = useState<string[]>([]);
   // sidebar width resizer
   const [showNewAppModal, setShowNewAppModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -49,13 +72,8 @@ export default function App() {
   const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showPackageManager, setShowPackageManager] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
-  const [dbStatus, setDbStatus] = useState<'none' | 'running' | 'stopped'>('none');
-  const [rightTab, setRightTab] = useState<RightTab>('editor');
-  const [canRevert, setCanRevert] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'sidebar' | 'chat' | 'right'>('chat');
-  const [pendingDiffFiles, setPendingDiffFiles] = useState<Record<string, string> | null>(null);
-  const [preAgentFiles, setPreAgentFiles] = useState<Record<string, string> | null>(null);
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
   const [completionModel, setCompletionModel] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
@@ -65,6 +83,17 @@ export default function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('deyad-theme') as 'dark' | 'light') || 'dark';
   });
+
+  // Helper to update per-app state
+  const updatePerApp = useCallback((appId: string, updates: Partial<PerAppState>) => {
+    setPerApp(prev => ({
+      ...prev,
+      [appId]: { ...(prev[appId] ?? defaultPerAppState), ...updates },
+    }));
+  }, []);
+
+  // Derived state for the currently selected app
+  const cur = selectedApp ? (perApp[selectedApp.id] ?? defaultPerAppState) : defaultPerAppState;
 
   // resizable panels (persist sizes in localStorage)
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -106,16 +135,14 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Auto-refresh file tree when a background task completes
+  // Auto-refresh file tree when a background task completes (any app)
   useEffect(() => {
     taskQueue.setOnFilesChanged(async (appId) => {
-      if (selectedApp?.id === appId) {
-        const files = await window.deyad.readFiles(appId);
-        setAppFiles(files);
-      }
+      const files = await window.deyad.readFiles(appId);
+      updatePerApp(appId, { appFiles: files });
     });
     return () => taskQueue.setOnFilesChanged(null);
-  }, [selectedApp]);
+  }, [updatePerApp]);
 
   // persist when sizes change (sidebar & right panel) and update CSS variables
   useEffect(() => {
@@ -134,15 +161,19 @@ export default function App() {
     localStorage.setItem('deyad-theme', theme);
   }, [theme]);
 
-  // Subscribe to DB status events
+  // Subscribe to DB status events (any app)
   useEffect(() => {
     const unsub = window.deyad.onDbStatus(({ appId, status }) => {
-      if (selectedApp?.id === appId) {
-        setDbStatus(status as 'running' | 'stopped');
-      }
+      setPerApp(prev => {
+        if (!prev[appId]) return prev;
+        return {
+          ...prev,
+          [appId]: { ...prev[appId], dbStatus: status as 'running' | 'stopped' },
+        };
+      });
     });
     return unsub;
-  }, [selectedApp]);
+  }, []);
 
   const loadApps = async () => {
     const list = await window.deyad.listApps();
@@ -151,85 +182,105 @@ export default function App() {
 
   const selectApp = useCallback(async (app: AppProject) => {
     setSelectedApp(app);
-    setSelectedFile(null);
-    // Reset DB status immediately so the iframe doesn't render with a stale 'running' state
-    setDbStatus('none');
-    // Always show the file editor when switching apps — the preview iframe always
-    // points to localhost:5173 so it could show a stale/different app's preview.
-    setRightTab('editor');
+    setOpenedApps(prev => prev.includes(app.id) ? prev : [...prev, app.id]);
+
     try {
       const files = await window.deyad.readFiles(app.id);
-      setAppFiles(files);
-
-      // Check undo availability
       const hasSnap = await window.deyad.hasSnapshot(app.id);
-      setCanRevert(hasSnap);
 
-      // Check DB status for full-stack apps
+      let dbSt: 'none' | 'running' | 'stopped' = 'none';
       if (app.appType === 'fullstack') {
-        const { status } = await window.deyad.dbStatus(app.id);
-        setDbStatus(status);
-      } else {
-        setDbStatus('none');
+        const result = await window.deyad.dbStatus(app.id);
+        dbSt = result.status as 'none' | 'running' | 'stopped';
       }
+
+      // Update files and status but preserve other per-app state (selectedFile, rightTab, etc.)
+      setPerApp(prev => {
+        const existing = prev[app.id] ?? defaultPerAppState;
+        return {
+          ...prev,
+          [app.id]: { ...existing, appFiles: files, canRevert: hasSnap, dbStatus: dbSt },
+        };
+      });
     } catch (err) {
       console.error('Failed to load app:', err);
       setSelectedApp(null);
-      setAppFiles({});
-      setCanRevert(false);
     }
   }, []);
 
-  const handleFilesUpdated = useCallback(async (newFiles: Record<string, string>) => {
-    if (!selectedApp) return;
-    // Snapshot the original files before the first agent write
-    setPendingDiffFiles((prev) => {
-      if (!prev) setPreAgentFiles({ ...appFiles });
-      return prev ? { ...prev, ...newFiles } : newFiles;
+  const handleFilesUpdated = useCallback((appId: string, newFiles: Record<string, string>) => {
+    setPerApp(prev => {
+      const s = prev[appId] ?? defaultPerAppState;
+      const newPending = s.pendingDiffFiles
+        ? { ...s.pendingDiffFiles, ...newFiles }
+        : newFiles;
+      const newPreAgent = s.pendingDiffFiles
+        ? s.preAgentFiles
+        : { ...s.appFiles };
+      return {
+        ...prev,
+        [appId]: { ...s, pendingDiffFiles: newPending, preAgentFiles: newPreAgent },
+      };
     });
-  }, [selectedApp, appFiles]);
+  }, []);
 
   const handleApplyDiff = useCallback(async () => {
-    if (!selectedApp || !pendingDiffFiles) return;
-    // Use the pre-agent snapshot for undo (Revert button)
-    if (preAgentFiles) {
-      await window.deyad.snapshotFiles(selectedApp.id, preAgentFiles);
+    if (!selectedApp) return;
+    const appId = selectedApp.id;
+    const s = perAppRef.current[appId] ?? defaultPerAppState;
+    if (!s.pendingDiffFiles) return;
+
+    if (s.preAgentFiles) {
+      await window.deyad.snapshotFiles(appId, s.preAgentFiles);
     }
-    // Files are already on disk from the agent — re-read to sync state
-    const freshFiles = await window.deyad.readFiles(selectedApp.id);
-    setAppFiles(freshFiles);
-    setCanRevert(true);
-    const firstKey = Object.keys(pendingDiffFiles)[0];
-    if (firstKey) setSelectedFile(firstKey);
-    setPendingDiffFiles(null);
-    setPreAgentFiles(null);
-  }, [selectedApp, pendingDiffFiles, preAgentFiles]);
+    const freshFiles = await window.deyad.readFiles(appId);
+    const firstKey = Object.keys(s.pendingDiffFiles)[0];
+    const updates: Partial<PerAppState> = {
+      appFiles: freshFiles,
+      canRevert: true,
+      pendingDiffFiles: null,
+      preAgentFiles: null,
+    };
+    if (firstKey) updates.selectedFile = firstKey;
+    updatePerApp(appId, updates);
+  }, [selectedApp, updatePerApp]);
 
   const handleRejectDiff = useCallback(async () => {
-    if (!selectedApp || !preAgentFiles || !pendingDiffFiles) {
-      setPendingDiffFiles(null);
-      setPreAgentFiles(null);
+    if (!selectedApp) return;
+    const appId = selectedApp.id;
+    const s = perAppRef.current[appId] ?? defaultPerAppState;
+    if (!s.preAgentFiles || !s.pendingDiffFiles) {
+      updatePerApp(appId, { pendingDiffFiles: null, preAgentFiles: null });
       return;
     }
-    // Restore the original content for every file the agent touched
+
     const revertMap: Record<string, string> = {};
-    for (const filePath of Object.keys(pendingDiffFiles)) {
-      if (filePath in preAgentFiles) {
-        revertMap[filePath] = preAgentFiles[filePath];
+    for (const filePath of Object.keys(s.pendingDiffFiles)) {
+      if (filePath in s.preAgentFiles) {
+        revertMap[filePath] = s.preAgentFiles[filePath];
       }
     }
     if (Object.keys(revertMap).length > 0) {
-      await window.deyad.writeFiles(selectedApp.id, revertMap);
+      await window.deyad.writeFiles(appId, revertMap);
     }
-    setAppFiles(preAgentFiles);
-    setPendingDiffFiles(null);
-    setPreAgentFiles(null);
-  }, [selectedApp, preAgentFiles, pendingDiffFiles]);
+    updatePerApp(appId, {
+      appFiles: s.preAgentFiles,
+      pendingDiffFiles: null,
+      preAgentFiles: null,
+    });
+  }, [selectedApp, updatePerApp]);
 
   const handleFileEdit = useCallback(async (filePath: string, content: string) => {
     if (!selectedApp) return;
-    await window.deyad.writeFiles(selectedApp.id, { [filePath]: content });
-    setAppFiles((prev) => ({ ...prev, [filePath]: content }));
+    const appId = selectedApp.id;
+    await window.deyad.writeFiles(appId, { [filePath]: content });
+    setPerApp(prev => {
+      const s = prev[appId] ?? defaultPerAppState;
+      return {
+        ...prev,
+        [appId]: { ...s, appFiles: { ...s.appFiles, [filePath]: content } },
+      };
+    });
   }, [selectedApp]);
 
 
@@ -322,13 +373,14 @@ export default function App() {
     await window.deyad.deleteApp(appId);
     if (selectedApp?.id === appId) {
       setSelectedApp(null);
-      setAppFiles({});
-      setSelectedFile(null);
-      setPendingDiffFiles(null);
-      setPreAgentFiles(null);
-      setCanRevert(false);
-      setDbStatus('none');
     }
+    // Clean up per-app state and opened apps list
+    setPerApp(prev => {
+      const next = { ...prev };
+      delete next[appId];
+      return next;
+    });
+    setOpenedApps(prev => prev.filter(id => id !== appId));
     await loadApps();
   };
 
@@ -340,33 +392,30 @@ export default function App() {
     }
   }, [selectedApp]);
 
-  const handleDbToggle = async () => {
-    if (!selectedApp) return;
-    if (dbStatus === 'running') {
-      setDbStatus('stopped');
-      const result = await window.deyad.dbStop(selectedApp.id);
-      if (!result.success) setDbStatus('running');
+  const handleDbToggle = useCallback(async (appId: string) => {
+    const s = perAppRef.current[appId] ?? defaultPerAppState;
+    if (s.dbStatus === 'running') {
+      updatePerApp(appId, { dbStatus: 'stopped' });
+      const result = await window.deyad.dbStop(appId);
+      if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
     } else {
-      setDbStatus('stopped'); // optimistic
-      const result = await window.deyad.dbStart(selectedApp.id);
+      updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
+      const result = await window.deyad.dbStart(appId);
       if (result.success) {
-        setDbStatus('running');
+        updatePerApp(appId, { dbStatus: 'running' });
       } else {
         alert(`Failed to start database:\n${result.error}`);
       }
     }
-  };
+  }, [updatePerApp]);
 
-  const handleRevert = async () => {
-    if (!selectedApp) return;
-    const result = await window.deyad.revertFiles(selectedApp.id);
+  const handleRevert = useCallback(async (appId: string) => {
+    const result = await window.deyad.revertFiles(appId);
     if (result.success) {
-      const files = await window.deyad.readFiles(selectedApp.id);
-      setAppFiles(files);
-      setSelectedFile(null);
-      setCanRevert(false);
+      const files = await window.deyad.readFiles(appId);
+      updatePerApp(appId, { appFiles: files, selectedFile: null, canRevert: false });
     }
-  };
+  }, [updatePerApp]);
 
   const handleExportApp = async (appId: string) => {
     setExportConfirm({ open: true, appId });
@@ -426,21 +475,39 @@ export default function App() {
         onMouseDown={(e) => startDrag('sidebar', e.clientX)}
       />
 
-      {/* centre: chat or empty state */}
+      {/* centre: chat panels (kept alive across app switches) or empty state */}
       {selectedApp ? (
         <div className="chat-wrapper">
-          <ChatPanel
-            app={selectedApp}
-            appFiles={appFiles}
-            selectedFile={selectedFile}
-            dbStatus={dbStatus}
-            onFilesUpdated={handleFilesUpdated}
-            onDbToggle={handleDbToggle}
-            onRevert={handleRevert}
-            canRevert={canRevert}
-            initialPrompt={pendingPrompt}
-            onInitialPromptConsumed={() => setPendingPrompt(null)}
-          />
+          {openedApps.map(appId => {
+            const appObj = apps.find(a => a.id === appId);
+            if (!appObj) return null;
+            const appState = perApp[appId] ?? defaultPerAppState;
+            const isSelected = selectedApp?.id === appId;
+            return (
+              <div
+                key={appId}
+                style={{
+                  display: isSelected ? 'flex' : 'none',
+                  flexDirection: 'column',
+                  height: '100%',
+                  width: '100%',
+                }}
+              >
+                <ChatPanel
+                  app={appObj}
+                  appFiles={appState.appFiles}
+                  selectedFile={appState.selectedFile}
+                  dbStatus={appState.dbStatus}
+                  onFilesUpdated={(newFiles) => handleFilesUpdated(appId, newFiles)}
+                  onDbToggle={() => handleDbToggle(appId)}
+                  onRevert={() => handleRevert(appId)}
+                  canRevert={appState.canRevert}
+                  initialPrompt={isSelected ? pendingPrompt : null}
+                  onInitialPromptConsumed={() => setPendingPrompt(null)}
+                />
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="empty-state">
@@ -469,79 +536,79 @@ export default function App() {
           <>
             <div className="right-panel-tabs">
               <button
-                className={`right-tab ${rightTab === 'editor' ? 'active' : ''}`}
-                onClick={() => setRightTab('editor')}
+                className={`right-tab ${cur.rightTab === 'editor' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'editor' })}
               >
                 Files
               </button>
               <button
-                className={`right-tab ${rightTab === 'preview' ? 'active' : ''}`}
-                onClick={() => setRightTab('preview')}
+                className={`right-tab ${cur.rightTab === 'preview' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'preview' })}
               >
                 Preview
               </button>
               <button
-                className={`right-tab ${rightTab === 'terminal' ? 'active' : ''}`}
-                onClick={() => setRightTab('terminal')}
+                className={`right-tab ${cur.rightTab === 'terminal' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'terminal' })}
               >
                 Terminal
               </button>
               <button
-                className={`right-tab ${rightTab === 'packages' ? 'active' : ''}`}
-                onClick={() => setRightTab('packages')}
+                className={`right-tab ${cur.rightTab === 'packages' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'packages' })}
               >
                 Packages
               </button>
               <button
-                className={`right-tab ${rightTab === 'envvars' ? 'active' : ''}`}
-                onClick={() => setRightTab('envvars')}
+                className={`right-tab ${cur.rightTab === 'envvars' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'envvars' })}
               >
                 Env
               </button>
               <button
-                className={`right-tab ${rightTab === 'git' ? 'active' : ''}`}
-                onClick={() => setRightTab('git')}
+                className={`right-tab ${cur.rightTab === 'git' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'git' })}
               >
                 Git
               </button>
               {selectedApp?.appType === 'fullstack' && (
                 <button
-                  className={`right-tab ${rightTab === 'database' ? 'active' : ''}`}
-                  onClick={() => setRightTab('database')}
+                  className={`right-tab ${cur.rightTab === 'database' ? 'active' : ''}`}
+                  onClick={() => updatePerApp(selectedApp.id, { rightTab: 'database' })}
                 >
                   Database
                 </button>
               )}
             </div>
 
-            {rightTab === 'editor' ? (
+            {cur.rightTab === 'editor' ? (
               <EditorPanel
-                files={appFiles}
-                selectedFile={selectedFile}
-                onSelectFile={setSelectedFile}
+                files={cur.appFiles}
+                selectedFile={cur.selectedFile}
+                onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file })}
                 onOpenFolder={() => window.deyad.openAppFolder(selectedApp.id)}
                 onFileEdit={handleFileEdit}
                 autocompleteEnabled={autocompleteEnabled}
                 completionModel={completionModel || defaultModel}
               />
-            ) : rightTab === 'preview' ? (
+            ) : cur.rightTab === 'preview' ? (
               <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} />
-            ) : rightTab === 'terminal' ? (
+            ) : cur.rightTab === 'terminal' ? (
               <TerminalPanel appId={selectedApp.id} />
-            ) : rightTab === 'packages' ? (
+            ) : cur.rightTab === 'packages' ? (
               <PackageManagerPanel appId={selectedApp.id} />
-            ) : rightTab === 'envvars' ? (
+            ) : cur.rightTab === 'envvars' ? (
               <EnvVarsPanel appId={selectedApp.id} />
-            ) : rightTab === 'git' ? (
+            ) : cur.rightTab === 'git' ? (
               <GitPanel
                 appId={selectedApp.id}
                 onFilesChanged={async () => {
                   const files = await window.deyad.readFiles(selectedApp.id);
-                  setAppFiles(files);
+                  updatePerApp(selectedApp.id, { appFiles: files });
                 }}
               />
-            ) : rightTab === 'database' ? (
-              <DatabasePanel app={selectedApp} dbStatus={dbStatus} onDbToggle={handleDbToggle} />
+            ) : cur.rightTab === 'database' ? (
+              <DatabasePanel app={selectedApp} dbStatus={cur.dbStatus} onDbToggle={() => handleDbToggle(selectedApp.id)} />
             ) : null}
           </>
         )}
@@ -571,10 +638,10 @@ export default function App() {
         />
       )}
 
-      {pendingDiffFiles && (
+      {cur.pendingDiffFiles && (
         <DiffModal
-          oldFiles={appFiles}
-          newFiles={pendingDiffFiles}
+          oldFiles={cur.preAgentFiles ?? cur.appFiles}
+          newFiles={cur.pendingDiffFiles}
           onApply={handleApplyDiff}
           onReject={handleRejectDiff}
         />
@@ -602,8 +669,7 @@ export default function App() {
           onClose={() => setShowVersionHistory(false)}
           onRestore={async () => {
             const files = await window.deyad.readFiles(selectedApp.id);
-            setAppFiles(files);
-            setSelectedFile(null);
+            updatePerApp(selectedApp.id, { appFiles: files, selectedFile: null });
           }}
         />
       )}
@@ -614,12 +680,12 @@ export default function App() {
           appName={selectedApp.name}
           appType={selectedApp.appType}
           dbProvider={selectedApp.dbProvider}
-          dbStatus={dbStatus}
+          dbStatus={cur.dbStatus}
           model={defaultModel}
           onClose={() => setShowTaskQueue(false)}
           onRefreshFiles={async () => {
             const files = await window.deyad.readFiles(selectedApp.id);
-            setAppFiles(files);
+            updatePerApp(selectedApp.id, { appFiles: files });
           }}
         />
       )}
@@ -645,7 +711,7 @@ export default function App() {
           onClick={() => setMobilePanel('right')}
         >
           <span className="mobile-nav-icon">📁</span>
-          <span className="mobile-nav-label">{rightTab === 'preview' ? 'Preview' : rightTab === 'terminal' ? 'Term' : rightTab === 'database' ? 'DB' : 'Files'}</span>
+          <span className="mobile-nav-label">{cur.rightTab === 'preview' ? 'Preview' : cur.rightTab === 'terminal' ? 'Term' : cur.rightTab === 'database' ? 'DB' : 'Files'}</span>
         </button>
       </nav>
 

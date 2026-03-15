@@ -91,7 +91,7 @@ describe('ipcOllama handler registration', () => {
       },
     };
 
-    const promise = handler(event, { model: 'llama3', messages: [{ role: 'user', content: 'hi' }] });
+    const promise = handler(event, { model: 'llama3', messages: [{ role: 'user', content: 'hi' }], requestId: 'test-req-1' });
 
     await new Promise((r) => setTimeout(r, 10));
 
@@ -104,6 +104,6 @@ describe('ipcOllama handler registration', () => {
     if (endHandler) endHandler();
 
     await promise;
-    expect(event.sender.send).toHaveBeenCalledWith('ollama:stream-token', 'Hello');
+    expect(event.sender.send).toHaveBeenCalledWith('ollama:stream-token', 'test-req-1', 'Hello');
   });
 });

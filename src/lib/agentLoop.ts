@@ -142,18 +142,19 @@ function streamOllamaTurn(
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let buf = '';
+    const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const unsubToken = window.deyad.onStreamToken((token: string) => {
+    const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
       buf += token;
       onToken(token);
     });
 
-    const unsubDone = window.deyad.onStreamDone(() => {
+    const unsubDone = window.deyad.onStreamDone(requestId, () => {
       cleanup();
       resolve(buf);
     });
 
-    const unsubError = window.deyad.onStreamError((err: string) => {
+    const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
       cleanup();
       reject(new Error(err));
     });
@@ -164,7 +165,7 @@ function streamOllamaTurn(
       unsubError();
     }
 
-    window.deyad.chatStream(model, messages).catch((err) => {
+    window.deyad.chatStream(model, messages, requestId).catch((err) => {
       cleanup();
       reject(err);
     });

@@ -94,12 +94,12 @@ export interface PluginManifest {
 interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
-  chatStream(model: string, messages: ChatMessage[]): Promise<void>;
+  chatStream(model: string, messages: ChatMessage[], requestId: string): Promise<void>;
   fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
   embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
-  onStreamToken(cb: (token: string) => void): () => void;
-  onStreamDone(cb: () => void): () => void;
-  onStreamError(cb: (err: string) => void): () => void;
+  onStreamToken(requestId: string, cb: (token: string) => void): () => void;
+  onStreamDone(requestId: string, cb: () => void): () => void;
+  onStreamError(requestId: string, cb: (err: string) => void): () => void;
 
   // App projects
   listApps(): Promise<AppProject[]>;

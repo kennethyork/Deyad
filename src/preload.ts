@@ -42,8 +42,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listModels: (): Promise<{ models: OllamaModel[] }> =>
     ipcRenderer.invoke('ollama:list-models'),
 
-  chatStream: (model: string, messages: ChatMessage[]): Promise<void> =>
-    ipcRenderer.invoke('ollama:chat-stream', { model, messages }),
+  chatStream: (model: string, messages: ChatMessage[], requestId: string): Promise<void> =>
+    ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId }),
 
   fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
     ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
@@ -51,21 +51,33 @@ contextBridge.exposeInMainWorld('deyad', {
   embed: (model: string, input: string | string[]): Promise<{ embeddings: number[][] }> =>
     ipcRenderer.invoke('ollama:embed', { model, input }),
 
-  onStreamToken: (cb: (token: string) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, token: string) => cb(token);
+  onStreamToken: (requestId: string, cb: (token: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, rid: string, token: string) => {
+      if (rid === requestId) cb(token);
+    };
     ipcRenderer.on('ollama:stream-token', handler);
     return () => ipcRenderer.removeListener('ollama:stream-token', handler);
   },
 
-  onStreamDone: (cb: () => void) => {
-    const handler = () => cb();
-    ipcRenderer.once('ollama:stream-done', handler);
+  onStreamDone: (requestId: string, cb: () => void) => {
+    const handler = (_: Electron.IpcRendererEvent, rid: string) => {
+      if (rid === requestId) {
+        ipcRenderer.removeListener('ollama:stream-done', handler);
+        cb();
+      }
+    };
+    ipcRenderer.on('ollama:stream-done', handler);
     return () => ipcRenderer.removeListener('ollama:stream-done', handler);
   },
 
-  onStreamError: (cb: (err: string) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, err: string) => cb(err);
-    ipcRenderer.once('ollama:stream-error', handler);
+  onStreamError: (requestId: string, cb: (err: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, rid: string, err: string) => {
+      if (rid === requestId) {
+        ipcRenderer.removeListener('ollama:stream-error', handler);
+        cb(err);
+      }
+    };
+    ipcRenderer.on('ollama:stream-error', handler);
     return () => ipcRenderer.removeListener('ollama:stream-error', handler);
   },
 

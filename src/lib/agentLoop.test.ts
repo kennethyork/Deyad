@@ -31,9 +31,9 @@ const fakeWindow = {
     chatStream: vi.fn(async () => {}),
     readFiles: vi.fn(async () => ({})),
     dbDescribe: vi.fn(async () => ({ tables: [] })),
-    onStreamToken: vi.fn((cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; }),
-    onStreamDone: vi.fn((cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; }),
-    onStreamError: vi.fn((cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; }),
+    onStreamToken: vi.fn((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; }),
+    onStreamDone: vi.fn((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; }),
+    onStreamError: vi.fn((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; }),
   },
 };
 
@@ -44,9 +44,9 @@ function resetWindowMocks() {
   fakeWindow.deyad.chatStream.mockImplementation(async () => {});
   fakeWindow.deyad.readFiles.mockImplementation(async () => ({}));
   fakeWindow.deyad.dbDescribe.mockImplementation(async () => ({ tables: [] }));
-  fakeWindow.deyad.onStreamToken.mockImplementation((cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; });
-  fakeWindow.deyad.onStreamDone.mockImplementation((cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
-  fakeWindow.deyad.onStreamError.mockImplementation((cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
+  fakeWindow.deyad.onStreamToken.mockImplementation((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; });
+  fakeWindow.deyad.onStreamDone.mockImplementation((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
+  fakeWindow.deyad.onStreamError.mockImplementation((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
 }
 
 // Simulate a streaming turn: emit tokens then call done

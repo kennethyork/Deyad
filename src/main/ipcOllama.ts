@@ -20,8 +20,8 @@ async function listOllamaModels(baseUrl: string): Promise<{ models: { name: stri
   });
 }
 
-/** Stream from Ollama (NDJSON format). */
-function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model: string, messages: { role: string; content: string }[]): Promise<void> {
+/** Stream from Ollama (NDJSON format). Tagged with requestId for concurrency. */
+function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model: string, messages: { role: string; content: string }[], requestId: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const body = JSON.stringify({ model, messages, stream: true });
     const request = net.request({ method: 'POST', url: `${baseUrl}/api/chat` });
@@ -30,7 +30,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     const finish = () => {
       if (resolved) return;
       resolved = true;
-      if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done');
+      if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done', requestId);
       resolve();
     };
     request.on('response', (response) => {
@@ -43,7 +43,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
           try {
             const parsed = JSON.parse(line);
             if (parsed.message?.content && !event.sender.isDestroyed()) {
-              event.sender.send('ollama:stream-token', parsed.message.content);
+              event.sender.send('ollama:stream-token', requestId, parsed.message.content);
             }
             if (parsed.done) finish();
           } catch (err) { console.debug('skip malformed:', err); }
@@ -54,7 +54,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     request.on('error', (err: Error) => {
       if (!resolved) {
         resolved = true;
-        if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', err.message);
+        if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, err.message);
         reject(err);
       }
     });
@@ -69,8 +69,8 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
     return listOllamaModels(getOllamaBaseUrl());
   });
 
-  ipcMain.handle('ollama:chat-stream', async (event, { model, messages }: { model: string; messages: { role: string; content: string }[] }) => {
-    return streamOllama(getOllamaBaseUrl(), event, model, messages);
+  ipcMain.handle('ollama:chat-stream', async (event, { model, messages, requestId }: { model: string; messages: { role: string; content: string }[]; requestId: string }) => {
+    return streamOllama(getOllamaBaseUrl(), event, model, messages, requestId);
   });
 
   /** Fill-in-the-middle completion for inline autocomplete. */
