@@ -55,6 +55,7 @@ export default function App() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'sidebar' | 'chat' | 'right'>('chat');
   const [pendingDiffFiles, setPendingDiffFiles] = useState<Record<string, string> | null>(null);
+  const [preAgentFiles, setPreAgentFiles] = useState<Record<string, string> | null>(null);
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
   const [completionModel, setCompletionModel] = useState('');
   const [defaultModel, setDefaultModel] = useState('');
@@ -180,27 +181,49 @@ export default function App() {
 
   const handleFilesUpdated = useCallback(async (newFiles: Record<string, string>) => {
     if (!selectedApp) return;
-    // Accumulate files so multi-step agent writes don't overwrite earlier batches
-    setPendingDiffFiles((prev) => (prev ? { ...prev, ...newFiles } : newFiles));
-  }, [selectedApp]);
+    // Snapshot the original files before the first agent write
+    setPendingDiffFiles((prev) => {
+      if (!prev) setPreAgentFiles({ ...appFiles });
+      return prev ? { ...prev, ...newFiles } : newFiles;
+    });
+  }, [selectedApp, appFiles]);
 
   const handleApplyDiff = useCallback(async () => {
     if (!selectedApp || !pendingDiffFiles) return;
-    await window.deyad.snapshotFiles(selectedApp.id, appFiles);
-    await window.deyad.writeFiles(selectedApp.id, pendingDiffFiles);
-    // Re-read all files from disk to catch any agent writes that were
-    // overwritten in pendingDiffFiles (multi-step agent loop)
+    // Use the pre-agent snapshot for undo (Revert button)
+    if (preAgentFiles) {
+      await window.deyad.snapshotFiles(selectedApp.id, preAgentFiles);
+    }
+    // Files are already on disk from the agent — re-read to sync state
     const freshFiles = await window.deyad.readFiles(selectedApp.id);
     setAppFiles(freshFiles);
     setCanRevert(true);
     const firstKey = Object.keys(pendingDiffFiles)[0];
     if (firstKey) setSelectedFile(firstKey);
     setPendingDiffFiles(null);
-  }, [selectedApp, appFiles, pendingDiffFiles]);
+    setPreAgentFiles(null);
+  }, [selectedApp, pendingDiffFiles, preAgentFiles]);
 
-  const handleRejectDiff = useCallback(() => {
+  const handleRejectDiff = useCallback(async () => {
+    if (!selectedApp || !preAgentFiles || !pendingDiffFiles) {
+      setPendingDiffFiles(null);
+      setPreAgentFiles(null);
+      return;
+    }
+    // Restore the original content for every file the agent touched
+    const revertMap: Record<string, string> = {};
+    for (const filePath of Object.keys(pendingDiffFiles)) {
+      if (filePath in preAgentFiles) {
+        revertMap[filePath] = preAgentFiles[filePath];
+      }
+    }
+    if (Object.keys(revertMap).length > 0) {
+      await window.deyad.writeFiles(selectedApp.id, revertMap);
+    }
+    setAppFiles(preAgentFiles);
     setPendingDiffFiles(null);
-  }, []);
+    setPreAgentFiles(null);
+  }, [selectedApp, preAgentFiles, pendingDiffFiles]);
 
   const handleFileEdit = useCallback(async (filePath: string, content: string) => {
     if (!selectedApp) return;
