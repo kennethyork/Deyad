@@ -11,6 +11,7 @@ interface Props {
   onNewApp: () => void;
   onDeleteApp: (id: string) => void;
   onRenameApp: (id: string, newName: string) => void;
+  onDuplicateApp: (id: string) => void;
   onExportApp: (id: string) => void;
   onDeployApp: () => void;
   onImportApp: () => void;
@@ -20,7 +21,7 @@ interface Props {
   activeTasks: number;
 }
 
-export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onExportApp, onDeployApp, onImportApp, onOpenSettings, onOpenTaskQueue, onOpenVersionHistory, activeTasks }: Props) {
+export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onDuplicateApp, onExportApp, onDeployApp, onImportApp, onOpenSettings, onOpenTaskQueue, onOpenVersionHistory, activeTasks }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -110,6 +111,13 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
                 {app.name}
               </span>
             )}
+            <button
+              className="sidebar-export"
+              onClick={(e) => { e.stopPropagation(); onDuplicateApp(app.id); }}
+              title="Duplicate project"
+            >
+              Dup
+            </button>
             <button
               className="sidebar-export"
               onClick={(e) => { e.stopPropagation(); onExportApp(app.id); }}

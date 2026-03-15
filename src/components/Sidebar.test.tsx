@@ -21,6 +21,7 @@ describe('Sidebar', () => {
     onNewApp: vi.fn(),
     onDeleteApp: vi.fn(),
     onRenameApp: vi.fn(),
+    onDuplicateApp: vi.fn(),
     onExportApp: vi.fn(),
     onDeployApp: vi.fn(),
     onImportApp: vi.fn(),

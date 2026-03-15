@@ -16,6 +16,7 @@ import VersionHistoryPanel from './components/VersionHistoryPanel';
 import PackageManagerPanel from './components/PackageManagerPanel';
 import EnvVarsPanel from './components/EnvVarsPanel';
 import GitPanel from './components/GitPanel';
+import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import { taskQueue } from './lib/taskQueue';
 
@@ -32,7 +33,7 @@ export interface AppProject {
   guiPort?: number;
 }
 
-type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git';
+type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git' | 'search';
 
 /** Per-app state that persists across app switches. */
 interface PerAppState {
@@ -392,6 +393,14 @@ export default function App() {
     }
   }, [selectedApp]);
 
+  const handleDuplicateApp = async (appId: string) => {
+    const app = await window.deyad.duplicateApp(appId);
+    if (app) {
+      await loadApps();
+      await selectApp(app as AppProject);
+    }
+  };
+
   const handleDbToggle = useCallback(async (appId: string) => {
     const s = perAppRef.current[appId] ?? defaultPerAppState;
     if (s.dbStatus === 'running') {
@@ -448,6 +457,7 @@ export default function App() {
           onNewApp={() => setShowNewAppModal(true)}
           onDeleteApp={handleDeleteApp}
           onRenameApp={handleRenameApp}
+          onDuplicateApp={handleDuplicateApp}
           onExportApp={handleExportApp}
           onDeployApp={() => setShowDeployModal(true)}
           onImportApp={() => setShowImportModal(true)}
@@ -566,6 +576,12 @@ export default function App() {
                 Env
               </button>
               <button
+                className={`right-tab ${cur.rightTab === 'search' ? 'active' : ''}`}
+                onClick={() => updatePerApp(selectedApp.id, { rightTab: 'search' })}
+              >
+                Search
+              </button>
+              <button
                 className={`right-tab ${cur.rightTab === 'git' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'git' })}
               >
@@ -606,6 +622,11 @@ export default function App() {
                   const files = await window.deyad.readFiles(selectedApp.id);
                   updatePerApp(selectedApp.id, { appFiles: files });
                 }}
+              />
+            ) : cur.rightTab === 'search' ? (
+              <SearchPanel
+                appId={selectedApp.id}
+                onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file, rightTab: 'editor' })}
               />
             ) : cur.rightTab === 'database' ? (
               <DatabasePanel app={selectedApp} dbStatus={cur.dbStatus} onDbToggle={() => handleDbToggle(selectedApp.id)} />

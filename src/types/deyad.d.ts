@@ -113,6 +113,8 @@ interface DeyadAPI {
   saveMessages(appId: string, messages: UiMessage[]): Promise<boolean>;
   loadMessages(appId: string): Promise<UiMessage[]>;
   importApp(name: string): Promise<AppProject | null>;
+  duplicateApp(appId: string): Promise<AppProject | null>;
+  searchFiles(appId: string, query: string): Promise<Array<{ file: string; line: number; text: string }>>;
 
   // Dev server (Preview)
   appDevStart(appId: string): Promise<{ success: boolean; error?: string }>;

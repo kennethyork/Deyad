@@ -563,4 +563,83 @@ export function registerAppHandlers(
 
     return { id, ...meta };
   });
+
+  // ── Duplicate ────────────────────────────────────────────────────────────
+
+  ipcMain.handle('apps:duplicate', async (_event, appId: string) => {
+    const srcDir = appDir(appId);
+    if (!fs.existsSync(srcDir)) return null;
+
+    // Read source metadata
+    const metaPath = path.join(srcDir, 'deyad.json');
+    let srcMeta: Record<string, unknown> = {};
+    if (fs.existsSync(metaPath)) {
+      try { srcMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch { /* ignore */ }
+    }
+    const srcName = (srcMeta.name as string) || appId;
+    const newName = `${srcName} (Copy)`;
+
+    const id = `${Date.now()}-${newName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const destDir = path.join(APPS_DIR, id);
+    fs.mkdirSync(destDir, { recursive: true });
+
+    copyRecursiveSync(srcDir, destDir);
+
+    // Write updated metadata with new name and timestamp
+    const newMeta: Record<string, unknown> = { ...srcMeta, name: newName, createdAt: new Date().toISOString() };
+    // Reallocate ports for fullstack apps to avoid collisions
+    if (newMeta.appType === 'fullstack') {
+      const [dbPort, guiPort] = await allocateAppPorts(id);
+      newMeta.dbPort = dbPort;
+      newMeta.guiPort = guiPort;
+    }
+    fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(newMeta, null, 2));
+
+    await gitInit(appDir, id);
+
+    return { id, ...newMeta };
+  });
+
+  // ── Search ────────────────────────────────────────────────────────────
+
+  ipcMain.handle('apps:search-files', (_event, { appId, query }: { appId: string; query: string }) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(dir)) return [];
+    const results: Array<{ file: string; line: number; text: string }> = [];
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.vite', '.next', '__pycache__']);
+    const MAX_RESULTS = 200;
+
+    let pattern: RegExp;
+    try {
+      pattern = new RegExp(query, 'gi');
+    } catch {
+      // Fallback to literal match if invalid regex
+      pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    }
+
+    const walk = (base: string, rel: string) => {
+      if (results.length >= MAX_RESULTS) return;
+      for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+        if (results.length >= MAX_RESULTS) return;
+        const fullPath = path.join(base, entry.name);
+        const relPath = rel ? `${rel}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
+        } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+          try {
+            const content = fs.readFileSync(fullPath, 'utf-8');
+            const lines = content.split('\n');
+            for (let i = 0; i < lines.length && results.length < MAX_RESULTS; i++) {
+              if (pattern.test(lines[i])) {
+                results.push({ file: relPath, line: i + 1, text: lines[i].trim().slice(0, 200) });
+              }
+              pattern.lastIndex = 0;
+            }
+          } catch { /* skip binary files */ }
+        }
+      }
+    };
+    walk(dir, '');
+    return results;
+  });
 }

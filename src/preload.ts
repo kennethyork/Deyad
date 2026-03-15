@@ -199,6 +199,14 @@ contextBridge.exposeInMainWorld('deyad', {
   importApp: (name: string): Promise<AppProject | null> =>
     ipcRenderer.invoke('apps:import', name),
 
+  // ── Duplicate ──────────────────────────────────────────────────────────
+  duplicateApp: (appId: string): Promise<AppProject | null> =>
+    ipcRenderer.invoke('apps:duplicate', appId),
+
+  // ── Search ─────────────────────────────────────────────────────────────
+  searchFiles: (appId: string, query: string): Promise<Array<{ file: string; line: number; text: string }>> =>
+    ipcRenderer.invoke('apps:search-files', { appId, query }),
+
   // ── Capacitor (Mobile) ─────────────────────────────────────────────────
   capacitorInit: (appId: string): Promise<{ success: boolean; alreadyInitialized?: boolean; error?: string }> =>
     ipcRenderer.invoke('apps:capacitor-init', appId),
