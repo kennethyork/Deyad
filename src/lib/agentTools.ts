@@ -316,10 +316,14 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
       if (id === termId) finish();
     });
 
+    // Interval handle — must be accessible to finish() for cleanup
+    let checkInterval: ReturnType<typeof setInterval> | null = null;
+
     function finish() {
       if (done) return;
       done = true;
       clearTimeout(timeout);
+      if (checkInterval) clearInterval(checkInterval);
       unsubData();
       unsubExit();
       window.deyad.terminalKill(termId).catch((err) => console.warn('terminalKill:', err));
@@ -335,23 +339,14 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
     await window.deyad.terminalWrite(termId, `${command} ; echo "${sentinel}"\n`);
 
     // Watch for sentinel in output
-    const checkInterval = setInterval(() => {
+    checkInterval = setInterval(() => {
       if (output.includes(sentinel)) {
-        clearInterval(checkInterval);
+        clearInterval(checkInterval!);
+        checkInterval = null;
         // Give a moment for trailing output
         setTimeout(() => finish(), 500);
       }
     }, 200);
-
-    // Also clear interval on finish
-    const origFinish = finish;
-    function finishAndClear() {
-      clearInterval(checkInterval);
-      origFinish();
-    }
-    // Replace timeout callback
-    clearTimeout(timeout);
-    setTimeout(() => finishAndClear(), 30_000);
   });
 }
 

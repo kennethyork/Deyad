@@ -203,7 +203,7 @@ CMD ["node", "backend/src/index.js"]
     }
     // Basic validation: no shell metacharacters in host/user/path/domain
     const allInputs = opts.host + opts.user + opts.path + (opts.domain || '');
-    if (/[;&|`$(){}]/.test(allInputs)) {
+    if (/[;&|`$(){}'"\\]/.test(allInputs)) {
       return { success: false, error: 'Invalid characters in connection details' };
     }
     // Validate domain format if provided
