@@ -69,7 +69,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
   ipcMain.handle('git:show', async (_event, appId: string, hash: string, filePath: string) => {
     const dir = appDir(appId);
     if (!fs.existsSync(path.join(dir, '.git'))) return null;
-    if (!/^[0-9a-f]+$/i.test(hash)) return null;
+    if (!/^[0-9a-f]{6,40}$/i.test(hash)) return null;
     if (filePath.includes('..') || path.isAbsolute(filePath)) return null;
     try {
       const { stdout } = await execFileAsync('git', ['show', `${hash}:${filePath}`], { cwd: dir, timeout: 10000 });
@@ -80,7 +80,7 @@ export function registerGitHandlers(appDir: (id: string) => string): void {
   ipcMain.handle('git:diff-stat', async (_event, appId: string, hash: string) => {
     const dir = appDir(appId);
     if (!fs.existsSync(path.join(dir, '.git'))) return [];
-    if (!/^[0-9a-f]+$/i.test(hash)) return [];
+    if (!/^[0-9a-f]{6,40}$/i.test(hash)) return [];
     try {
       const { stdout } = await execFileAsync(
         'git', ['diff-tree', '--no-commit-id', '-r', '--name-status', hash],

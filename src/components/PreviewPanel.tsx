@@ -37,7 +37,10 @@ export default function PreviewPanel({ app, onPublish }: Props) {
     const unsubStatus = window.deyad.onAppDevStatus(({ appId, status: s }) => {
       if (appId !== app.id) return;
       if (s === 'stopped') setStatus('stopped');
-      if (s === 'starting') setStatus('starting');
+      if (s === 'starting') {
+        setStatus('starting');
+        setPreviewUrl(FALLBACK_URL);
+      }
       if (s === 'running') setStatus('running');
     });
 

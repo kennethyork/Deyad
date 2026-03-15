@@ -174,6 +174,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('Failed to load app:', err);
+      setSelectedApp(null);
       setAppFiles({});
       setCanRevert(false);
     }
@@ -324,6 +325,7 @@ export default function App() {
       setAppFiles({});
       setSelectedFile(null);
       setPendingDiffFiles(null);
+      setPreAgentFiles(null);
       setCanRevert(false);
       setDbStatus('none');
     }
