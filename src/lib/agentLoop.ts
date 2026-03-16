@@ -401,9 +401,51 @@ export function runAgentLoop(options: AgentOptions): () => void {
           } catch (err) { console.debug('ignore review failures:', err); }
         }
 
+        // Runtime error check: if dev server is running, capture logs briefly after file changes
+        let runtimeErrorText = '';
+        if (filesChanged && !aborted) {
+          try {
+            const devStatus = await window.deyad.appDevStatus(appId);
+            if (devStatus.status === 'running') {
+              // Collect dev server output for a few seconds to catch compilation/runtime errors
+              const logChunks: string[] = [];
+              const unsub = window.deyad.onAppDevLog(({ appId: logAppId, data }) => {
+                if (logAppId === appId) logChunks.push(data);
+              });
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              unsub();
+              const logOutput = logChunks.join('');
+              // Scan for error patterns
+              const errorPatterns = [
+                /\berror\b.*TS\d+/i,                     // TypeScript errors
+                /SyntaxError:/,                           // Syntax errors
+                /ReferenceError:/,                        // Undefined references
+                /TypeError:/,                             // Type errors at runtime
+                /Failed to compile/i,                     // Build failures
+                /\[vite\].*error/i,                       // Vite errors
+                /Module not found/i,                      // Missing imports
+                /Cannot find module/i,                    // Missing modules
+                /Uncaught.*Error/,                        // Uncaught exceptions
+                /ERROR\s+in\s+/,                          // Webpack-style errors
+                /\bCRASH\b/i,                             // Crashes
+              ];
+              const matchedErrors: string[] = [];
+              for (const line of logOutput.split('\n')) {
+                if (errorPatterns.some(p => p.test(line))) {
+                  matchedErrors.push(line.trim());
+                }
+              }
+              if (matchedErrors.length > 0) {
+                const uniqueErrors = [...new Set(matchedErrors)].slice(0, 15);
+                runtimeErrorText = `\n\n<runtime_errors>\nThe dev server reported errors after your changes — please fix them:\n${uniqueErrors.join('\n')}\n</runtime_errors>`;
+              }
+            }
+          } catch (err) { console.debug('ignore runtime check:', err); }
+        }
+
         // Add assistant response and tool results to conversation
         messages.push({ role: 'assistant', content: turnResponse });
-        messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText });
+        messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText + runtimeErrorText });
 
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';
