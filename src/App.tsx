@@ -607,8 +607,6 @@ export default function App() {
                 autocompleteEnabled={autocompleteEnabled}
                 completionModel={completionModel || defaultModel}
               />
-            ) : cur.rightTab === 'preview' ? (
-              <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} />
             ) : cur.rightTab === 'terminal' ? (
               <TerminalPanel appId={selectedApp.id} />
             ) : cur.rightTab === 'packages' ? (
@@ -631,6 +629,10 @@ export default function App() {
             ) : cur.rightTab === 'database' ? (
               <DatabasePanel app={selectedApp} dbStatus={cur.dbStatus} onDbToggle={() => handleDbToggle(selectedApp.id)} />
             ) : null}
+            {/* Keep PreviewPanel mounted so it maintains HMR/WebSocket connection */}
+            <div style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
+              <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} />
+            </div>
           </>
         )}
       </div>

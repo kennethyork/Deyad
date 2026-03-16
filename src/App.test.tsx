@@ -40,6 +40,7 @@ describe('App component', () => {
       onDbStatus: vi.fn().mockReturnValue(() => {}),
       onAppDevLog: vi.fn().mockReturnValue(() => {}),
       onAppDevStatus: vi.fn().mockReturnValue(() => {}),
+      appDevStatus: vi.fn().mockResolvedValue({ status: 'stopped' }),
       checkDocker: vi.fn(),
       getSettings: vi.fn().mockResolvedValue({ ollamaHost: '', defaultModel: '' }),
       listModels: vi.fn().mockResolvedValue({ models: [] }),

@@ -55,12 +55,18 @@ export default function PreviewPanel({ app, onPublish }: Props) {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  // Reset when switching apps
+  // Reset when switching apps — check actual server status
   useEffect(() => {
-    setStatus('stopped');
     setLogs('');
     setStartError('');
     setPreviewUrl(FALLBACK_URL);
+    window.deyad.appDevStatus(app.id).then((res: { status: string }) => {
+      if (res.status === 'running') {
+        setStatus('running');
+      } else {
+        setStatus('stopped');
+      }
+    }).catch(() => setStatus('stopped'));
   }, [app.id]);
 
   const handleStart = async () => {

@@ -18,6 +18,7 @@ beforeEach(() => {
     onAppDevStatus: vi.fn().mockReturnValue(() => {}),
     appDevStart: vi.fn().mockResolvedValue({ success: true }),
     appDevStop: vi.fn().mockResolvedValue(undefined),
+    appDevStatus: vi.fn().mockResolvedValue({ status: 'stopped' }),
     getSettings: vi.fn().mockResolvedValue({}),
   };
 });
