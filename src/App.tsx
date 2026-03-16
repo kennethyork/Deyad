@@ -73,6 +73,7 @@ export default function App() {
   const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showPackageManager, setShowPackageManager] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [mobilePanel, setMobilePanel] = useState<'sidebar' | 'chat' | 'right'>('chat');
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
@@ -223,6 +224,8 @@ export default function App() {
         [appId]: { ...s, pendingDiffFiles: newPending, preAgentFiles: newPreAgent },
       };
     });
+    // Trigger preview iframe refresh after agent writes files
+    setPreviewRefreshKey(k => k + 1);
   }, []);
 
   const handleApplyDiff = useCallback(async () => {
@@ -631,7 +634,7 @@ export default function App() {
             ) : null}
             {/* Keep PreviewPanel mounted so it maintains HMR/WebSocket connection */}
             <div style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
-              <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} />
+              <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} refreshKey={previewRefreshKey} />
             </div>
           </>
         )}

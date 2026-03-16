@@ -8,9 +8,10 @@ type DevStatus = 'stopped' | 'starting' | 'running' | 'error';
 interface Props {
   app: AppProject;
   onPublish: () => void;
+  refreshKey?: number;
 }
 
-export default function PreviewPanel({ app, onPublish }: Props) {
+export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
   const [status, setStatus] = useState<DevStatus>('stopped');
   const [logs, setLogs] = useState<string>('');
   const [showLogs, setShowLogs] = useState(false);
@@ -54,6 +55,20 @@ export default function PreviewPanel({ app, onPublish }: Props) {
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
+
+  // Auto-refresh iframe when files are written by the agent
+  const prevRefreshKey = useRef(refreshKey);
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey !== prevRefreshKey.current && status === 'running' && iframeRef.current) {
+      // Small delay to let Vite process the file change
+      const timer = setTimeout(() => {
+        if (iframeRef.current) iframeRef.current.src = previewUrl;
+      }, 500);
+      prevRefreshKey.current = refreshKey;
+      return () => clearTimeout(timer);
+    }
+    prevRefreshKey.current = refreshKey;
+  }, [refreshKey, status, previewUrl]);
 
   // Reset when switching apps — check actual server status
   useEffect(() => {
