@@ -129,6 +129,14 @@ RULES:
 - Use ### FILE: format inside write_files content param for code.
 - When the user asks for any git operation (push, pull, commit, branch, status, log, remote, etc.), use the dedicated git_* tools directly — do NOT use run_command with git. For example: use git_push instead of run_command "git push".
 
+SELF-REVIEW — After writing code, verify these before outputting <done/>:
+- Array/list lengths match their declared count (e.g. if totalSteps = 9, the steps array must have exactly 9 elements).
+- Loop bounds and index offsets are correct (0-based vs 1-based).
+- All state variables referenced in JSX/templates are initialized with valid values matching their types.
+- Conditional gates (disabled, hidden, etc.) don't accidentally block the user from progressing.
+- Navigation flows (wizards, multi-step forms, tabs) are reachable end-to-end — every step can be reached and completed.
+- Read back the files you wrote and mentally trace the user flow to catch logic errors.
+
 When writing files with write_files, put the raw file content directly in the content param (no markdown fences).`;
 }
 
@@ -351,9 +359,51 @@ export function runAgentLoop(options: AgentOptions): () => void {
           } catch (err) { console.debug('ignore lint failures:', err); }
         }
 
+        // Auto-review: after file changes, scan for common logical bugs
+        let autoReviewText = '';
+        if (filesChanged && !aborted) {
+          try {
+            const freshFiles = await window.deyad.readFiles(appId);
+            const issues: string[] = [];
+            for (const [filePath, content] of Object.entries(freshFiles)) {
+              if (!filePath.endsWith('.tsx') && !filePath.endsWith('.ts')) continue;
+              // Check: array length vs declared count mismatch
+              const countMatches = [...content.matchAll(/(?:const|let)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(\d+)/g)];
+              for (const m of countMatches) {
+                const varName = m[1];
+                const declaredCount = parseInt(m[2], 10);
+                // Look for an array that references this variable in a bounds check or is sized by it
+                const arrayPattern = new RegExp(`\\[([^\\]]{20,})\\]`, 'g');
+                for (const arrMatch of content.matchAll(arrayPattern)) {
+                  const arrContent = arrMatch[0];
+                  // Count top-level elements (rough: count <Component or { at depth 0)
+                  const elementCount = (arrContent.match(/(?:^\[|,)\s*(?:<|\{|['"`])/g) || []).length;
+                  if (elementCount > 0 && Math.abs(elementCount - declaredCount) === 1 && varName.toLowerCase().includes('total') || varName.toLowerCase().includes('count') || varName.toLowerCase().includes('steps')) {
+                    if (elementCount !== declaredCount) {
+                      issues.push(`${filePath}: ${varName} = ${declaredCount} but the associated array appears to have ${elementCount} elements (off-by-one?)`);
+                    }
+                  }
+                }
+              }
+              // Check: state initialized with undefined but typed without undefined
+              const stateMatches = [...content.matchAll(/useState<([^>]+)>\(([^)]+)\)/g)];
+              for (const sm of stateMatches) {
+                const type = sm[1];
+                const init = sm[2].trim();
+                if (init === 'undefined' && !type.includes('undefined') && !type.includes('null')) {
+                  issues.push(`${filePath}: useState<${type}> initialized with undefined but type doesn't allow it`);
+                }
+              }
+            }
+            if (issues.length > 0) {
+              autoReviewText = `\n\n<auto_review>\nPotential logic issues detected — please verify and fix:\n${issues.join('\n')}\n</auto_review>`;
+            }
+          } catch (err) { console.debug('ignore review failures:', err); }
+        }
+
         // Add assistant response and tool results to conversation
         messages.push({ role: 'assistant', content: turnResponse });
-        messages.push({ role: 'user', content: resultsText + autoLintText });
+        messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText });
 
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';
