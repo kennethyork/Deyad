@@ -203,6 +203,42 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
 
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
+
+    // Configure TypeScript/JavaScript to not show false errors
+    const tsDefaults = monaco.languages.typescript.typescriptDefaults;
+    const jsDefaults = monaco.languages.typescript.javascriptDefaults;
+
+    const sharedCompilerOptions: import('monaco-editor').languages.typescript.CompilerOptions = {
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+      module: monaco.languages.typescript.ModuleKind.ESNext,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      allowJs: true,
+      strict: false,
+      noEmit: true,
+      skipLibCheck: true,
+      isolatedModules: true,
+      resolveJsonModule: true,
+    };
+
+    tsDefaults.setCompilerOptions(sharedCompilerOptions);
+    jsDefaults.setCompilerOptions(sharedCompilerOptions);
+
+    // Disable semantic and syntax validation — the user's project has its own tsconfig
+    // and Monaco doesn't have access to node_modules/@types
+    tsDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: true,
+    });
+    jsDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: true,
+    });
+
     // Add Ctrl+S / Cmd+S save action
     editor.addAction({
       id: 'save-file',
