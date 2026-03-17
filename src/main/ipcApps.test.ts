@@ -80,7 +80,7 @@ describe('ipcApps handler registration', () => {
 
     const expected = [
       'apps:list', 'apps:create', 'apps:read-files', 'apps:write-files',
-      'apps:delete', 'apps:get-dir', 'apps:open-folder', 'apps:rename',
+      'apps:delete-files', 'apps:delete', 'apps:get-dir', 'apps:open-folder', 'apps:rename',
       'apps:save-messages', 'apps:load-messages', 'apps:dev-start', 'apps:dev-stop',
       'apps:dev-status', 'apps:export', 'apps:snapshot', 'apps:has-snapshot', 'apps:revert',
       'apps:import',
