@@ -325,17 +325,41 @@ export function runAgentLoop(options: AgentOptions): () => void {
           // edit_file also modifies files
           if (call.name === 'edit_file' && result.success) {
             filesChanged = true;
-            if (call.params.path) allChangedFiles.add(call.params.path);
+            if (call.params.path) {
+              allChangedFiles.add(call.params.path);
+              // Read the updated file so the UI can show the diff
+              try {
+                const freshFiles = await window.deyad.readFiles(appId);
+                const updatedContent = freshFiles[call.params.path];
+                if (updatedContent !== undefined) {
+                  await callbacks.onFilesWritten({ [call.params.path]: updatedContent });
+                }
+              } catch (err) { console.debug('ignore edit_file notify:', err); }
+            }
           }
 
           // multi_edit modifies files
           if (call.name === 'multi_edit' && result.success) {
             filesChanged = true;
-            // Track all paths from multi_edit
+            const editedPaths: string[] = [];
             for (let i = 0; i < 50; i++) {
               const p = call.params[`edit_${i}_path`] || call.params[`file_${i}_path`];
               if (!p) break;
               allChangedFiles.add(p);
+              editedPaths.push(p);
+            }
+            // Read all edited files so the UI can show the diff
+            if (editedPaths.length > 0) {
+              try {
+                const freshFiles = await window.deyad.readFiles(appId);
+                const editedMap: Record<string, string> = {};
+                for (const p of editedPaths) {
+                  if (freshFiles[p] !== undefined) editedMap[p] = freshFiles[p];
+                }
+                if (Object.keys(editedMap).length > 0) {
+                  await callbacks.onFilesWritten(editedMap);
+                }
+              } catch (err) { console.debug('ignore multi_edit notify:', err); }
             }
           }
 
