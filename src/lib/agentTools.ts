@@ -142,7 +142,6 @@ export async function executeTool(
       }
 
       case 'git_status': {
-        const termId = await window.deyad.createTerminal(appId);
         return await executeCommand(appId, 'git status --short');
       }
 

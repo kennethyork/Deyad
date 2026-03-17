@@ -73,7 +73,7 @@ export default function TerminalPanel({ appId }: Props) {
     // paste shortcut
     term.attachCustomKeyEventHandler((e) => {
       if (e.ctrlKey && e.key === 'v') {
-        navigator.clipboard.readText().then(text => term.write(text));
+        navigator.clipboard.readText().then(text => window.deyad.terminalWrite(termId, text));
         return false;
       }
       return true;
@@ -98,8 +98,9 @@ export default function TerminalPanel({ appId }: Props) {
     setActiveId(tab.id);
   }, [appId]);
 
-  // auto-create first tab on mount
+  // auto-create first tab on mount; reset tab counter
   useEffect(() => {
+    tabCounter = 0;
     if (tabs.length === 0) {
       createTab();
     }

@@ -81,7 +81,7 @@ export function detectErrors(text: string): DetectedError[] {
     }
 
     // Runtime errors from browser console style
-    if (/Uncaught|TypeError|ReferenceError|RangeError/.test(trimmed)) {
+    if (/\bUncaught\b|\bTypeError\b|\bReferenceError\b|\bRangeError\b/.test(trimmed)) {
       errors.push({ type: 'runtime', message: trimmed, raw: trimmed });
     }
   }

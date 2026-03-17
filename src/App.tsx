@@ -142,6 +142,7 @@ export default function App() {
     taskQueue.setOnFilesChanged(async (appId) => {
       const files = await window.deyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files });
+      setPreviewRefreshKey(k => k + 1);
     });
     return () => taskQueue.setOnFilesChanged(null);
   }, [updatePerApp]);
@@ -237,6 +238,8 @@ export default function App() {
     if (s.preAgentFiles) {
       await window.deyad.snapshotFiles(appId, s.preAgentFiles);
     }
+    // Write pending files to disk (chat mode doesn't write them during generation)
+    await window.deyad.writeFiles(appId, s.pendingDiffFiles);
     const freshFiles = await window.deyad.readFiles(appId);
     const firstKey = Object.keys(s.pendingDiffFiles)[0];
     const updates: Partial<PerAppState> = {
@@ -247,6 +250,7 @@ export default function App() {
     };
     if (firstKey) updates.selectedFile = firstKey;
     updatePerApp(appId, updates);
+    setPreviewRefreshKey(k => k + 1);
   }, [selectedApp, updatePerApp]);
 
   const handleRejectDiff = useCallback(async () => {
@@ -259,13 +263,20 @@ export default function App() {
     }
 
     const revertMap: Record<string, string> = {};
+    const newFilePaths: string[] = [];
     for (const filePath of Object.keys(s.pendingDiffFiles)) {
       if (filePath in s.preAgentFiles) {
         revertMap[filePath] = s.preAgentFiles[filePath];
+      } else {
+        // File didn't exist before — delete it from disk
+        newFilePaths.push(filePath);
       }
     }
     if (Object.keys(revertMap).length > 0) {
       await window.deyad.writeFiles(appId, revertMap);
+    }
+    if (newFilePaths.length > 0) {
+      await window.deyad.deleteFiles(appId, newFilePaths);
     }
     updatePerApp(appId, {
       appFiles: s.preAgentFiles,
@@ -285,6 +296,7 @@ export default function App() {
         [appId]: { ...s, appFiles: { ...s.appFiles, [filePath]: content } },
       };
     });
+    setPreviewRefreshKey(k => k + 1);
   }, [selectedApp]);
 
 
@@ -404,20 +416,27 @@ export default function App() {
     }
   };
 
+  const dbToggling = useRef<Set<string>>(new Set());
   const handleDbToggle = useCallback(async (appId: string) => {
-    const s = perAppRef.current[appId] ?? defaultPerAppState;
-    if (s.dbStatus === 'running') {
-      updatePerApp(appId, { dbStatus: 'stopped' });
-      const result = await window.deyad.dbStop(appId);
-      if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
-    } else {
-      updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
-      const result = await window.deyad.dbStart(appId);
-      if (result.success) {
-        updatePerApp(appId, { dbStatus: 'running' });
+    if (dbToggling.current.has(appId)) return;
+    dbToggling.current.add(appId);
+    try {
+      const s = perAppRef.current[appId] ?? defaultPerAppState;
+      if (s.dbStatus === 'running') {
+        updatePerApp(appId, { dbStatus: 'stopped' });
+        const result = await window.deyad.dbStop(appId);
+        if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
       } else {
-        alert(`Failed to start database:\n${result.error}`);
+        updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
+        const result = await window.deyad.dbStart(appId);
+        if (result.success) {
+          updatePerApp(appId, { dbStatus: 'running' });
+        } else {
+          alert(`Failed to start database:\n${result.error}`);
+        }
       }
+    } finally {
+      dbToggling.current.delete(appId);
     }
   }, [updatePerApp]);
 
@@ -426,6 +445,7 @@ export default function App() {
     if (result.success) {
       const files = await window.deyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files, selectedFile: null, canRevert: false });
+      setPreviewRefreshKey(k => k + 1);
     }
   }, [updatePerApp]);
 
@@ -622,6 +642,7 @@ export default function App() {
                 onFilesChanged={async () => {
                   const files = await window.deyad.readFiles(selectedApp.id);
                   updatePerApp(selectedApp.id, { appFiles: files });
+                  setPreviewRefreshKey(k => k + 1);
                 }}
               />
             ) : cur.rightTab === 'search' ? (

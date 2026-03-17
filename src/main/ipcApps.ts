@@ -258,6 +258,19 @@ export function registerAppHandlers(
     return true;
   });
 
+  ipcMain.handle('apps:delete-files', async (_event, { appId, paths: filePaths }: { appId: string; paths: string[] }) => {
+    const dir = appDir(appId);
+    for (const relPath of filePaths) {
+      const fullPath = path.resolve(dir, relPath);
+      if (!fullPath.startsWith(dir + path.sep) && fullPath !== dir) {
+        throw new Error(`Invalid file path: ${relPath}`);
+      }
+      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+    }
+    await gitCommit(appDir, appId, `Delete ${filePaths.length} file(s)`);
+    return true;
+  });
+
   ipcMain.handle('apps:delete', async (_event, appId: string) => {
     const proc = devProcesses.get(appId);
     if (proc) {

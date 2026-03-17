@@ -150,17 +150,21 @@ When writing files with write_files, put the raw file content directly in the co
 
 /**
  * Streams a single Ollama turn and returns the full response text.
+ * Accepts an abortSignal callback; when it returns true, the stream is abandoned.
  */
 function streamOllamaTurn(
   model: string,
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   onToken: (token: string) => void,
+  isAborted: () => boolean,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let buf = '';
+    let cleaned = false;
     const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
+      if (isAborted()) { cleanup(); resolve(buf); return; }
       buf += token;
       onToken(token);
     });
@@ -176,6 +180,8 @@ function streamOllamaTurn(
     });
 
     function cleanup() {
+      if (cleaned) return;
+      cleaned = true;
       unsubToken();
       unsubDone();
       unsubError();
@@ -271,7 +277,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         const turnResponse = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        });
+        }, () => aborted);
 
         if (aborted) break;
 

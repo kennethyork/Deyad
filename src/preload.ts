@@ -94,6 +94,9 @@ contextBridge.exposeInMainWorld('deyad', {
   writeFiles: (appId: string, files: Record<string, string>): Promise<boolean> =>
     ipcRenderer.invoke('apps:write-files', { appId, files }),
 
+  deleteFiles: (appId: string, paths: string[]): Promise<boolean> =>
+    ipcRenderer.invoke('apps:delete-files', { appId, paths }),
+
   deleteApp: (appId: string): Promise<boolean> =>
     ipcRenderer.invoke('apps:delete', appId),
 

@@ -106,6 +106,7 @@ interface DeyadAPI {
   createApp(name: string, description: string, appType: AppType, dbProvider?: DbProvider): Promise<AppProject>;
   readFiles(appId: string): Promise<Record<string, string>>;
   writeFiles(appId: string, files: Record<string, string>): Promise<boolean>;
+  deleteFiles(appId: string, paths: string[]): Promise<boolean>;
   deleteApp(appId: string): Promise<boolean>;
   getAppDir(appId: string): Promise<string>;
   openAppFolder(appId: string): Promise<boolean>;
