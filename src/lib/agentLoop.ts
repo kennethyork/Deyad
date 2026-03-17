@@ -116,7 +116,7 @@ WORKFLOW:
 2. Plan your approach briefly in prose.
 3. Implement changes using write_files and run_command as needed.
 4. Verify your work (e.g. check for errors, read files to confirm).
-5. When everything is done, output <done/>.
+5. When everything is done, write a brief SUMMARY of what you did (which files you created/modified and what changed), then output <done/>.
 
 RULES:
 - ALWAYS follow the user's instructions and constraints exactly. If the user says "stay on page", "don't change navigation", "only modify X", or any other constraint, obey it literally.
@@ -138,6 +138,12 @@ SELF-REVIEW — After writing code, verify these before outputting <done/>:
 - Conditional gates (disabled, hidden, etc.) don't accidentally block the user from progressing.
 - Navigation flows (wizards, multi-step forms, tabs) are reachable end-to-end — every step can be reached and completed.
 - Read back the files you wrote and mentally trace the user flow to catch logic errors.
+
+OUTPUT — Always write visible prose that the user can read:
+- Before tool calls, briefly state what you're about to do.
+- After making changes, summarize what you did: which files were created or modified and what changed.
+- NEVER output only tool calls with no prose — the user cannot see tool calls, only your text.
+- Before <done/>, always write a summary like: "Done! I created/modified X, Y, Z. Here's what changed: ..."
 
 When writing files with write_files, put the raw file content directly in the content param (no markdown fences).`;
 }
@@ -251,6 +257,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
 
       let fullOutput = '';
       let iteration = 0;
+      const allChangedFiles = new Set<string>();
+      const allCommands: string[] = [];
 
       // Agent loop
       while (iteration < MAX_ITERATIONS && !aborted) {
@@ -271,7 +279,14 @@ export function runAgentLoop(options: AgentOptions): () => void {
         const toolCalls = parseToolCalls(turnResponse);
 
         if (toolCalls.length === 0 || isDone(turnResponse)) {
-          // No tool calls or explicit done — the agent is finished
+          // If the visible content is too short, append an auto-generated summary
+          const visibleContent = stripToolMarkup(fullOutput).trim();
+          if (visibleContent.length < 40 && allChangedFiles.size > 0) {
+            const fileList = [...allChangedFiles].map(f => `- ${f}`).join('\n');
+            const summary = `\n\n**Changes made:**\n${fileList}`;
+            fullOutput += summary;
+            callbacks.onContent(fullOutput);
+          }
           callbacks.onDone();
           return;
         }
@@ -293,12 +308,14 @@ export function runAgentLoop(options: AgentOptions): () => void {
             const fileMap: Record<string, string> = {};
             if (call.params.path && call.params.content !== undefined) {
               fileMap[call.params.path] = call.params.content;
+              allChangedFiles.add(call.params.path);
             }
             for (let i = 0; i < 50; i++) {
               const p = call.params[`file_${i}_path`];
               const c = call.params[`file_${i}_content`];
               if (!p) break;
               fileMap[p] = c ?? '';
+              allChangedFiles.add(p);
             }
             if (Object.keys(fileMap).length > 0) {
               await callbacks.onFilesWritten(fileMap);
@@ -308,11 +325,23 @@ export function runAgentLoop(options: AgentOptions): () => void {
           // edit_file also modifies files
           if (call.name === 'edit_file' && result.success) {
             filesChanged = true;
+            if (call.params.path) allChangedFiles.add(call.params.path);
           }
 
           // multi_edit modifies files
           if (call.name === 'multi_edit' && result.success) {
             filesChanged = true;
+            // Track all paths from multi_edit
+            for (let i = 0; i < 50; i++) {
+              const p = call.params[`edit_${i}_path`] || call.params[`file_${i}_path`];
+              if (!p) break;
+              allChangedFiles.add(p);
+            }
+          }
+
+          // Track commands run
+          if (call.name === 'run_command' && call.params.command) {
+            allCommands.push(call.params.command);
           }
         }
 
