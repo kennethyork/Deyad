@@ -119,12 +119,14 @@ WORKFLOW:
 5. When everything is done, output <done/>.
 
 RULES:
+- ALWAYS follow the user's instructions and constraints exactly. If the user says "stay on page", "don't change navigation", "only modify X", or any other constraint, obey it literally.
+- Only modify files and components that are directly relevant to the user's request. Do NOT change routing, navigation, page structure, or other unrelated code unless the user explicitly asks for it.
 - Always explore the project structure before making changes.
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
 - Keep your prose explanations concise — focus on actions.
-- Do not ask the user questions; make reasonable decisions autonomously.
+- Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response.
 - Use ### FILE: format inside write_files content param for code.
 - When the user asks for any git operation (push, pull, commit, branch, status, log, remote, etc.), use the dedicated git_* tools directly — do NOT use run_command with git. For example: use git_push instead of run_command "git push".
@@ -237,12 +239,14 @@ export function runAgentLoop(options: AgentOptions): () => void {
         } catch (err) { console.debug('ignore:', err); }
       }
 
-      // Add conversation history (last 6 messages)
-      for (const msg of history.slice(-6)) {
+      // Add conversation history (last 6 messages), excluding the final message
+      // since it's the current user message which gets added separately below
+      const historyWithoutCurrent = history.slice(0, -1).slice(-6);
+      for (const msg of historyWithoutCurrent) {
         messages.push(msg);
       }
 
-      // Add the user's current message
+      // Add the user's current message (always last, never duplicated)
       messages.push({ role: 'user', content: userMessage });
 
       let fullOutput = '';
