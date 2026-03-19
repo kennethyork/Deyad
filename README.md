@@ -4,12 +4,12 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20AI-000000)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-Prisma-003B57?logo=sqlite&logoColor=white)
 ![MIT](https://img.shields.io/badge/License-MIT-green)
 
 **The open-source, local-first AI app builder.** Describe what you want, get a working app — frontend or full-stack — without sending a single byte to the cloud.
 
-Deyad runs [Ollama](https://ollama.ai) on your machine for AI inference, scaffolds real production stacks (React + Express + PostgreSQL + Prisma), and gives you a complete IDE with live preview, terminal, database admin, version history, and one-click deployment.
+Deyad runs [Ollama](https://ollama.ai) on your machine for AI inference, scaffolds real production stacks (React + Express + SQLite + Prisma), and gives you a complete IDE with live preview, terminal, database browser, version history, and one-click deployment.
 
 **Your data stays on your machine. No API keys. No subscriptions. No token limits.**
 
@@ -41,9 +41,10 @@ You describe your app in chat
 | No API key / account required | **Yes** | No | No | No | No | No |
 | Open source | **Yes** | No | No | No | No | No |
 | Full-stack with real database | **Yes** | No | Partial | No | Partial | No |
+| Zero-config database (SQLite) | **Yes** | No | No | No | No | No |
 | Autonomous agent (multi-step) | **Yes** | Partial | Partial | Yes | Partial | No |
 | Error auto-detect & self-fix | **Yes** | No | No | No | No | No |
-| Built-in database admin (pgAdmin) | **Yes** | No | No | No | No | No |
+| Built-in SQLite table browser | **Yes** | No | No | No | No | No |
 | Git auto-commit every generation | **Yes** | No | No | No | No | No |
 | GitHub push/pull/branches | **Yes** | No | No | Yes | No | No |
 | AI handles git commands in chat | **Yes** | No | No | No | No | No |
@@ -94,10 +95,9 @@ You describe your app in chat
 
 ### Database
 
-- **PostgreSQL 17** — containerized via Docker/Podman, auto-configured
+- **SQLite** — zero-config file-based database, no Docker required
 - **Prisma ORM** — type-safe schema management
-- **pgAdmin** — embedded database admin UI inside the app
-- **One-click start/stop** — manage containers from the UI
+- **Built-in table browser** — browse tables, view rows, and inspect schema directly in the app
 - **Schema introspection** — AI agent can query live table structure while coding
 
 ### Version Control & GitHub
@@ -163,9 +163,9 @@ Drop custom templates into the `plugins/` directory with a `plugin.json` manifes
 | AI | Ollama (any local model) |
 | Frontend scaffold | React + Vite + TypeScript |
 | Backend scaffold | Node.js + Express + TypeScript |
-| Database | PostgreSQL 17 (Docker/Podman) |
+| Database | SQLite (file-based, zero-config) |
 | ORM | Prisma |
-| DB Admin | pgAdmin (latest) |
+| DB Browser | Built-in SQLite table browser |
 | Version control | Git (auto-commit + GitHub push/pull/branches) |
 | Desktop deploy | Electron Builder (AppImage/exe/DMG) |
 | Testing | Vitest |
@@ -181,7 +181,7 @@ Drop custom templates into the `plugins/` directory with a `plugin.json` manifes
 | [Node.js >= 18](https://nodejs.org) (with npm) | Runs generated apps, installs packages, Vite dev server | **Yes** |
 | [Ollama](https://ollama.ai) | Local AI inference — the entire app depends on this | **Yes** |
 | [Git](https://git-scm.com) | Auto-commit, version history, GitHub push/pull | **Yes** |
-| [Docker](https://docker.com) or [Podman](https://podman.io) | PostgreSQL + pgAdmin containers | **Full-stack only** |
+| SQLite | File-based database for full-stack apps | Pre-installed on most systems |
 
 ### Optional (install when needed)
 
@@ -214,10 +214,7 @@ sudo apt install -y git
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
 
-# 4. Podman (for full-stack / database apps)
-sudo apt install -y podman
-
-# 5. Install & run Deyad
+# 4. Install & run Deyad
 # Option A: Download the .deb from GitHub Releases
 sudo dpkg -i Deyad-amd64.deb
 
@@ -240,10 +237,7 @@ sudo dnf install -y git
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
 
-# 4. Podman (for full-stack / database apps)
-sudo dnf install -y podman
-
-# 5. Install & run Deyad
+# 4. Install & run Deyad
 # Option A: Download the .rpm from GitHub Releases
 sudo rpm -i Deyad-x86_64.rpm
 
@@ -261,9 +255,6 @@ sudo pacman -S nodejs npm git
 # 2. Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
-
-# 3. Podman (for full-stack / database apps)
-sudo pacman -S podman
 
 # 4. Install & run Deyad
 # Option A: Download the AppImage from GitHub Releases
@@ -290,12 +281,7 @@ winget install Git.Git
 winget install Ollama.Ollama
 ollama pull llama3.2
 
-# 4. Docker Desktop (for full-stack / database apps)
-#    Download from https://docker.com/products/docker-desktop
-#    Or via winget:
-winget install Docker.DockerDesktop
-
-# 5. Install & run Deyad
+# 4. Install & run Deyad
 # Option A: Download Deyad-x64.exe from GitHub Releases and run the installer
 # Option B: Run from source
 git clone https://github.com/theKennethy/Deyad.git
@@ -316,8 +302,7 @@ npm --version       # Should be >= 9
 git --version       # Any recent version
 ollama --version    # Should respond (ensure ollama serve is running)
 
-# Optional — only needed for full-stack apps:
-docker --version    # or: podman --version
+# SQLite is built into most systems — no separate install needed
 ```
 
 ---
@@ -347,7 +332,7 @@ On first launch, the **Welcome Wizard** walks you through connecting to Ollama a
 2. **Chat** — describe what you want in natural language. The agent reads your code, writes files, runs commands, and iterates autonomously.
 3. **Edit** — use the built-in Monaco editor to make manual changes
 4. **Preview** — click Run to start the Vite dev server and see your app live
-5. **Database** — toggle the DB on to start PostgreSQL + pgAdmin containers
+5. **Database** — browse SQLite tables and schema in the built-in database panel
 6. **Deploy** — click Publish, select a provider, and deploy
 
 ### Full-Stack Project Structure
@@ -362,7 +347,6 @@ your-app/
 │   ├── src/
 │   ├── prisma/
 │   └── package.json
-├── docker-compose.yml  # PostgreSQL + pgAdmin
 └── .git/               # Auto-initialized
 ```
 
