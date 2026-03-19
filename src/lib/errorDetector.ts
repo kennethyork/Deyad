@@ -117,3 +117,49 @@ export function buildErrorFixPrompt(errors: DetectedError[], fileContents?: Reco
 
   return prompt;
 }
+
+/**
+ * Returns a user-friendly hint for a detected error, or null if no hint applies.
+ */
+export function getErrorHint(error: DetectedError): string | null {
+  const msg = error.message;
+
+  // Module / dependency not found
+  if (error.type === 'module' || /Can't resolve|Cannot find module/i.test(msg)) {
+    const pkgMatch = msg.match(/(?:Can't resolve|Cannot find module)\s+['"]([^'"]+)['"]/);
+    if (pkgMatch) return `Missing dependency — try: npm install ${pkgMatch[1]}`;
+    return 'Check the import path or install the missing package.';
+  }
+
+  // Port already in use
+  if (/EADDRINUSE/i.test(msg)) {
+    return 'Port is already in use. Stop the other process or change the port.';
+  }
+
+  // Syntax errors
+  if (error.type === 'syntax' || /Unexpected token/i.test(msg)) {
+    return 'Check for missing brackets, semicolons, or mismatched quotes near the reported line.';
+  }
+
+  // TypeScript type errors
+  if (error.type === 'typescript') {
+    if (/is not assignable to type/i.test(msg)) return 'Type mismatch — check the expected vs. provided type.';
+    if (/Property .+ does not exist/i.test(msg)) return 'Accessing a property that doesn\'t exist on this type. Check spelling or add a type declaration.';
+    if (/Cannot find name/i.test(msg)) {
+      const nameMatch = msg.match(/Cannot find name\s+'([^']+)'/);
+      if (nameMatch) return `'${nameMatch[1]}' is not defined. Import it or check for typos.`;
+    }
+    if (/has no exported member/i.test(msg)) return 'The import target doesn\'t export this name. Check the library\'s exports.';
+    return 'TypeScript type error — review the types at the reported location.';
+  }
+
+  // Runtime errors
+  if (/ReferenceError/i.test(msg)) return 'A variable or function is used before it\'s defined. Check scope and imports.';
+  if (/TypeError.*undefined/i.test(msg)) return 'Trying to access a property on undefined. Add a null check or verify the data flow.';
+  if (/TypeError.*null/i.test(msg)) return 'Trying to access a property on null. Ensure the value is initialized.';
+  if (/RangeError/i.test(msg)) return 'Value is out of range — check array indices or recursive calls for infinite loops.';
+  if (/ENOENT/i.test(msg)) return 'File or directory not found. Check the path exists.';
+  if (/EACCES|EPERM/i.test(msg)) return 'Permission denied. Check file permissions or run with appropriate access.';
+
+  return null;
+}

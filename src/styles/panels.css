@@ -256,6 +256,7 @@
   color: var(--text-secondary);
   padding: 3px 0;
   font-family: var(--font-mono);
+  flex-wrap: wrap;
 }
 .error-type-badge {
   background: rgba(239,68,68,0.15);
@@ -276,6 +277,14 @@
   font-size: 11px;
   color: var(--text-muted);
   padding: 4px 0;
+}
+.error-hint {
+  width: 100%;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans, sans-serif);
+  padding: 2px 0 2px 4px;
+  opacity: 0.85;
 }
 
 

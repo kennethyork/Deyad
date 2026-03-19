@@ -177,17 +177,23 @@ function AppInner() {
     localStorage.setItem('deyad-theme', theme);
   }, [theme]);
 
-  // Command palette keyboard shortcut
+  // Command palette & search keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         setShowCommandPalette((v) => !v);
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+        e.preventDefault();
+        if (selectedApp) {
+          updatePerApp(selectedApp.id, { rightTab: 'search' });
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [selectedApp]);
 
   // Subscribe to DB status events (any app)
   useEffect(() => {
@@ -518,7 +524,7 @@ function AppInner() {
       { id: 'tab.database', name: 'Show Database', icon: '🗄️', run: () => updatePerApp(selectedApp.id, { rightTab: 'database' }) },
       { id: 'tab.packages', name: 'Show Packages', icon: '📦', run: () => updatePerApp(selectedApp.id, { rightTab: 'packages' }) },
       { id: 'tab.git', name: 'Show Git', icon: '🔀', run: () => updatePerApp(selectedApp.id, { rightTab: 'git' }) },
-      { id: 'tab.search', name: 'Search Files', icon: '🔍', shortcut: 'Ctrl+P', run: () => updatePerApp(selectedApp.id, { rightTab: 'search' }) },
+      { id: 'tab.search', name: 'Search Files', icon: '🔍', shortcut: 'Ctrl+Shift+F', run: () => updatePerApp(selectedApp.id, { rightTab: 'search' }) },
       { id: 'tab.env', name: 'Environment Variables', icon: '🔑', run: () => updatePerApp(selectedApp.id, { rightTab: 'envvars' }) },
       { id: 'app.folder', name: 'Open in File Manager', icon: '📁', run: () => { window.deyad.openAppFolder(selectedApp.id); } },
     ] : []),

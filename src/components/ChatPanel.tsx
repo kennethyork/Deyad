@@ -5,7 +5,7 @@ import { extractFilesFromResponse, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPro
 import { runAgentLoop } from '../lib/agentLoop';
 import { stripToolMarkup } from '../lib/agentTools';
 import type { ToolResult } from '../lib/agentTools';
-import { detectErrors, buildErrorFixPrompt } from '../lib/errorDetector';
+import { detectErrors, buildErrorFixPrompt, getErrorHint } from '../lib/errorDetector';
 import type { DetectedError } from '../lib/errorDetector';
 import MessageList from './MessageList';
 import AgentStepsList from './AgentStepsList';
@@ -662,6 +662,10 @@ User's instructions: ${text}`;
               <div key={i} className="error-detection-item">
                 <span className="error-type-badge">{e.type}</span>
                 <span className="error-msg">{e.message.slice(0, 120)}</span>
+                {(() => {
+                  const hint = getErrorHint(e);
+                  return hint ? <div className="error-hint">💡 {hint}</div> : null;
+                })()}
               </div>
             ))}
             {detectedErrors.length > 3 && (
