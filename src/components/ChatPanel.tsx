@@ -66,6 +66,7 @@ export default function ChatPanel({
   const autoFixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_AUTO_FIX_ATTEMPTS = 3;
   const embedModelRef = useRef('');
+  const modelOptionsRef = useRef<{ temperature: number; top_p: number; repeat_penalty: number }>({ temperature: 0.7, top_p: 0.9, repeat_penalty: 1.1 });
   const rafRef = useRef<number>(0);
 
   // Clean up stream listeners on unmount
@@ -177,6 +178,11 @@ export default function ChatPanel({
       if (settings.embedModel) {
         embedModelRef.current = settings.embedModel;
       }
+      modelOptionsRef.current = {
+        temperature: settings.temperature ?? 0.7,
+        top_p: settings.topP ?? 0.9,
+        repeat_penalty: settings.repeatPenalty ?? 1.1,
+      };
     } catch (err) {
       console.debug('Handled error:', err);
       setError('Could not connect to Ollama. Make sure it is running.');
@@ -285,7 +291,16 @@ export default function ChatPanel({
         // For Ollama vision models: strip data URI prefix, pass raw base64
         const base64 = imageAttachment.replace(/^data:image\/[^;]+;base64,/, '');
         ollamaMessages[lastIdx].images = [base64];
-        ollamaMessages[lastIdx].content = `The user has attached a screenshot/image. Analyze it and generate code that recreates or improves the UI shown. ${text}`;
+        ollamaMessages[lastIdx].content = `The user has attached a screenshot or design mockup (possibly from Figma, a wireframe, or a UI screenshot). Your task:
+
+1. Analyze the layout, spacing, typography, colors, icons, and component hierarchy precisely.
+2. Recreate the UI as pixel-perfect React + TypeScript + CSS code.
+3. Use semantic HTML elements, CSS variables for colors, and responsive flexbox/grid layouts.
+4. Match exact colors (extract hex values from the image), font sizes, border radii, and spacing.
+5. If it looks like a multi-page design, implement navigation between views.
+6. Add hover states, transitions, and interactive behavior where visually implied.
+
+User's instructions: ${text}`;
       }
       setImageAttachment(null);
     }
@@ -389,7 +404,7 @@ export default function ChatPanel({
 
     streamCleanupRef.current = cleanup;
 
-    window.deyad.chatStream(selectedModel, ollamaMessages, requestId).catch((err) => {
+    window.deyad.chatStream(selectedModel, ollamaMessages, requestId, modelOptionsRef.current).catch((err) => {
       cleanup();
       setError(`Failed to connect to Ollama: ${err instanceof Error ? err.message : String(err)}`);
       setStreaming(false);
@@ -446,6 +461,7 @@ export default function ChatPanel({
       selectedFile,
       history,
       embedModel: embedModelRef.current || undefined,
+      modelOptions: modelOptionsRef.current,
       callbacks: {
         onContent: (fullText: string) => {
           streamBuf.current = stripToolMarkup(fullText);

@@ -96,6 +96,8 @@ export interface AgentOptions {
   history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
   /** Ollama embedding model name for RAG retrieval (optional). */
   embedModel?: string;
+  /** Model generation options (temperature, top_p, repeat_penalty). */
+  modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number };
   callbacks: AgentCallbacks;
 }
 
@@ -157,6 +159,7 @@ function streamOllamaTurn(
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
   onToken: (token: string) => void,
   isAborted: () => boolean,
+  modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number },
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let buf = '';
@@ -187,7 +190,7 @@ function streamOllamaTurn(
       unsubError();
     }
 
-    window.deyad.chatStream(model, messages, requestId).catch((err) => {
+    window.deyad.chatStream(model, messages, requestId, modelOptions).catch((err) => {
       cleanup();
       reject(err);
     });
@@ -200,7 +203,7 @@ function streamOllamaTurn(
  * Returns a cleanup function that can abort the loop.
  */
 export function runAgentLoop(options: AgentOptions): () => void {
-  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, callbacks } = options;
+  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, callbacks } = options;
   let aborted = false;
 
   const abort = () => { aborted = true; };
@@ -277,7 +280,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         const turnResponse = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        }, () => aborted);
+        }, () => aborted, modelOptions);
 
         if (aborted) break;
 

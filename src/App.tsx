@@ -18,6 +18,8 @@ import EnvVarsPanel from './components/EnvVarsPanel';
 import GitPanel from './components/GitPanel';
 import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
+import CommandPalette from './components/CommandPalette';
+import type { Command } from './components/CommandPalette';
 import { taskQueue } from './lib/taskQueue';
 
 export interface AppProject {
@@ -72,6 +74,7 @@ export default function App() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showPackageManager, setShowPackageManager] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
@@ -163,6 +166,18 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('deyad-theme', theme);
   }, [theme]);
+
+  // Command palette keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Subscribe to DB status events (any app)
   useEffect(() => {
@@ -468,6 +483,26 @@ export default function App() {
       setExportResult(`Export failed: ${result.error}`);
     }
   };
+
+  const paletteCommands: Command[] = [
+    { id: 'app.new', name: 'New App', icon: '➕', shortcut: 'Ctrl+N', run: () => setShowNewAppModal(true) },
+    { id: 'app.import', name: 'Import Project', icon: '📂', run: () => setShowImportModal(true) },
+    { id: 'settings', name: 'Settings', icon: '⚙️', run: () => setShowSettings(true) },
+    ...(selectedApp ? [
+      { id: 'deploy', name: 'Deploy App', icon: '🚀', run: () => setShowDeployModal(true) },
+      { id: 'history', name: 'Version History', icon: '🕐', run: () => setShowVersionHistory(true) },
+      { id: 'tasks', name: 'Task Queue', icon: '📋', run: () => setShowTaskQueue(true) },
+      { id: 'tab.editor', name: 'Show Editor', icon: '✏️', run: () => updatePerApp(selectedApp.id, { rightTab: 'editor' }) },
+      { id: 'tab.preview', name: 'Show Preview', icon: '👁️', run: () => updatePerApp(selectedApp.id, { rightTab: 'preview' }) },
+      { id: 'tab.terminal', name: 'Show Terminal', icon: '💻', run: () => updatePerApp(selectedApp.id, { rightTab: 'terminal' }) },
+      { id: 'tab.database', name: 'Show Database', icon: '🗄️', run: () => updatePerApp(selectedApp.id, { rightTab: 'database' }) },
+      { id: 'tab.packages', name: 'Show Packages', icon: '📦', run: () => updatePerApp(selectedApp.id, { rightTab: 'packages' }) },
+      { id: 'tab.git', name: 'Show Git', icon: '🔀', run: () => updatePerApp(selectedApp.id, { rightTab: 'git' }) },
+      { id: 'tab.search', name: 'Search Files', icon: '🔍', shortcut: 'Ctrl+P', run: () => updatePerApp(selectedApp.id, { rightTab: 'search' }) },
+      { id: 'tab.env', name: 'Environment Variables', icon: '🔑', run: () => updatePerApp(selectedApp.id, { rightTab: 'envvars' }) },
+      { id: 'app.folder', name: 'Open in File Manager', icon: '📁', run: () => { window.deyad.openAppFolder(selectedApp.id); } },
+    ] : []),
+  ];
 
   return (
     <div
@@ -798,6 +833,13 @@ export default function App() {
         onConfirm={() => setExportResult(null)}
         onCancel={() => setExportResult(null)}
       />
+
+      {showCommandPalette && (
+        <CommandPalette
+          commands={paletteCommands}
+          onClose={() => setShowCommandPalette(false)}
+        />
+      )}
     </div>
   );
 }

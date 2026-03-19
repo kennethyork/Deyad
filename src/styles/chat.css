@@ -461,6 +461,12 @@
   gap: 8px;
   background: var(--bg-surface);
   flex-shrink: 0;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+.chat-input-area.drag-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
 }
 
 .scroll-controls {

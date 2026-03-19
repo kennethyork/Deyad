@@ -31,6 +31,9 @@ export interface DeyadSettings {
   pgAdminEmail: string;
   pgAdminPassword: string;
   theme: 'dark' | 'light';
+  temperature: number;
+  topP: number;
+  repeatPenalty: number;
 }
 
 export const DEFAULT_SETTINGS: DeyadSettings = {
@@ -43,6 +46,9 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   pgAdminEmail: 'admin@admin.com',
   pgAdminPassword: 'admin',
   theme: 'dark',
+  temperature: 0.7,
+  topP: 0.9,
+  repeatPenalty: 1.1,
 };
 
 export function loadSettings(settingsPath: string): DeyadSettings {

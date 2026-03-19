@@ -14,6 +14,9 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const [embedModel, setEmbedModel] = useState('');
   const [pgAdminEmail, setPgAdminEmail] = useState('admin@admin.com');
   const [pgAdminPassword, setPgAdminPassword] = useState('admin');
+  const [temperature, setTemperature] = useState(0.7);
+  const [topP, setTopP] = useState(0.9);
+  const [repeatPenalty, setRepeatPenalty] = useState(1.1);
   const [models, setModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,6 +35,9 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     setEmbedModel(settings.embedModel ?? '');
     setPgAdminEmail(settings.pgAdminEmail ?? 'admin@admin.com');
     setPgAdminPassword(settings.pgAdminPassword ?? 'admin');
+    setTemperature(settings.temperature ?? 0.7);
+    setTopP(settings.topP ?? 0.9);
+    setRepeatPenalty(settings.repeatPenalty ?? 1.1);
     loadModels();
   };
 
@@ -53,6 +59,9 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
       embedModel,
       pgAdminEmail: pgAdminEmail.trim(),
       pgAdminPassword,
+      temperature,
+      topP,
+      repeatPenalty,
       theme,
     });
     setSaving(false);
@@ -192,6 +201,64 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
               ))}
             </select>
             <span className="settings-hint">Enable RAG for smarter context. Use nomic-embed-text or similar embedding model.</span>
+          </div>
+
+          <hr className="settings-divider" />
+
+          <div className="form-field">
+            <label>Model Parameters</label>
+            <span className="settings-hint">Fine-tune how the AI generates responses.</span>
+          </div>
+
+          <div className="form-field">
+            <div className="settings-slider-row">
+              <label htmlFor="temperature">Temperature</label>
+              <input
+                id="temperature"
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={temperature}
+                onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              />
+              <span className="settings-slider-value">{temperature.toFixed(1)}</span>
+            </div>
+            <span className="settings-hint">Higher = more creative, lower = more focused (default: 0.7)</span>
+          </div>
+
+          <div className="form-field">
+            <div className="settings-slider-row">
+              <label htmlFor="top-p">Top P</label>
+              <input
+                id="top-p"
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={topP}
+                onChange={(e) => setTopP(parseFloat(e.target.value))}
+              />
+              <span className="settings-slider-value">{topP.toFixed(2)}</span>
+            </div>
+            <span className="settings-hint">Nucleus sampling threshold (default: 0.9)</span>
+          </div>
+
+          <div className="form-field">
+            <div className="settings-slider-row">
+              <label htmlFor="repeat-penalty">Repeat Penalty</label>
+              <input
+                id="repeat-penalty"
+                type="range"
+                min="1"
+                max="2"
+                step="0.05"
+                value={repeatPenalty}
+                onChange={(e) => setRepeatPenalty(parseFloat(e.target.value))}
+              />
+              <span className="settings-slider-value">{repeatPenalty.toFixed(2)}</span>
+            </div>
+            <span className="settings-hint">Penalize repetition in output (default: 1.1)</span>
           </div>
 
           <hr className="settings-divider" />

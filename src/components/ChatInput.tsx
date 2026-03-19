@@ -1,4 +1,4 @@
-import { useRef, memo } from 'react';
+import { useRef, memo, useState } from 'react';
 
 interface Props {
   input: string;
@@ -22,6 +22,18 @@ export default memo(function ChatInput({
   onImagePaste,
 }: Props) {
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => setImageAttachment(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -39,7 +51,12 @@ export default memo(function ChatInput({
   };
 
   return (
-    <div className="chat-input-area">
+    <div
+      className={`chat-input-area${dragOver ? ' drag-over' : ''}`}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
       {imageAttachment && (
         <div className="image-preview">
           <img src={imageAttachment} alt="Attached" />
