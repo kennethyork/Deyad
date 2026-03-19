@@ -60,54 +60,27 @@ describe('generateFrontendScaffold', () => {
 
 describe('generateFullStackScaffold', () => {
   const opts = {
-    appName: 'My PG App',
-    description: 'Test pg app',
-    dbName: 'mypgapp_db',
-    dbUser: 'mypgapp_user',
-    dbPassword: 'PgP@ss!456',
+    appName: 'My App',
+    description: 'Test app',
+    dbName: 'myapp_db',
+    dbUser: 'myapp_user',
+    dbPassword: 'pass123',
   };
 
-  it('generates docker-compose.yml with PostgreSQL', () => {
+  it('does not generate docker-compose.yml', () => {
     const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).toContain('postgres:17');
-    expect(files['docker-compose.yml']).toContain('mypgapp_db');
-    expect(files['docker-compose.yml']).toContain('mypgapp_user');
-    expect(files['docker-compose.yml']).toContain('PgP@ss!456');
-    expect(files['docker-compose.yml']).toContain("'5433:5432'");
+    expect(files['docker-compose.yml']).toBeUndefined();
   });
 
-  it('includes pgAdmin service in docker-compose', () => {
+  it('generates Prisma schema with SQLite provider', () => {
     const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).toContain('dpage/pgadmin4');
-    expect(files['docker-compose.yml']).toContain("'5050:80'");
-    expect(files['docker-compose.yml']).toContain('PGADMIN_DEFAULT_EMAIL');
-    expect(files['docker-compose.yml']).toContain('condition: service_healthy');
-  });
-
-  it('uses pg_isready for healthcheck', () => {
-    const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).toContain('pg_isready');
-    expect(files['docker-compose.yml']).toContain('-U mypgapp_user');
-  });
-
-  it('does not include MySQL-specific config', () => {
-    const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).not.toContain('mysql');
-    expect(files['docker-compose.yml']).not.toContain('MYSQL_');
-    expect(files['docker-compose.yml']).not.toContain('3306');
-  });
-
-  it('generates Prisma schema with PostgreSQL provider', () => {
-    const files = generateFullStackScaffold(opts);
-    expect(files['backend/prisma/schema.prisma']).toContain('provider = "postgresql"');
+    expect(files['backend/prisma/schema.prisma']).toContain('provider = "sqlite"');
     expect(files['backend/prisma/schema.prisma']).toContain('DATABASE_URL');
   });
 
-  it('generates backend .env with correct PostgreSQL DATABASE_URL', () => {
+  it('generates backend .env with SQLite file URL', () => {
     const files = generateFullStackScaffold(opts);
-    expect(files['backend/.env']).toContain(
-      'postgresql://mypgapp_user:PgP@ss!456@localhost:5433/mypgapp_db',
-    );
+    expect(files['backend/.env']).toContain('file:./dev.db');
   });
 
   it('generates backend package.json with Express and Prisma', () => {
@@ -130,31 +103,16 @@ describe('generateFullStackScaffold', () => {
   it('generates frontend app entry point', () => {
     const files = generateFullStackScaffold(opts);
     expect(files['frontend/src/main.tsx']).toContain('ReactDOM.createRoot');
-    expect(files['frontend/src/App.tsx']).toContain('My PG App');
+    expect(files['frontend/src/App.tsx']).toContain('My App');
   });
 
-  it('generates README with PostgreSQL stack info', () => {
+  it('generates README with SQLite stack info', () => {
     const files = generateFullStackScaffold(opts);
     expect(files['README.md']).toContain('React');
     expect(files['README.md']).toContain('Express');
-    expect(files['README.md']).toContain('PostgreSQL');
+    expect(files['README.md']).toContain('SQLite');
     expect(files['README.md']).toContain('Prisma');
-    expect(files['README.md']).toContain('docker compose up');
-  });
-
-  it('uses postgres_data volume name', () => {
-    const files = generateFullStackScaffold(opts);
-    expect(files['docker-compose.yml']).toContain('postgres_data');
-  });
-
-  it('sanitizes special characters in db name and user', () => {
-    const files = generateFullStackScaffold({
-      ...opts,
-      dbName: 'my-app db!',
-      dbUser: 'user-name',
-    });
-    expect(files['docker-compose.yml']).toContain('my_app_db_');
-    expect(files['docker-compose.yml']).toContain('user_name');
+    expect(files['README.md']).not.toContain('docker');
   });
 });
 
@@ -176,23 +134,6 @@ describe('allocatePorts', () => {
     const a = allocatePorts('stable-id');
     const b = allocatePorts('stable-id');
     expect(a).toEqual(b);
-  });
-});
-
-describe('generateFullStackScaffold with custom ports', () => {
-  it('uses provided dbPort and guiPort in compose', () => {
-    const files = generateFullStackScaffold({
-      appName: 'Custom',
-      description: 'test',
-      dbName: 'db',
-      dbUser: 'usr',
-      dbPassword: 'pw',
-      dbPort: 25432,
-      guiPort: 25050,
-    });
-    expect(files['docker-compose.yml']).toContain("'25432:5432'");
-    expect(files['docker-compose.yml']).toContain("'25050:80'");
-    expect(files['backend/.env']).toContain('localhost:25432');
   });
 });
 

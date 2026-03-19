@@ -23,9 +23,7 @@ interface Props {
   app: AppProject;
   appFiles: Record<string, string>;
   selectedFile?: string | null;
-  dbStatus: 'none' | 'running' | 'stopped';
   onFilesUpdated: (files: Record<string, string>) => void;
-  onDbToggle: () => void;
   onRevert: () => void;
   canRevert: boolean;
   initialPrompt?: string | null;
@@ -36,9 +34,7 @@ export default function ChatPanel({
   app,
   appFiles,
   selectedFile,
-  dbStatus,
   onFilesUpdated,
-  onDbToggle,
   onRevert,
   canRevert,
   initialPrompt,
@@ -260,8 +256,8 @@ export default function ChatPanel({
       });
     }
 
-    // If the database is running, fetch and inject the live schema
-    if (dbStatus === 'running' && app.appType === 'fullstack') {
+    // If this is a fullstack app, fetch and inject the schema
+    if (app.appType === 'fullstack') {
       try {
         const schema = await window.deyad.dbDescribe(app.id);
         if (schema.tables.length > 0) {
@@ -270,7 +266,7 @@ export default function ChatPanel({
             .join('\n');
           ollamaMessages.push({
             role: 'system' as const,
-            content: `The database is running (PostgreSQL). Current schema:\n${schemaText}\n\nUse this schema when generating backend code, API routes, or Prisma queries.`,
+            content: `The database is SQLite (via Prisma). Current schema:\n${schemaText}\n\nUse this schema when generating backend code, API routes, or Prisma queries.`,
           });
         }
       } catch (err) {
@@ -454,7 +450,7 @@ User's instructions: ${text}`;
       appId: app.id,
       appType: app.appType,
       dbProvider: app.dbProvider,
-      dbStatus,
+      dbStatus: 'none',
       model: selectedModel,
       userMessage: text,
       appFiles,
@@ -578,18 +574,6 @@ User's instructions: ${text}`;
             <span className="token-counter" title="Estimated tokens in conversation">
               ~{tokenCount > 1000 ? `${(tokenCount / 1000).toFixed(1)}k` : tokenCount} tokens
             </span>
-          )}
-          {app.appType === 'fullstack' && (
-            <div className="db-status">
-              <span className={`db-indicator ${dbStatus}`}>
-                {dbStatus === 'running' ? 'DB Running' : dbStatus === 'stopped' ? 'DB Stopped' : ''}
-              </span>
-              {dbStatus !== 'none' && (
-                <button className={`btn-db ${dbStatus}`} onClick={onDbToggle}>
-                  {dbStatus === 'running' ? 'Stop' : 'Start'}
-                </button>
-              )}
-            </div>
           )}
           <button
             className={`btn-plan-mode ${planningMode ? 'active' : ''}`}

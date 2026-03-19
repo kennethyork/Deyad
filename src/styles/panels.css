@@ -733,6 +733,117 @@
   font-family: var(--font-mono);
 }
 
+/* SQLite table browser layout */
+.db-tables-view {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.db-browse-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.db-table-list {
+  width: 140px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.db-table-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.db-table-list-item:hover { background: var(--bg-hover); }
+.db-table-list-item.active {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-light);
+  font-weight: 600;
+}
+
+.db-table-data {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.db-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.db-row-count {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.db-data-scroll {
+  flex: 1;
+  overflow: auto;
+}
+
+.db-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.db-data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  padding: 4px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.db-data-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.db-data-table tr:hover td {
+  background: var(--bg-hover);
+}
+.db-data-table em {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.db-gui-placeholder code {
+  background: var(--bg-base);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
 /* ── Git Panel ──────────────────────────────────────────────────────── */
 
 .git-panel {

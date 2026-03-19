@@ -36,12 +36,9 @@ describe('App component', () => {
       readFiles: vi.fn().mockResolvedValue({}),
       writeFiles: vi.fn(),
       hasSnapshot: vi.fn().mockResolvedValue(false),
-      dbStatus: vi.fn().mockResolvedValue({ status: 'none' }),
-      onDbStatus: vi.fn().mockReturnValue(() => {}),
       onAppDevLog: vi.fn().mockReturnValue(() => {}),
       onAppDevStatus: vi.fn().mockReturnValue(() => {}),
       appDevStatus: vi.fn().mockResolvedValue({ status: 'stopped' }),
-      checkDocker: vi.fn(),
       getSettings: vi.fn().mockResolvedValue({ ollamaHost: '', defaultModel: '' }),
       listModels: vi.fn().mockResolvedValue({ models: [] }),
       andThen: undefined,
@@ -52,6 +49,10 @@ describe('App component', () => {
       onTerminalExit: vi.fn().mockReturnValue(() => {}),
       onTerminalClear: vi.fn().mockReturnValue(() => {}),
       terminalKill: vi.fn().mockResolvedValue(undefined),
+      dbTables: vi.fn().mockResolvedValue([]),
+      dbQuery: vi.fn().mockResolvedValue([]),
+      dbDescribe: vi.fn().mockResolvedValue({ tables: [] }),
+      listPlugins: vi.fn().mockResolvedValue([]),
       // other stubs may be needed but App won't call them in tests
     } as any;
   });

@@ -84,7 +84,7 @@ export interface AgentCallbacks {
 export interface AgentOptions {
   appId: string;
   appType: 'frontend' | 'fullstack';
-  dbProvider?: 'postgresql';
+  dbProvider?: 'sqlite';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;
   userMessage: string;
@@ -103,7 +103,7 @@ export interface AgentOptions {
 
 function getAgentSystemPrompt(appType: string, _dbProvider?: string): string {
   const stackInfo = appType === 'fullstack'
-    ? 'This is a full-stack project (React + Vite + TypeScript frontend, Express + Prisma backend, PostgreSQL database).'
+    ? 'This is a full-stack project (React + Vite + TypeScript frontend, Express + Prisma backend, SQLite database).'
     : 'This is a frontend project (React + Vite + TypeScript).';
 
   return `You are Deyad Agent, an autonomous AI developer powered by Ollama.
@@ -241,7 +241,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
       }
 
       // Inject DB schema if available
-      if (dbStatus === 'running' && appType === 'fullstack') {
+      if (appType === 'fullstack') {
         try {
           const schema = await window.deyad.dbDescribe(appId);
           if (schema.tables.length > 0) {

@@ -7,9 +7,8 @@
  * generateFullStackScaffold — a project with:
  *   - React + Vite  (frontend, port 5173)
  *   - Express       (backend API, port 3001)
- *   - PostgreSQL 16 (via Docker Compose)
+ *   - SQLite        (file-based database via Prisma)
  *   - Prisma ORM    (schema + client)
- *   - docker-compose.yml
  *   - README with startup instructions
  */
 
@@ -177,7 +176,7 @@ input:focus { border-color: #6366f1; }
   };
 }
 
-export type DbProvider = 'postgresql';
+export type DbProvider = 'sqlite';
 
 export interface ScaffoldOptions {
   appName: string;
@@ -186,14 +185,6 @@ export interface ScaffoldOptions {
   dbUser: string;
   /** If omitted a cryptographically random password is generated at scaffold time. */
   dbPassword: string;
-  /** Host port for the DB (mapped to container 5432). Auto-assigned if omitted. */
-  dbPort?: number;
-  /** Host port for the admin GUI (pgAdmin, mapped to container 80). Auto-assigned if omitted. */
-  guiPort?: number;
-  /** pgAdmin login email. Defaults to admin@admin.com. */
-  pgAdminEmail?: string;
-  /** pgAdmin login password. Defaults to admin. */
-  pgAdminPassword?: string;
 }
 
 /**
@@ -224,64 +215,8 @@ function sanitize(s: string): string {
 
 export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string, string> {
   const { appName, description } = opts;
-  const dbName = sanitize(opts.dbName || 'deyad_db');
-  const dbUser = sanitize(opts.dbUser || 'deyad_user');
-  const dbPassword = opts.dbPassword;
-  const hostDbPort = opts.dbPort ?? 5433;
-  const hostGuiPort = opts.guiPort ?? 5050;
-  const pgAdminEmail = opts.pgAdminEmail || 'admin@admin.com';
-  const pgAdminPassword = opts.pgAdminPassword || 'admin';
-
-  const dockerCompose = `version: '3.9'
-
-services:
-  postgres:
-    image: postgres:17
-    container_name: ${sanitize(appName)}_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${dbName}
-      POSTGRES_USER: ${dbUser}
-      POSTGRES_PASSWORD: ${dbPassword}
-    ports:
-      - '${hostDbPort}:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${dbUser} -d ${dbName}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: ${sanitize(appName)}_pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${pgAdminEmail}
-      PGADMIN_DEFAULT_PASSWORD: ${pgAdminPassword}
-      PGADMIN_CONFIG_WTF_CSRF_ENABLED: 'False'
-      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: 'False'
-      PGADMIN_CONFIG_WTF_CSRF_CHECK_DEFAULT: 'False'
-    ports:
-      - '${hostGuiPort}:80'
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-volumes:
-  postgres_data:
-`;
-
-  const dbPort = String(hostDbPort);
-  const dbProtocol = 'postgresql';
-  const prismaProvider = 'postgresql';
-  const dbLabel = 'PostgreSQL 16';
 
   return {
-    // ── Docker Compose ──────────────────────────────────────────────────
-    'docker-compose.yml': dockerCompose,
 
     // ── Backend: Express + Prisma ───────────────────────────────────────
     'backend/package.json': JSON.stringify(
@@ -338,11 +273,11 @@ volumes:
       2,
     ),
 
-    'backend/.env': `DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
+    'backend/.env': `DATABASE_URL="file:./dev.db"
 PORT=3001
 `,
 
-    'backend/.env.example': `DATABASE_URL="${dbProtocol}://USER:PASSWORD@localhost:${dbPort}/${dbName}"
+    'backend/.env.example': `DATABASE_URL="file:./dev.db"
 PORT=3001
 `,
 
@@ -354,7 +289,7 @@ generator client {
 }
 
 datasource db {
-  provider = "${prismaProvider}"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -690,28 +625,18 @@ ${description}
 |----------|-----------------------------|
 | Frontend | React 18 + Vite + TypeScript |
 | Backend  | Node.js + Express + TypeScript |
-| Database | ${dbLabel} (Docker)             |
+| Database | SQLite (file-based)          |
 | ORM      | Prisma                       |
 
 ## Getting Started
 
-### 1. Start the PostgreSQL database
-
-> Requires [Docker](https://www.docker.com/) to be installed.
-
-\`\`\`bash
-docker compose up -d
-\`\`\`
-
-You can also click **Start DB** inside Deyad.
-
-### 2. Set up the backend
+### 1. Set up the backend
 
 \`\`\`bash
 cd backend
 npm install
-# Run Prisma migrations
-npx prisma db push     # or: npx prisma migrate dev
+# Create the database and generate Prisma client
+npx prisma db push
 npx prisma generate
 # Start dev server
 npm run dev
@@ -719,7 +644,7 @@ npm run dev
 
 Backend runs at **http://localhost:3001**
 
-### 3. Set up the frontend
+### 2. Set up the frontend
 
 \`\`\`bash
 cd frontend
@@ -729,21 +654,10 @@ npm run dev
 
 Frontend runs at **http://localhost:5173**
 
-### 4. Open the database admin UI
+## Database
 
-pgAdmin is available at **http://localhost:${hostGuiPort}**
-
-Login with:
-- **Email:** ${pgAdminEmail}
-- **Password:** (your pgAdmin password from Settings)
-
-## Database connection
-
-Edit \`backend/.env\` to change the connection string:
-
-\`\`\`
-DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
-\`\`\`
+The database is a SQLite file at \`backend/prisma/dev.db\`. You can browse it in
+the **Database** tab inside Deyad, or open it with any SQLite client.
 
 ## Prisma
 

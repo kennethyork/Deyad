@@ -9,9 +9,7 @@ const fullApp = {
   description: '',
   createdAt: new Date().toISOString(),
   appType: 'fullstack' as const,
-  dbProvider: 'postgresql' as const,
-  dbPort: 15432,
-  guiPort: 15050,
+  dbProvider: 'sqlite' as const,
 };
 
 const simpleSchema = {
@@ -25,8 +23,11 @@ describe('DatabasePanel', () => {
   beforeEach(() => {
     (window as any).deyad = {
       dbDescribe: vi.fn().mockResolvedValue(simpleSchema),
-      portCheck: vi.fn().mockResolvedValue(true),
-      getSettings: vi.fn().mockResolvedValue({ pgAdminEmail: 'admin@admin.com', pgAdminPassword: 'admin' }),
+      dbTables: vi.fn().mockResolvedValue(['User', 'Post']),
+      dbQuery: vi.fn().mockResolvedValue([
+        { id: 1, name: 'Alice', email: 'alice@example.com' },
+        { id: 2, name: 'Bob', email: 'bob@example.com' },
+      ]),
     };
   });
 
@@ -36,32 +37,39 @@ describe('DatabasePanel', () => {
   });
 
   it('shows message for non-fullstack app', () => {
-    render(<DatabasePanel app={{ ...fullApp, appType: 'frontend' }} dbStatus="none" onDbToggle={vi.fn()} />);
+    render(<DatabasePanel app={{ ...fullApp, appType: 'frontend' }} />);
     expect(screen.getByText(/only for full-stack apps/i)).toBeTruthy();
   });
 
-  it('shows placeholder when DB stopped', () => {
-    render(<DatabasePanel app={fullApp} dbStatus="stopped" onDbToggle={vi.fn()} />);
-    expect(screen.getByText(/start the database/i)).toBeTruthy();
-  });
-
-  it('renders webview when DB is running', async () => {
-    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
+  it('shows table list from SQLite database', async () => {
+    render(<DatabasePanel app={fullApp} />);
     await waitFor(() => {
-      const webview = container.querySelector('webview');
-      expect(webview).toBeTruthy();
-      expect(webview?.getAttribute('src')).toContain('15050');
+      expect(screen.getAllByText('User').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Post').length).toBeGreaterThanOrEqual(1);
     });
   });
 
-  it('shows starting placeholder when port not ready', () => {
-    (window as any).deyad.portCheck = vi.fn().mockResolvedValue(false);
-    render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
-    expect(screen.getByText(/starting pgadmin/i)).toBeTruthy();
+  it('loads rows when a table is selected', async () => {
+    render(<DatabasePanel app={fullApp} />);
+    await waitFor(() => expect(screen.getAllByText('User').length).toBeGreaterThanOrEqual(1));
+    // First table is auto-selected, rows should load
+    await waitFor(() => {
+      expect(screen.getByText('Alice')).toBeTruthy();
+      expect(screen.getByText('Bob')).toBeTruthy();
+    });
+  });
+
+  it('shows placeholder when no database exists', async () => {
+    (window as any).deyad.dbTables = vi.fn().mockResolvedValue([]);
+    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [] });
+    render(<DatabasePanel app={fullApp} />);
+    await waitFor(() => {
+      expect(screen.getByText(/database not created yet/i)).toBeTruthy();
+    });
   });
 
   it('switches to schema view and shows tables', async () => {
-    const { container } = render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
+    const { container } = render(<DatabasePanel app={fullApp} />);
     const schemaBtn = container.querySelector('.db-toolbar-tab:nth-child(2)');
     fireEvent.click(schemaBtn!);
     expect(await screen.findByText('User')).toBeTruthy();

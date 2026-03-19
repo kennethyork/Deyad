@@ -17,7 +17,6 @@ import {
   deleteSnapshot as deleteSnapshotUtil,
 } from '../lib/mainUtils';
 import { gitInit, gitCommit } from './ipcGit';
-import { stopCompose } from './ipcDocker';
 
 const execFileAsync = promisify(execFile);
 
@@ -214,10 +213,7 @@ export function registerAppHandlers(
       appType: resolvedAppType,
     };
     if (resolvedAppType === 'fullstack') {
-      meta.dbProvider = 'postgresql';
-      const [dbPort, guiPort] = await allocateAppPorts(id);
-      meta.dbPort = dbPort;
-      meta.guiPort = guiPort;
+      meta.dbProvider = 'sqlite';
     }
     fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
     await gitInit(appDir, id);
@@ -277,7 +273,6 @@ export function registerAppHandlers(
       proc.kill();
       devProcesses.delete(appId);
     }
-    await stopCompose(appDir, appId).catch((err) => console.warn('stopCompose:', err));
     const dir = appDir(appId);
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
     deleteSnapshot(appId);
@@ -579,10 +574,7 @@ export function registerAppHandlers(
 
     const meta: Record<string, unknown> = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
     if (appType === 'fullstack') {
-      meta.dbProvider = 'postgresql';
-      const [dbPort, guiPort] = await allocateAppPorts(id);
-      meta.dbPort = dbPort;
-      meta.guiPort = guiPort;
+      meta.dbProvider = 'sqlite';
     }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
@@ -614,12 +606,6 @@ export function registerAppHandlers(
 
     // Write updated metadata with new name and timestamp
     const newMeta: Record<string, unknown> = { ...srcMeta, name: newName, createdAt: new Date().toISOString() };
-    // Reallocate ports for fullstack apps to avoid collisions
-    if (newMeta.appType === 'fullstack') {
-      const [dbPort, guiPort] = await allocateAppPorts(id);
-      newMeta.dbPort = dbPort;
-      newMeta.guiPort = guiPort;
-    }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(newMeta, null, 2));
 
     await gitInit(appDir, id);

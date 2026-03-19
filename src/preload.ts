@@ -18,7 +18,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export type DbProvider = 'postgresql';
+export type DbProvider = 'sqlite';
 export type AppType = 'frontend' | 'fullstack';
 
 export interface AppProject {
@@ -137,27 +137,12 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('apps:dev-status', handler);
   },
 
-  // ── Docker / Database ───────────────────────────────────────────────────
-  checkDocker: (): Promise<boolean> =>
-    ipcRenderer.invoke('docker:check'),
+  // ── Database (SQLite) ────────────────────────────────────────────────────
+  dbTables: (appId: string): Promise<string[]> =>
+    ipcRenderer.invoke('db:tables', appId),
 
-  dbStart: (appId: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('docker:db-start', appId),
-
-  dbStop: (appId: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('docker:db-stop', appId),
-
-  dbStatus: (appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }> =>
-    ipcRenderer.invoke('docker:db-status', appId),
-
-  portCheck: (port: number): Promise<boolean> =>
-    ipcRenderer.invoke('docker:port-check', port),
-
-  onDbStatus: (cb: (payload: { appId: string; status: string }) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; status: string }) => cb(payload);
-    ipcRenderer.on('docker:db-status', handler);
-    return () => ipcRenderer.removeListener('docker:db-status', handler);
-  },
+  dbQuery: (appId: string, sql: string): Promise<Record<string, unknown>[]> =>
+    ipcRenderer.invoke('db:query', { appId, sql }),
 
   dbDescribe: (appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }> =>
     ipcRenderer.invoke('db:describe', appId),

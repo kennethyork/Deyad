@@ -52,7 +52,6 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [appType, setAppType] = useState<AppType>('frontend');
-  const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [pluginTemplates, setPluginTemplates] = useState<Template[]>([]);
 
@@ -67,10 +66,6 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
       });
       setPluginTemplates(pts);
     }).catch((err) => console.warn('listPlugins:', err));
-  }, []);
-
-  useEffect(() => {
-    window.deyad.checkDocker().then(setDockerAvailable);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,9 +100,9 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                   <button
                     key={t.name}
                     type="button"
-                    className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''} ${t.appType === 'fullstack' && dockerAvailable === false ? 'disabled' : ''}`}
-                    onClick={() => !(t.appType === 'fullstack' && dockerAvailable === false) && selectTemplate(t)}
-                    title={t.appType === 'fullstack' && dockerAvailable === false ? 'Docker required' : t.description}
+                    className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''}`}
+                    onClick={() => selectTemplate(t)}
+                    title={t.description}
                   >
                     <span className="template-icon">{t.icon}</span>
                     <span className="template-name">{t.name}</span>
@@ -157,16 +152,12 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
 
               <button
                 type="button"
-                className={`type-card ${appType === 'fullstack' ? 'selected' : ''} ${dockerAvailable === false ? 'disabled' : ''}`}
-                onClick={() => dockerAvailable !== false && setAppType('fullstack')}
-                title={dockerAvailable === false ? 'Docker is required for full-stack apps' : ''}
+                className={`type-card ${appType === 'fullstack' ? 'selected' : ''}`}
+                onClick={() => setAppType('fullstack')}
               >
                 <span className="type-card-icon"></span>
                 <span className="type-card-title">Full Stack</span>
-                <span className="type-card-desc">React + Express + DB + Prisma</span>
-                {dockerAvailable === false && (
-                  <span className="type-card-warning">Docker required</span>
-                )}
+                <span className="type-card-desc">React + Express + SQLite + Prisma</span>
               </button>
             </div>
           </div>
@@ -177,14 +168,10 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
             <div className="stack-info">
               <p className="stack-info-title">What gets scaffolded automatically:</p>
               <ul>
-                <li><strong>docker-compose.yml</strong> — PostgreSQL 16 database</li>
-                <li><strong>backend/</strong> — Express API + Prisma ORM</li>
+                <li><strong>backend/</strong> — Express API + Prisma ORM + SQLite</li>
                 <li><strong>frontend/</strong> — React + Vite app (proxies to backend)</li>
                 <li><strong>README.md</strong> — Setup &amp; run instructions</li>
               </ul>
-              <p className="stack-info-db">
-                DB credentials will be randomly generated when you create the app. Check <code>backend/.env</code> after creation.
-              </p>
             </div>
           )}
 

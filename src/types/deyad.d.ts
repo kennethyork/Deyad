@@ -35,7 +35,7 @@ interface ChatMessage {
   content: string;
 }
 
-type DbProvider = 'postgresql';
+type DbProvider = 'sqlite';
 
 type AppType = 'frontend' | 'fullstack';
 
@@ -46,8 +46,6 @@ interface AppProject {
   createdAt: string;
   appType: AppType;
   dbProvider?: DbProvider;
-  dbPort?: number;
-  guiPort?: number;
 }
 
 interface UiMessage {
@@ -65,8 +63,6 @@ interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
-  pgAdminEmail: string;
-  pgAdminPassword: string;
   theme: 'dark' | 'light';
   temperature: number;
   topP: number;
@@ -127,13 +123,9 @@ interface DeyadAPI {
   onAppDevLog(cb: (payload: { appId: string; data: string }) => void): () => void;
   onAppDevStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
-  // Docker / Database
-  checkDocker(): Promise<boolean>;
-  dbStart(appId: string): Promise<{ success: boolean; error?: string }>;
-  dbStop(appId: string): Promise<{ success: boolean; error?: string }>;
-  dbStatus(appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }>;
-  portCheck(port: number): Promise<boolean>;
-  onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
+  // Database (SQLite)
+  dbTables(appId: string): Promise<string[]>;
+  dbQuery(appId: string, sql: string): Promise<Record<string, unknown>[]>;
 
   // Settings
   getSettings(): Promise<DeyadSettings>;

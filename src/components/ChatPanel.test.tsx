@@ -21,7 +21,7 @@ beforeEach(()=>{
 
 describe('ChatPanel',()=>{
   it('renders and sends message',async()=>{
-    const {getByPlaceholderText,container} = render(<ChatPanel app={dummyApp} appFiles={{}} dbStatus="none" onFilesUpdated={vi.fn()} onDbToggle={vi.fn()} onRevert={vi.fn()} canRevert={false} />);
+    const {getByPlaceholderText,container} = render(<ChatPanel app={dummyApp} appFiles={{}} onFilesUpdated={vi.fn()} onRevert={vi.fn()} canRevert={false} />);
     // Wait for models to load so selectedModel is set
     await waitFor(()=>{
       const select = container.querySelector('.model-select') as HTMLSelectElement;
