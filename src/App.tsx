@@ -20,6 +20,7 @@ import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import CommandPalette from './components/CommandPalette';
 import type { Command } from './components/CommandPalette';
+import { ToastProvider, useToast } from './components/ToastContainer';
 import { taskQueue } from './lib/taskQueue';
 
 export interface AppProject {
@@ -59,6 +60,15 @@ const defaultPerAppState: PerAppState = {
 };
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
+  );
+}
+
+function AppInner() {
+  const { addToast } = useToast();
   const [apps, setApps] = useState<AppProject[]>([]);
   const [selectedApp, setSelectedApp] = useState<AppProject | null>(null);
   const [perApp, setPerApp] = useState<Record<string, PerAppState>>({});
@@ -387,6 +397,7 @@ export default function App() {
     }
 
     await selectApp({ ...app });
+    addToast('success', `Created ${appType} app "${name}"`);
   };
 
   const handleImportApp = async (name: string) => {
@@ -396,10 +407,11 @@ export default function App() {
       if (app) {
         await loadApps();
         await selectApp(app);
+        addToast('success', `Imported "${name}"`);
       }
     } catch (err) {
       console.error('Import failed:', err);
-      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      addToast('error', `Import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -418,6 +430,7 @@ export default function App() {
     });
     setOpenedApps(prev => prev.filter(id => id !== appId));
     await loadApps();
+    addToast('success', 'App deleted');
   };
 
   const handleRenameApp = useCallback(async (appId: string, newName: string) => {
@@ -426,6 +439,7 @@ export default function App() {
     if (selectedApp?.id === appId) {
       setSelectedApp((prev) => prev ? { ...prev, name: newName } : prev);
     }
+    addToast('success', `Renamed to "${newName}"`);
   }, [selectedApp]);
 
   const handleDuplicateApp = async (appId: string) => {
@@ -433,6 +447,7 @@ export default function App() {
     if (app) {
       await loadApps();
       await selectApp(app as AppProject);
+      addToast('success', 'App duplicated');
     }
   };
 
@@ -446,13 +461,15 @@ export default function App() {
         updatePerApp(appId, { dbStatus: 'stopped' });
         const result = await window.deyad.dbStop(appId);
         if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
+        else addToast('info', 'Database stopped');
       } else {
         updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
         const result = await window.deyad.dbStart(appId);
         if (result.success) {
           updatePerApp(appId, { dbStatus: 'running' });
+          addToast('success', 'Database started');
         } else {
-          alert(`Failed to start database:\n${result.error}`);
+          addToast('error', `Failed to start database: ${result.error}`);
         }
       }
     } finally {
@@ -466,6 +483,7 @@ export default function App() {
       const files = await window.deyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files, selectedFile: null, canRevert: false });
       setPreviewRefreshKey(k => k + 1);
+      addToast('success', 'Changes reverted');
     }
   }, [updatePerApp]);
 
@@ -479,8 +497,10 @@ export default function App() {
     const result = await window.deyad.exportApp(appId, mobile ? 'mobile' : 'zip');
     if (result.success && result.path) {
       setExportResult(`${mobile ? 'Mobile export created at' : 'Exported to'} ${result.path}`);
+      addToast('success', mobile ? 'Mobile export created' : 'Exported as ZIP');
     } else if (!result.success && result.error !== 'Cancelled') {
       setExportResult(`Export failed: ${result.error}`);
+      addToast('error', `Export failed: ${result.error}`);
     }
   };
 

@@ -169,6 +169,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
   // Local edit state
   const [editContent, setEditContent] = useState<string>('');
   const [isDirty, setIsDirty] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const isDirtyRef = useRef(false);
   const handleSaveRef = useRef<() => void>(() => {});
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null);
@@ -188,8 +189,11 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     if (selectedFile && editorRef.current) {
       const value = editorRef.current.getValue();
       if (value !== (filesRef.current[selectedFile] ?? '')) {
+        setSaveState('saving');
         onFileEdit(selectedFile, value);
         setIsDirty(false);
+        setTimeout(() => setSaveState('saved'), 150);
+        setTimeout(() => setSaveState('idle'), 2000);
       }
     }
   }, [selectedFile, onFileEdit]);
@@ -428,6 +432,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
               >
                 {isDirty ? '● Save' : '✓ Saved'}
               </button>
+              {saveState === 'saving' && <span className="save-indicator saving">Saving…</span>}
+              {saveState === 'saved' && <span className="save-indicator saved">✓ Auto-saved</span>}
             </div>
             <Editor
               theme="vs-dark"
