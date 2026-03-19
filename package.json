@@ -1,7 +1,7 @@
 {
   "name": "deyad",
   "productName": "Deyad",
-  "version": "1.4.26",
+  "version": "1.4.27",
   "description": "Local AI app builder powered by Ollama models",
   "repository": {
     "type": "git",

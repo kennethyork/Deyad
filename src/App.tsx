@@ -376,10 +376,15 @@ export default function App() {
 
   const handleImportApp = async (name: string) => {
     setShowImportModal(false);
-    const app = await window.deyad.importApp(name);
-    if (app) {
-      await loadApps();
-      await selectApp(app);
+    try {
+      const app = await window.deyad.importApp(name);
+      if (app) {
+        await loadApps();
+        await selectApp(app);
+      }
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

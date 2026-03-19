@@ -554,22 +554,36 @@ export function registerAppHandlers(
     const isFullStack = fs.existsSync(path.join(srcDir, 'backend')) && fs.existsSync(path.join(srcDir, 'frontend'));
     const appType = isFullStack ? 'fullstack' : 'frontend';
 
-    const copyDir = (src: string, dest: string) => {
-      for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-        if (entry.name === 'node_modules' || entry.name === '.git') continue;
-        const srcPath = path.join(src, entry.name);
-        const destPath = path.join(dest, entry.name);
-        if (entry.isDirectory()) {
-          fs.mkdirSync(destPath, { recursive: true });
-          copyDir(srcPath, destPath);
-        } else {
-          fs.copyFileSync(srcPath, destPath);
+    const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.vite', '.next', '__pycache__', 'build']);
+    // Disable Electron ASAR interception so .asar files copy as regular files
+    const prevNoAsar = process.noAsar;
+    process.noAsar = true;
+    try {
+      const copyDir = (src: string, dest: string) => {
+        for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+          if (SKIP_DIRS.has(entry.name)) continue;
+          const srcPath = path.join(src, entry.name);
+          const destPath = path.join(dest, entry.name);
+          if (entry.isDirectory()) {
+            fs.mkdirSync(destPath, { recursive: true });
+            copyDir(srcPath, destPath);
+          } else if (entry.isFile()) {
+            try { fs.copyFileSync(srcPath, destPath); } catch { /* skip unreadable files */ }
+          }
         }
-      }
-    };
-    copyDir(srcDir, destDir);
+      };
+      copyDir(srcDir, destDir);
+    } finally {
+      process.noAsar = prevNoAsar;
+    }
 
-    const meta = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
+    const meta: Record<string, unknown> = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
+    if (appType === 'fullstack') {
+      meta.dbProvider = 'postgresql';
+      const [dbPort, guiPort] = await allocateAppPorts(id);
+      meta.dbPort = dbPort;
+      meta.guiPort = guiPort;
+    }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
     await gitInit(appDir, id);
