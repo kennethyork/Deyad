@@ -7,9 +7,9 @@
 ![SQLite](https://img.shields.io/badge/SQLite-Prisma-003B57?logo=sqlite&logoColor=white)
 ![MIT](https://img.shields.io/badge/License-MIT-green)
 
-**The open-source, local-first AI app builder.** Describe what you want, get a working app — frontend or full-stack — without sending a single byte to the cloud.
+**The open-source, local-first AI app builder.** Describe what you want, get a working app — frontend, full-stack, or backend — without sending a single byte to the cloud.
 
-Deyad runs [Ollama](https://ollama.ai) on your machine for AI inference, scaffolds real production stacks (React + Express + SQLite + Prisma), and gives you a complete IDE with live preview, terminal, database browser, version history, and one-click deployment.
+Deyad runs [Ollama](https://ollama.ai) on your machine for AI inference, scaffolds 5 production stacks (React, Express + SQLite + Prisma, Next.js 14, Python/FastAPI, Go/Chi), and gives you a complete IDE with live preview, terminal, database browser, version history, OAuth deploy, and a plugin system.
 
 **Your data stays on your machine. No API keys. No subscriptions. No token limits.**
 
@@ -40,6 +40,7 @@ You describe your app in chat
 | Your data stays on your machine | **Yes** | No | No | No | No | No |
 | No API key / account required | **Yes** | No | No | No | No | No |
 | Open source | **Yes** | No | No | No | No | No |
+| Multi-stack scaffolds (5 stacks) | **Yes** | No | No | No | No | No |
 | Full-stack with real database | **Yes** | No | Partial | No | Partial | No |
 | Zero-config database (SQLite) | **Yes** | No | No | No | No | No |
 | Autonomous agent (multi-step) | **Yes** | Partial | Partial | Yes | Partial | No |
@@ -55,11 +56,12 @@ You describe your app in chat
 | Image → Code (vision models) | **Yes** | Yes | Yes | Yes | No | Yes |
 | Live preview | **Yes** | Yes | Yes | No | Yes | Yes |
 | Integrated terminal | **Yes** | Partial | No | Yes | No | No |
-| Deploy (7 targets incl. VPS) | **Yes** | Yes | Yes | No | Yes | Vercel only |
+| Deploy (7 targets + OAuth) | **Yes** | Yes | Yes | No | Yes | Vercel only |
+| One-click OAuth deploy | **Yes** | Yes | Yes | No | No | Vercel only |
 | Desktop app packaging (Electron) | **Yes** | No | No | No | No | No |
 | Built-in Ollama in packaged apps | **Yes** | No | No | No | No | No |
 | Mobile preview (Capacitor) | **Yes** | No | No | No | No | No |
-| Plugin system | **Yes** | No | No | Yes | No | No |
+| Plugin API (tools/agents/themes) | **Yes** | No | No | Yes | No | No |
 | Works without internet | **Yes** | No | No | No | No | No |
 
 > **Why Ollama-only matters:** Every other AI app builder sends your code and prompts to a cloud API — you pay per token, you need an account, and your proprietary code leaves your machine. Deyad runs inference entirely on your hardware via Ollama. **Zero cloud dependency. Zero cost. Zero data leakage.**
@@ -114,17 +116,19 @@ You describe your app in chat
 
 ### Deployment
 
-Deploy to 7 targets directly from the app:
+Deploy to 7 targets directly from the app, with **one-click OAuth** for Vercel and Netlify:
 
-| Provider | Type | Pricing |
-| --- | --- | --- |
-| **Vercel** | Frontend & full-stack | Free tier |
-| **Netlify** | Frontend & full-stack | Free tier |
-| **Surge** | Static sites | Free |
-| **Railway** | Full-stack with database | Usage-based |
-| **Fly.io** | Container-based | Free tier |
-| **VPS (SSH + rsync)** | Any Linux server via SSH | Your own server |
-| **Electron Desktop** | Standalone desktop app (Linux/Win/Mac) | Free |
+| Provider | Type | Auth | Pricing |
+| --- | --- | --- | --- |
+| **Vercel** | Frontend & full-stack | **OAuth token** or CLI | Free tier |
+| **Netlify** | Frontend & full-stack | **OAuth token** or CLI | Free tier |
+| **Surge** | Static sites | CLI | Free |
+| **Railway** | Full-stack with database | CLI | Usage-based |
+| **Fly.io** | Container-based | CLI | Free tier |
+| **VPS (SSH + rsync)** | Any Linux server via SSH | SSH key | Your own server |
+| **Electron Desktop** | Standalone desktop app (Linux/Win/Mac) | — | Free |
+
+- **OAuth deploy** — paste your Vercel or Netlify token, click Deploy. No CLI install needed. Token stored locally with `0600` permissions.
 
 - **VPS deploy** — build your frontend and rsync the dist to any Linux server over SSH
   - Configure user, host, remote path, and SSH port from the UI
@@ -140,15 +144,32 @@ Deploy to 7 targets directly from the app:
 - **ZIP export** — download your project as an archive
 - **PWA export** — mobile-ready with Web App Manifest
 
+### Project Stacks
+
+Create apps in 5 production-ready stacks:
+
+| Stack | What you get |
+| --- | --- |
+| **Frontend** | React + Vite + TypeScript |
+| **Full Stack** | React + Express + SQLite + Prisma |
+| **Next.js** | Next.js 14 App Router + API routes + TypeScript |
+| **Python** | FastAPI + SQLModel + uvicorn + SQLite |
+| **Go** | Go + Chi v5 + modernc.org/sqlite |
+
 ### Templates
 
 Start from a template or go blank:
 
 - Todo App · Dashboard · Landing Page · Chat UI · Blog · E-commerce
 
-### Plugins
+### Plugin API
 
-Drop custom templates into the `plugins/` directory with a `plugin.json` manifest. Auto-discovered on startup.
+Extend Deyad with custom tools, agents, and themes. Drop a folder into `plugins/` with a `plugin.json` manifest:
+
+- **Custom tools** — add new agent tools the AI can call
+- **Custom agents** — define specialized AI personas with their own system prompts and models
+- **Custom themes** — load CSS themes from plugins
+- Auto-discovered on startup, invokable from the renderer via `window.deyad.pluginInvokeTool()`, `pluginListAgents()`, `pluginListThemes()`
 
 ---
 
@@ -162,12 +183,17 @@ Drop custom templates into the `plugins/` directory with a `plugin.json` manifes
 | Terminal | xterm.js + node-pty |
 | AI | Ollama (any local model) |
 | Frontend scaffold | React + Vite + TypeScript |
-| Backend scaffold | Node.js + Express + TypeScript |
+| Full-stack scaffold | Node.js + Express + TypeScript |
+| Next.js scaffold | Next.js 14 App Router + API routes |
+| Python scaffold | FastAPI + SQLModel + uvicorn |
+| Go scaffold | Go + Chi v5 + modernc.org/sqlite |
 | Database | SQLite (file-based, zero-config) |
-| ORM | Prisma |
+| ORM | Prisma (JS/TS), SQLModel (Python), modernc (Go) |
 | DB Browser | Built-in SQLite table browser |
 | Version control | Git (auto-commit + GitHub push/pull/branches) |
 | Desktop deploy | Electron Builder (AppImage/exe/DMG) |
+| Deploy auth | OAuth tokens (Vercel, Netlify) + CLI fallback |
+| Plugins | Custom tools, agents, and themes via plugin.json |
 | Testing | Vitest |
 
 ---
@@ -328,7 +354,7 @@ On first launch, the **Welcome Wizard** walks you through connecting to Ollama a
 
 ## Usage
 
-1. **Create an app** — click **+ New App**, pick a template or start blank, choose Frontend or Full-Stack
+1. **Create an app** — click **+ New App**, pick a template or start blank, choose from 5 stacks (Frontend, Full-Stack, Next.js, Python, Go)
 2. **Chat** — describe what you want in natural language. The agent reads your code, writes files, runs commands, and iterates autonomously.
 3. **Edit** — use the built-in Monaco editor to make manual changes
 4. **Preview** — click Run to start the Vite dev server and see your app live
