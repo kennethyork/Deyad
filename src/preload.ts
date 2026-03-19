@@ -19,7 +19,7 @@ export interface ChatMessage {
 }
 
 export type DbProvider = 'sqlite';
-export type AppType = 'frontend' | 'fullstack';
+export type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
 
 export interface AppProject {
   id: string;
@@ -227,6 +227,18 @@ contextBridge.exposeInMainWorld('deyad', {
   deployVps: (appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }): Promise<{ success: boolean; url?: string; error?: string }> =>
     ipcRenderer.invoke('apps:deploy-vps', appId, opts),
 
+  deployOAuth: (appId: string, provider: 'vercel' | 'netlify', token: string): Promise<{ success: boolean; url?: string; error?: string }> =>
+    ipcRenderer.invoke('apps:deploy-oauth', appId, provider, token),
+
+  deployTokenGet: (provider: 'vercel' | 'netlify'): Promise<string | null> =>
+    ipcRenderer.invoke('apps:deploy-token-get', provider),
+
+  deployTokenSet: (provider: 'vercel' | 'netlify', token: string): Promise<boolean> =>
+    ipcRenderer.invoke('apps:deploy-token-set', provider, token),
+
+  deployTokenClear: (provider: 'vercel' | 'netlify'): Promise<boolean> =>
+    ipcRenderer.invoke('apps:deploy-token-clear', provider),
+
   onDeployLog: (cb: (payload: { appId: string; data: string }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; data: string }) => cb(payload);
     ipcRenderer.on('apps:deploy-log', handler);
@@ -235,6 +247,15 @@ contextBridge.exposeInMainWorld('deyad', {
 
   // Plugins
   listPlugins: (): Promise<PluginManifest[]> => ipcRenderer.invoke('plugins:list'),
+
+  pluginInvokeTool: (toolName: string, params: Record<string, unknown>): Promise<string> =>
+    ipcRenderer.invoke('plugins:invoke-tool', { toolName, params }),
+
+  pluginListThemes: (): Promise<Array<{ name: string; css: string }>> =>
+    ipcRenderer.invoke('plugins:list-themes'),
+
+  pluginListAgents: (): Promise<Array<{ name: string; description: string; systemPrompt: string; model?: string }>> =>
+    ipcRenderer.invoke('plugins:list-agents'),
 
   // ── Git ────────────────────────────────────────────────────────────────
   gitCommitAgent: (appId: string, message: string): Promise<{ success: boolean; output?: string; error?: string }> =>

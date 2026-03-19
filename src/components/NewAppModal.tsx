@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-type AppType = 'frontend' | 'fullstack';
+type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
 
 interface Props {
   onClose: () => void;
@@ -108,6 +108,9 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                     <span className="template-name">{t.name}</span>
                     <span className="template-desc">{t.description}</span>
                     {t.appType === 'fullstack' && <span className="template-badge">Full Stack</span>}
+                    {t.appType === 'nextjs' && <span className="template-badge">Next.js</span>}
+                    {t.appType === 'python' && <span className="template-badge">Python</span>}
+                    {t.appType === 'go' && <span className="template-badge">Go</span>}
                   </button>
                 ))}
               </div>
@@ -159,6 +162,36 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                 <span className="type-card-title">Full Stack</span>
                 <span className="type-card-desc">React + Express + SQLite + Prisma</span>
               </button>
+
+              <button
+                type="button"
+                className={`type-card ${appType === 'nextjs' ? 'selected' : ''}`}
+                onClick={() => setAppType('nextjs')}
+              >
+                <span className="type-card-icon">▲</span>
+                <span className="type-card-title">Next.js</span>
+                <span className="type-card-desc">Next.js 14 + App Router + TypeScript</span>
+              </button>
+
+              <button
+                type="button"
+                className={`type-card ${appType === 'python' ? 'selected' : ''}`}
+                onClick={() => setAppType('python')}
+              >
+                <span className="type-card-icon">🐍</span>
+                <span className="type-card-title">Python</span>
+                <span className="type-card-desc">FastAPI + SQLite + SQLModel</span>
+              </button>
+
+              <button
+                type="button"
+                className={`type-card ${appType === 'go' ? 'selected' : ''}`}
+                onClick={() => setAppType('go')}
+              >
+                <span className="type-card-icon">🔷</span>
+                <span className="type-card-title">Go</span>
+                <span className="type-card-desc">Go + Chi router + SQLite</span>
+              </button>
             </div>
           </div>
 
@@ -170,6 +203,39 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
               <ul>
                 <li><strong>backend/</strong> — Express API + Prisma ORM + SQLite</li>
                 <li><strong>frontend/</strong> — React + Vite app (proxies to backend)</li>
+                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
+              </ul>
+            </div>
+          )}
+
+          {appType === 'nextjs' && (
+            <div className="stack-info">
+              <p className="stack-info-title">What gets scaffolded automatically:</p>
+              <ul>
+                <li><strong>src/app/</strong> — Next.js App Router pages &amp; layouts</li>
+                <li><strong>src/app/api/</strong> — API routes (serverless)</li>
+                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
+              </ul>
+            </div>
+          )}
+
+          {appType === 'python' && (
+            <div className="stack-info">
+              <p className="stack-info-title">What gets scaffolded automatically:</p>
+              <ul>
+                <li><strong>main.py</strong> — FastAPI app with SQLite via SQLModel</li>
+                <li><strong>requirements.txt</strong> — Python dependencies</li>
+                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
+              </ul>
+            </div>
+          )}
+
+          {appType === 'go' && (
+            <div className="stack-info">
+              <p className="stack-info-title">What gets scaffolded automatically:</p>
+              <ul>
+                <li><strong>main.go</strong> — Go + Chi router with SQLite</li>
+                <li><strong>go.mod</strong> — Go module dependencies</li>
                 <li><strong>README.md</strong> — Setup &amp; run instructions</li>
               </ul>
             </div>

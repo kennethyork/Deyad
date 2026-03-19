@@ -18,13 +18,31 @@ interface PluginTemplate {
   name: string;
   description: string;
   icon: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   prompt: string;
+}
+interface PluginAgentTool {
+  name: string;
+  description: string;
+  parameters: Record<string, string>;
+}
+interface PluginAgent {
+  name: string;
+  description: string;
+  systemPrompt: string;
+  model?: string;
+}
+interface PluginTheme {
+  name: string;
+  css: string;
 }
 interface PluginManifest {
   name: string;
   description?: string;
   templates?: PluginTemplate[];
+  agentTools?: PluginAgentTool[];
+  agents?: PluginAgent[];
+  themes?: PluginTheme[];
 }
 
 let loadedPlugins: PluginManifest[] = [];
@@ -75,6 +93,36 @@ export function registerSettingsHandlers(
   // ── Plugins ───────────────────────────────────────────────────────────────
 
   ipcMain.handle('plugins:list', () => loadedPlugins);
+
+  ipcMain.handle('plugins:invoke-tool', (_event, toolName: string, params: Record<string, unknown>) => {
+    for (const plugin of loadedPlugins) {
+      const tool = plugin.agentTools?.find(t => t.name === toolName);
+      if (tool) {
+        return { success: true, plugin: plugin.name, tool: tool.name, params };
+      }
+    }
+    return { success: false, error: `Tool "${toolName}" not found in any plugin` };
+  });
+
+  ipcMain.handle('plugins:list-themes', () => {
+    const themes: Array<{ plugin: string; name: string; css: string }> = [];
+    for (const plugin of loadedPlugins) {
+      for (const theme of plugin.themes ?? []) {
+        themes.push({ plugin: plugin.name, name: theme.name, css: theme.css });
+      }
+    }
+    return themes;
+  });
+
+  ipcMain.handle('plugins:list-agents', () => {
+    const agents: Array<{ plugin: string; name: string; description: string; systemPrompt: string; model?: string }> = [];
+    for (const plugin of loadedPlugins) {
+      for (const agent of plugin.agents ?? []) {
+        agents.push({ plugin: plugin.name, ...agent });
+      }
+    }
+    return agents;
+  });
 
   // ── Package Manager ───────────────────────────────────────────────────────
 

@@ -8,7 +8,8 @@ import os from 'node:os';
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
-  BrowserWindow: { fromWebContents: vi.fn(() => ({ webContents: { send: vi.fn() } })) },
+  BrowserWindow: { fromWebContents: vi.fn(() => ({ webContents: { send: vi.fn() } })), getAllWindows: vi.fn(() => []) },
+  app: { getPath: vi.fn(() => os.tmpdir()) },
 }));
 
 // Capture handlers registered via ipcMain.handle

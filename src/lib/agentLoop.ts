@@ -83,7 +83,7 @@ export interface AgentCallbacks {
 
 export interface AgentOptions {
   appId: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   dbProvider?: 'sqlite';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;

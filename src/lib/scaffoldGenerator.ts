@@ -674,3 +674,412 @@ npx prisma studio
 `,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Next.js scaffold
+// ═══════════════════════════════════════════════════════════════════════
+
+export function generateNextJsScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
+  const { appName, description } = opts;
+  const safeName = appName.toLowerCase().replace(/[^a-z0-9-_.]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  return {
+    'package.json': JSON.stringify(
+      {
+        name: safeName,
+        version: '0.0.1',
+        description,
+        private: true,
+        scripts: {
+          dev: 'next dev',
+          build: 'next build',
+          start: 'next start',
+          lint: 'next lint',
+        },
+        dependencies: {
+          next: '^14.2.0',
+          react: '^18.3.1',
+          'react-dom': '^18.3.1',
+        },
+        devDependencies: {
+          '@types/node': '^20.14.0',
+          '@types/react': '^18.3.11',
+          '@types/react-dom': '^18.3.1',
+          typescript: '^5.4.5',
+        },
+      },
+      null,
+      2,
+    ),
+
+    'tsconfig.json': JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2017',
+          lib: ['dom', 'dom.iterable', 'esnext'],
+          allowJs: true,
+          skipLibCheck: true,
+          strict: true,
+          noEmit: true,
+          esModuleInterop: true,
+          module: 'esnext',
+          moduleResolution: 'bundler',
+          resolveJsonModule: true,
+          isolatedModules: true,
+          jsx: 'preserve',
+          incremental: true,
+          plugins: [{ name: 'next' }],
+          paths: { '@/*': ['./src/*'] },
+        },
+        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
+        exclude: ['node_modules'],
+      },
+      null,
+      2,
+    ),
+
+    'next.config.mjs': `/** @type {import('next').NextConfig} */
+const nextConfig = {};
+export default nextConfig;
+`,
+
+    'src/app/layout.tsx': `import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: '${appName}',
+  description: '${description}',
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+`,
+
+    'src/app/globals.css': `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+  min-height: 100vh;
+}
+`,
+
+    'src/app/page.tsx': `export default function Home() {
+  return (
+    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1rem', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>✨ ${appName}</h1>
+      <p style={{ color: '#94a3b8', marginTop: '0.5rem' }}>${description}</p>
+      <p style={{ color: '#64748b', marginTop: '2rem', fontSize: '0.875rem' }}>
+        Chat with the AI to build your app →
+      </p>
+    </main>
+  );
+}
+`,
+
+    'src/app/api/hello/route.ts': `import { NextResponse } from 'next/server';
+
+export async function GET() {
+  return NextResponse.json({ message: 'Hello from ${appName}!' });
+}
+`,
+
+    'README.md': `# ${appName}
+
+${description}
+
+## Stack
+
+| Layer    | Technology            |
+|----------|-----------------------|
+| Framework | Next.js 14 (App Router) |
+| Language  | TypeScript            |
+| UI        | React 18              |
+
+## Getting Started
+
+\\\`\\\`\\\`bash
+npm install
+npm run dev
+\\\`\\\`\\\`
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+`,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Python / FastAPI scaffold
+// ═══════════════════════════════════════════════════════════════════════
+
+export function generatePythonScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
+  const { appName, description } = opts;
+  const safeName = appName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+
+  return {
+    'requirements.txt': `fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+sqlmodel>=0.0.19
+`,
+
+    'main.py': `"""${appName} — ${description}"""
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import Field, Session, SQLModel, create_engine, select
+
+# ── Database ────────────────────────────────────────────────────────────
+DATABASE_URL = "sqlite:///./data.db"
+engine = create_engine(DATABASE_URL, echo=False)
+
+
+class Item(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    done: bool = False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SQLModel.metadata.create_all(engine)
+    yield
+
+
+# ── App ─────────────────────────────────────────────────────────────────
+app = FastAPI(title="${appName}", description="${description}", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/")
+def root():
+    return {"message": "Hello from ${appName}!"}
+
+
+@app.get("/items")
+def list_items():
+    with Session(engine) as session:
+        return session.exec(select(Item)).all()
+
+
+@app.post("/items", status_code=201)
+def create_item(item: Item):
+    with Session(engine) as session:
+        session.add(item)
+        session.commit()
+        session.refresh(item)
+        return item
+
+
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    with Session(engine) as session:
+        item = session.get(Item, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        session.delete(item)
+        session.commit()
+        return {"deleted": True}
+`,
+
+    '.gitignore': `__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.venv/
+data.db
+`,
+
+    'README.md': `# ${appName}
+
+${description}
+
+## Stack
+
+| Layer     | Technology          |
+|-----------|---------------------|
+| Framework | FastAPI             |
+| Language  | Python 3.11+        |
+| Database  | SQLite (via SQLModel)|
+| Server    | Uvicorn             |
+
+## Getting Started
+
+\\\`\\\`\\\`bash
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\\\\Scripts\\\\activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+\\\`\\\`\\\`
+
+API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
+`,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Go scaffold
+// ═══════════════════════════════════════════════════════════════════════
+
+export function generateGoScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
+  const { appName, description } = opts;
+  const safeName = appName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  return {
+    'go.mod': `module ${safeName}
+
+go 1.22
+
+require github.com/go-chi/chi/v5 v5.0.12
+`,
+
+    'main.go': `package main
+
+import (
+\t"database/sql"
+\t"encoding/json"
+\t"log"
+\t"net/http"
+\t"strconv"
+
+\t"github.com/go-chi/chi/v5"
+\t"github.com/go-chi/chi/v5/middleware"
+\t_ "modernc.org/sqlite"
+)
+
+// ${appName} — ${description}
+
+var db *sql.DB
+
+type Item struct {
+\tID   int64  \`json:"id"\`
+\tName string \`json:"name"\`
+\tDone bool   \`json:"done"\`
+}
+
+func main() {
+\tvar err error
+\tdb, err = sql.Open("sqlite", "./data.db")
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
+\tdefer db.Close()
+
+\t_, err = db.Exec(\`CREATE TABLE IF NOT EXISTS items (
+\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,
+\t\tname TEXT NOT NULL,
+\t\tdone BOOLEAN DEFAULT FALSE
+\t)\`)
+\tif err != nil {
+\t\tlog.Fatal(err)
+\t}
+
+\tr := chi.NewRouter()
+\tr.Use(middleware.Logger)
+\tr.Use(middleware.Recoverer)
+
+\tr.Get("/", func(w http.ResponseWriter, r *http.Request) {
+\t\tjson.NewEncoder(w).Encode(map[string]string{"message": "Hello from ${appName}!"})
+\t})
+
+\tr.Get("/items", listItems)
+\tr.Post("/items", createItem)
+\tr.Delete("/items/{id}", deleteItem)
+
+\tlog.Println("Listening on :8080")
+\tlog.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func listItems(w http.ResponseWriter, r *http.Request) {
+\trows, err := db.Query("SELECT id, name, done FROM items")
+\tif err != nil {
+\t\thttp.Error(w, err.Error(), 500)
+\t\treturn
+\t}
+\tdefer rows.Close()
+
+\titems := []Item{}
+\tfor rows.Next() {
+\t\tvar it Item
+\t\tif err := rows.Scan(&it.ID, &it.Name, &it.Done); err != nil {
+\t\t\thttp.Error(w, err.Error(), 500)
+\t\t\treturn
+\t\t}
+\t\titems = append(items, it)
+\t}
+\tjson.NewEncoder(w).Encode(items)
+}
+
+func createItem(w http.ResponseWriter, r *http.Request) {
+\tvar it Item
+\tif err := json.NewDecoder(r.Body).Decode(&it); err != nil {
+\t\thttp.Error(w, "Invalid JSON", 400)
+\t\treturn
+\t}
+\tresult, err := db.Exec("INSERT INTO items (name, done) VALUES (?, ?)", it.Name, it.Done)
+\tif err != nil {
+\t\thttp.Error(w, err.Error(), 500)
+\t\treturn
+\t}
+\tid, _ := result.LastInsertId()
+\tit.ID = id
+\tw.WriteHeader(201)
+\tjson.NewEncoder(w).Encode(it)
+}
+
+func deleteItem(w http.ResponseWriter, r *http.Request) {
+\tidStr := chi.URLParam(r, "id")
+\tid, err := strconv.ParseInt(idStr, 10, 64)
+\tif err != nil {
+\t\thttp.Error(w, "Invalid ID", 400)
+\t\treturn
+\t}
+\t_, err = db.Exec("DELETE FROM items WHERE id = ?", id)
+\tif err != nil {
+\t\thttp.Error(w, err.Error(), 500)
+\t\treturn
+\t}
+\tjson.NewEncoder(w).Encode(map[string]bool{"deleted": true})
+}
+`,
+
+    '.gitignore': `data.db
+${safeName}
+`,
+
+    'README.md': `# ${appName}
+
+${description}
+
+## Stack
+
+| Layer     | Technology            |
+|-----------|-----------------------|
+| Language  | Go 1.22+              |
+| Router    | Chi v5                |
+| Database  | SQLite (modernc.org)  |
+
+## Getting Started
+
+\\\`\\\`\\\`bash
+go mod tidy
+go run .
+\\\`\\\`\\\`
+
+Server runs at [http://localhost:8080](http://localhost:8080)
+`,
+  };
+}

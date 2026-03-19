@@ -1,12 +1,14 @@
 /**
  * Deploy IPC handlers for Netlify, Vercel, Surge, Railway, Fly.io, and Electron desktop.
+ * Includes OAuth token-based deploy for Vercel and Netlify (no CLI needed).
  */
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, app } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { execFile, spawn } from 'node:child_process';
+import https from 'node:https';
 
 const execFileAsync = promisify(execFile);
 
@@ -482,4 +484,226 @@ contextBridge.exposeInMainWorld('ollama', {
       return { success: false, error: msg };
     }
   });
+
+  // ── OAuth token storage ──────────────────────────────────────────────
+  const tokensPath = path.join(app.getPath('userData'), 'deploy-tokens.json');
+
+  function readTokens(): Record<string, string> {
+    try {
+      return JSON.parse(fs.readFileSync(tokensPath, 'utf-8'));
+    } catch {
+      return {};
+    }
+  }
+
+  function writeTokens(tokens: Record<string, string>): void {
+    fs.writeFileSync(tokensPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
+  }
+
+  ipcMain.handle('apps:deploy-token-get', (_e, provider: string) => {
+    const tokens = readTokens();
+    return tokens[provider] ?? null;
+  });
+
+  ipcMain.handle('apps:deploy-token-set', (_e, provider: string, token: string) => {
+    const tokens = readTokens();
+    tokens[provider] = token;
+    writeTokens(tokens);
+    return { success: true };
+  });
+
+  ipcMain.handle('apps:deploy-token-clear', (_e, provider: string) => {
+    const tokens = readTokens();
+    delete tokens[provider];
+    writeTokens(tokens);
+    return { success: true };
+  });
+
+  // ── OAuth deploy via REST API (no CLI needed) ────────────────────────
+  ipcMain.handle('apps:deploy-oauth', async (_e, appId: string, provider: string, token: string) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    const sendLog = (msg: string) => win?.webContents.send('deploy-log', msg);
+
+    try {
+      const dir = appDir(appId);
+      const distDir = path.join(dir, 'dist');
+      if (!fs.existsSync(distDir)) {
+        sendLog('Building project before deploy…\n');
+        await spawnWithLogs('npm', ['run', 'build'], { cwd: dir, timeout: 120_000 }, sendLog);
+      }
+
+      if (!fs.existsSync(distDir)) {
+        return { success: false, error: 'Build did not produce a dist/ folder.' };
+      }
+
+      if (provider === 'vercel') {
+        return await deployVercelRest(distDir, token, appId, sendLog);
+      } else if (provider === 'netlify') {
+        return await deployNetlifyRest(distDir, token, appId, sendLog);
+      } else {
+        return { success: false, error: `Unknown OAuth provider: ${provider}` };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      sendLog(`\nDeploy failed: ${msg}\n`);
+      return { success: false, error: msg };
+    }
+  });
+
+  // ── Vercel REST API deploy ───────────────────────────────────────────
+  async function deployVercelRest(
+    distDir: string,
+    token: string,
+    appId: string,
+    sendLog: (msg: string) => void,
+  ): Promise<{ success: boolean; url?: string; error?: string }> {
+    sendLog('Deploying to Vercel via REST API…\n');
+
+    const files: { file: string; data: string }[] = [];
+    function collectFiles(dir: string, prefix: string) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          collectFiles(path.join(dir, entry.name), rel);
+        } else {
+          const content = fs.readFileSync(path.join(dir, entry.name));
+          files.push({ file: rel, data: content.toString('base64') });
+        }
+      }
+    }
+    collectFiles(distDir, '');
+    sendLog(`Uploading ${files.length} files…\n`);
+
+    const body = JSON.stringify({
+      name: appId,
+      files: files.map(f => ({ file: f.file, data: f.data, encoding: 'base64' })),
+      projectSettings: { framework: null },
+    });
+
+    const result = await httpsRequest({
+      hostname: 'api.vercel.com',
+      path: '/v13/deployments',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+      },
+    }, body);
+
+    const data = JSON.parse(result);
+    if (data.url) {
+      const url = `https://${data.url}`;
+      sendLog(`\nDeployed! ${url}\n`);
+      return { success: true, url };
+    }
+    return { success: false, error: data.error?.message ?? 'Unknown Vercel error' };
+  }
+
+  // ── Netlify REST API deploy ──────────────────────────────────────────
+  async function deployNetlifyRest(
+    distDir: string,
+    token: string,
+    appId: string,
+    sendLog: (msg: string) => void,
+  ): Promise<{ success: boolean; url?: string; error?: string }> {
+    sendLog('Deploying to Netlify via REST API…\n');
+
+    // Collect file digests
+    const crypto = await import('node:crypto');
+    const fileMap: Record<string, string> = {};
+    const fileContents: Record<string, Buffer> = {};
+
+    function collectFiles(dir: string, prefix: string) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+          collectFiles(path.join(dir, entry.name), rel);
+        } else {
+          const content = fs.readFileSync(path.join(dir, entry.name));
+          const sha1 = crypto.createHash('sha1').update(content).digest('hex');
+          fileMap[`/${rel}`] = sha1;
+          fileContents[sha1] = content;
+        }
+      }
+    }
+    collectFiles(distDir, '');
+    sendLog(`Hashing ${Object.keys(fileMap).length} files…\n`);
+
+    // Create deploy with file list
+    const createBody = JSON.stringify({ title: appId, files: fileMap });
+    const createResult = await httpsRequest({
+      hostname: 'api.netlify.com',
+      path: '/api/v1/sites',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(createBody),
+      },
+    }, createBody);
+
+    const site = JSON.parse(createResult);
+    if (!site.id) {
+      return { success: false, error: site.message ?? 'Failed to create Netlify site' };
+    }
+
+    const siteId = site.id;
+    sendLog(`Site created: ${site.ssl_url ?? site.url}\n`);
+
+    // Create deploy
+    const deployBody = JSON.stringify({ files: fileMap });
+    const deployResult = await httpsRequest({
+      hostname: 'api.netlify.com',
+      path: `/api/v1/sites/${siteId}/deploys`,
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(deployBody),
+      },
+    }, deployBody);
+
+    const deploy = JSON.parse(deployResult);
+    const deployId = deploy.id;
+    const required: string[] = deploy.required ?? [];
+
+    // Upload required files
+    sendLog(`Uploading ${required.length} files…\n`);
+    for (const sha of required) {
+      const content = fileContents[sha];
+      if (!content) continue;
+      await httpsRequest({
+        hostname: 'api.netlify.com',
+        path: `/api/v1/deploys/${deployId}/files/${sha}`,
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': content.length,
+        },
+      }, content);
+    }
+
+    const url = deploy.ssl_url ?? deploy.url ?? site.ssl_url ?? site.url;
+    sendLog(`\nDeployed! ${url}\n`);
+    return { success: true, url };
+  }
+
+  // ── HTTPS helper ─────────────────────────────────────────────────────
+  function httpsRequest(
+    options: https.RequestOptions,
+    body?: string | Buffer,
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const req = https.request(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      });
+      req.on('error', reject);
+      if (body) req.write(body);
+      req.end();
+    });
+  }
 }

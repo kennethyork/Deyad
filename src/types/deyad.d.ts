@@ -37,7 +37,7 @@ interface ChatMessage {
 
 type DbProvider = 'sqlite';
 
-type AppType = 'frontend' | 'fullstack';
+type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
 
 interface AppProject {
   id: string;
@@ -79,7 +79,7 @@ export interface PluginTemplate {
   name: string;
   description: string;
   icon: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   prompt: string;
 }
 
@@ -87,7 +87,27 @@ export interface PluginManifest {
   name: string;
   description?: string;
   templates?: PluginTemplate[];
-  // future extension points: models, deployProviders, etc.
+  agentTools?: PluginAgentTool[];
+  agents?: PluginAgent[];
+  themes?: PluginTheme[];
+}
+
+export interface PluginAgentTool {
+  name: string;
+  description: string;
+  parameters: Record<string, { type: string; description: string; required?: boolean }>;
+}
+
+export interface PluginAgent {
+  name: string;
+  description: string;
+  systemPrompt: string;
+  model?: string;
+}
+
+export interface PluginTheme {
+  name: string;
+  css: string;
 }
 
 interface DeyadAPI {
@@ -185,10 +205,17 @@ interface DeyadAPI {
   deployFullstack(appId: string, provider: 'railway' | 'flyio'): Promise<{ success: boolean; url?: string; error?: string }>;
   deployElectron(appId: string, platform?: 'linux' | 'win' | 'mac'): Promise<{ success: boolean; outputDir?: string; error?: string }>;
   deployVps(appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }): Promise<{ success: boolean; url?: string; error?: string }>;
+  deployOAuth(appId: string, provider: 'vercel' | 'netlify', token: string): Promise<{ success: boolean; url?: string; error?: string }>;
+  deployTokenGet(provider: 'vercel' | 'netlify'): Promise<string | null>;
+  deployTokenSet(provider: 'vercel' | 'netlify', token: string): Promise<boolean>;
+  deployTokenClear(provider: 'vercel' | 'netlify'): Promise<boolean>;
   onDeployLog(cb: (payload: { appId: string; data: string }) => void): () => void;
 
   // Plugins
   listPlugins(): Promise<PluginManifest[]>;
+  pluginInvokeTool(toolName: string, params: Record<string, unknown>): Promise<string>;
+  pluginListThemes(): Promise<PluginTheme[]>;
+  pluginListAgents(): Promise<PluginAgent[]>;
 
   // Database inspection
   dbDescribe(appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }>;

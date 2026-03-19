@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateFrontendScaffold, generateFullStackScaffold, allocatePorts } from '../lib/scaffoldGenerator';
+import { generateFrontendScaffold, generateFullStackScaffold, generateNextJsScaffold, generatePythonScaffold, generateGoScaffold, allocatePorts } from '../lib/scaffoldGenerator';
 
 describe('generateFrontendScaffold', () => {
   const opts = { appName: 'My App', description: 'A test app' };
@@ -137,3 +137,127 @@ describe('allocatePorts', () => {
   });
 });
 
+describe('generateNextJsScaffold', () => {
+  const opts = { appName: 'Next App', description: 'A Next.js app' };
+
+  it('generates package.json with Next.js and React', () => {
+    const files = generateNextJsScaffold(opts);
+    const pkg = JSON.parse(files['package.json']);
+    expect(pkg.dependencies.next).toBeDefined();
+    expect(pkg.dependencies.react).toBeDefined();
+    expect(pkg.scripts.dev).toBe('next dev');
+    expect(pkg.scripts.build).toBe('next build');
+  });
+
+  it('generates Next.js config', () => {
+    const files = generateNextJsScaffold(opts);
+    expect(files['next.config.mjs']).toBeDefined();
+  });
+
+  it('generates App Router layout', () => {
+    const files = generateNextJsScaffold(opts);
+    expect(files['src/app/layout.tsx']).toContain('Next App');
+    expect(files['src/app/layout.tsx']).toContain('RootLayout');
+  });
+
+  it('generates a page component', () => {
+    const files = generateNextJsScaffold(opts);
+    expect(files['src/app/page.tsx']).toContain('Next App');
+  });
+
+  it('generates an API route', () => {
+    const files = generateNextJsScaffold(opts);
+    expect(files['src/app/api/hello/route.ts']).toContain('NextResponse');
+  });
+
+  it('generates README with Next.js stack info', () => {
+    const files = generateNextJsScaffold(opts);
+    expect(files['README.md']).toContain('Next.js');
+    expect(files['README.md']).toContain('App Router');
+  });
+
+  it('generates tsconfig.json with Next.js plugin', () => {
+    const files = generateNextJsScaffold(opts);
+    const ts = JSON.parse(files['tsconfig.json']);
+    expect(ts.compilerOptions.plugins).toEqual([{ name: 'next' }]);
+  });
+});
+
+describe('generatePythonScaffold', () => {
+  const opts = { appName: 'Py App', description: 'A Python API' };
+
+  it('generates requirements.txt with FastAPI and uvicorn', () => {
+    const files = generatePythonScaffold(opts);
+    expect(files['requirements.txt']).toContain('fastapi');
+    expect(files['requirements.txt']).toContain('uvicorn');
+    expect(files['requirements.txt']).toContain('sqlmodel');
+  });
+
+  it('generates main.py with FastAPI app', () => {
+    const files = generatePythonScaffold(opts);
+    expect(files['main.py']).toContain('FastAPI');
+    expect(files['main.py']).toContain('Py App');
+    expect(files['main.py']).toContain('sqlite');
+  });
+
+  it('generates main.py with CRUD endpoints', () => {
+    const files = generatePythonScaffold(opts);
+    expect(files['main.py']).toContain('@app.get("/items")');
+    expect(files['main.py']).toContain('@app.post("/items"');
+    expect(files['main.py']).toContain('@app.delete("/items/');
+  });
+
+  it('generates .gitignore', () => {
+    const files = generatePythonScaffold(opts);
+    expect(files['.gitignore']).toContain('__pycache__');
+    expect(files['.gitignore']).toContain('.venv');
+  });
+
+  it('generates README with Python stack info', () => {
+    const files = generatePythonScaffold(opts);
+    expect(files['README.md']).toContain('FastAPI');
+    expect(files['README.md']).toContain('Python');
+    expect(files['README.md']).toContain('uvicorn');
+  });
+});
+
+describe('generateGoScaffold', () => {
+  const opts = { appName: 'Go App', description: 'A Go API' };
+
+  it('generates go.mod with chi dependency', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['go.mod']).toContain('go 1.22');
+    expect(files['go.mod']).toContain('go-chi/chi');
+  });
+
+  it('generates main.go with Chi router', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['main.go']).toContain('chi.NewRouter');
+    expect(files['main.go']).toContain('Go App');
+  });
+
+  it('generates main.go with CRUD handlers', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['main.go']).toContain('func listItems');
+    expect(files['main.go']).toContain('func createItem');
+    expect(files['main.go']).toContain('func deleteItem');
+  });
+
+  it('generates main.go with SQLite setup', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['main.go']).toContain('sql.Open("sqlite"');
+    expect(files['main.go']).toContain('CREATE TABLE IF NOT EXISTS');
+  });
+
+  it('generates .gitignore', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['.gitignore']).toContain('data.db');
+  });
+
+  it('generates README with Go stack info', () => {
+    const files = generateGoScaffold(opts);
+    expect(files['README.md']).toContain('Go');
+    expect(files['README.md']).toContain('Chi');
+    expect(files['README.md']).toContain('SQLite');
+  });
+});

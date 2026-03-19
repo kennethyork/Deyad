@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 interface Props {
   appId: string;
   appName: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   onClose: () => void;
 }
 
@@ -52,9 +52,19 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
   const [vpsDomain, setVpsDomain] = useState('');
   const [vpsWorking, setVpsWorking] = useState(false);
   const [vpsStatus, setVpsStatus] = useState<string | null>(null);
+  const [oauthTokens, setOauthTokens] = useState<Record<string, string | null>>({});
+  const [oauthInput, setOauthInput] = useState<string | null>(null);
+  const [oauthToken, setOauthToken] = useState('');
 
   useEffect(() => {
     checkCLIs();
+    // Load saved OAuth tokens
+    Promise.all([
+      window.deyad.deployTokenGet('vercel'),
+      window.deyad.deployTokenGet('netlify'),
+    ]).then(([vToken, nToken]) => {
+      setOauthTokens({ vercel: vToken, netlify: nToken });
+    }).catch(() => {});
     const unsub = window.deyad.onDeployLog(({ appId: id, data }) => {
       if (id === appId) {
         setLogs((prev) => prev + data);
@@ -93,6 +103,32 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
       ? await window.deyad.deployFullstack(appId, selected as FullstackProvider)
       : await window.deyad.deploy(appId, selected as FrontendProvider);
 
+    setResult(res);
+    setDeploying(false);
+  };
+
+type OAuthProvider = 'vercel' | 'netlify';
+
+  const handleOauthSave = async (provider: OAuthProvider) => {
+    if (!oauthToken.trim()) return;
+    await window.deyad.deployTokenSet(provider, oauthToken.trim());
+    setOauthTokens((prev) => ({ ...prev, [provider]: oauthToken.trim() }));
+    setOauthInput(null);
+    setOauthToken('');
+  };
+
+  const handleOauthDisconnect = async (provider: OAuthProvider) => {
+    await window.deyad.deployTokenClear(provider);
+    setOauthTokens((prev) => ({ ...prev, [provider]: null }));
+  };
+
+  const handleOauthDeploy = async (provider: OAuthProvider) => {
+    const token = oauthTokens[provider];
+    if (!token) return;
+    setDeploying(true);
+    setLogs('');
+    setResult(null);
+    const res = await window.deyad.deployOAuth(appId, provider, token);
     setResult(res);
     setDeploying(false);
   };
@@ -141,6 +177,70 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                   <code>npm i -g vercel</code> or <code>npm i -g netlify-cli</code>
                 </div>
               )}
+
+              {/* One-click OAuth deploy (no CLI needed) */}
+              <div style={{ marginTop: '1rem' }}>
+                <p className="deploy-hint" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
+                  One-click deploy (no CLI needed)
+                </p>
+                {(['vercel', 'netlify'] as const).map((provider) => (
+                  <div key={provider} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ width: 70, fontWeight: 500, textTransform: 'capitalize' }}>{provider}</span>
+                    {oauthTokens[provider] ? (
+                      <>
+                        <span className="deploy-cli-ready">Connected</span>
+                        <button
+                          className="btn-primary"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+                          onClick={() => handleOauthDeploy(provider)}
+                          disabled={deploying}
+                        >
+                          Deploy
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          onClick={() => handleOauthDisconnect(provider)}
+                        >
+                          Disconnect
+                        </button>
+                      </>
+                    ) : oauthInput === provider ? (
+                      <>
+                        <input
+                          type="password"
+                          placeholder="Paste access token"
+                          value={oauthToken}
+                          onChange={(e) => setOauthToken(e.target.value)}
+                          style={{ flex: 1, fontSize: '0.8rem' }}
+                        />
+                        <button
+                          className="btn-primary"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          onClick={() => handleOauthSave(provider)}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          onClick={() => { setOauthInput(null); setOauthToken(''); }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+                        onClick={() => setOauthInput(provider)}
+                      >
+                        Connect with Token
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
               {logs && (
                 <pre ref={logRef} className="deploy-logs">{logs}</pre>

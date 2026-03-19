@@ -28,7 +28,7 @@ export interface AppProject {
   name: string;
   description: string;
   createdAt: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   dbProvider?: 'sqlite';
 }
 
@@ -345,7 +345,7 @@ function AppInner() {
   };
 
 
-  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', templatePrompt?: string) => {
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go', templatePrompt?: string) => {
     const app = await window.deyad.createApp(name, description, appType, 'sqlite');
     setShowNewAppModal(false);
     await loadApps();
@@ -361,6 +361,18 @@ function AppInner() {
         dbUser: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_user',
         dbPassword: generatePassword(24),
       });
+      await window.deyad.writeFiles(app.id, scaffold);
+    } else if (appType === 'nextjs') {
+      const { generateNextJsScaffold } = await import('./lib/scaffoldGenerator');
+      const scaffold = generateNextJsScaffold({ appName: name, description });
+      await window.deyad.writeFiles(app.id, scaffold);
+    } else if (appType === 'python') {
+      const { generatePythonScaffold } = await import('./lib/scaffoldGenerator');
+      const scaffold = generatePythonScaffold({ appName: name, description });
+      await window.deyad.writeFiles(app.id, scaffold);
+    } else if (appType === 'go') {
+      const { generateGoScaffold } = await import('./lib/scaffoldGenerator');
+      const scaffold = generateGoScaffold({ appName: name, description });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
       // Write a minimal runnable Vite scaffold so the app can be previewed right away

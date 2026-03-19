@@ -6,7 +6,7 @@ interface Props {
   /** Current app context for quick-enqueue. */
   appId: string;
   appName: string;
-  appType: 'frontend' | 'fullstack';
+  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
   dbProvider?: 'sqlite';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;
