@@ -19,6 +19,7 @@ import GitPanel from './components/GitPanel';
 import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import CommandPalette from './components/CommandPalette';
+import PluginMarketplace from './components/PluginMarketplace';
 import type { Command } from './components/CommandPalette';
 import { ToastProvider, useToast } from './components/ToastContainer';
 import { taskQueue } from './lib/taskQueue';
@@ -78,6 +79,7 @@ function AppInner() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showPackageManager, setShowPackageManager] = useState(false);
+  const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
@@ -474,6 +476,7 @@ function AppInner() {
     { id: 'app.new', name: 'New App', icon: '➕', shortcut: 'Ctrl+N', run: () => setShowNewAppModal(true) },
     { id: 'app.import', name: 'Import Project', icon: '📂', run: () => setShowImportModal(true) },
     { id: 'settings', name: 'Settings', icon: '⚙️', run: () => setShowSettings(true) },
+    { id: 'plugins', name: 'Plugin Marketplace', icon: '🧩', run: () => setShowPluginMarketplace(true) },
     ...(selectedApp ? [
       { id: 'deploy', name: 'Deploy App', icon: '🚀', run: () => setShowDeployModal(true) },
       { id: 'history', name: 'Version History', icon: '🕐', run: () => setShowVersionHistory(true) },
@@ -511,6 +514,7 @@ function AppInner() {
           onDeployApp={() => setShowDeployModal(true)}
           onImportApp={() => setShowImportModal(true)}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenPlugins={() => setShowPluginMarketplace(true)}
           onOpenTaskQueue={() => setShowTaskQueue(true)}
           onOpenVersionHistory={() => setShowVersionHistory(true)}
           activeTasks={activeTasks}
@@ -743,6 +747,10 @@ function AppInner() {
             updatePerApp(selectedApp.id, { appFiles: files, selectedFile: null });
           }}
         />
+      )}
+
+      {showPluginMarketplace && (
+        <PluginMarketplace onClose={() => setShowPluginMarketplace(false)} />
       )}
 
       {showTaskQueue && selectedApp && (

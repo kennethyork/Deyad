@@ -5,6 +5,7 @@
 import { app, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import https from 'node:https';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import type { DeyadSettings } from '../lib/mainUtils';
@@ -122,6 +123,113 @@ export function registerSettingsHandlers(
       }
     }
     return agents;
+  });
+
+  // ── Plugin Marketplace ────────────────────────────────────────────────────
+
+  const REGISTRY_URL = 'https://raw.githubusercontent.com/theKennethy/deyad-plugins/main/registry.json';
+
+  function httpsGet(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url);
+      https.get({ hostname: parsedUrl.hostname, path: parsedUrl.pathname + parsedUrl.search, headers: { 'User-Agent': 'Deyad' } }, (res) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          const location = res.headers.location;
+          if (location) return httpsGet(location).then(resolve, reject);
+        }
+        if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+        let data = '';
+        res.on('data', (chunk: string) => { data += chunk; });
+        res.on('end', () => resolve(data));
+        res.on('error', reject);
+      }).on('error', reject);
+    });
+  }
+
+  ipcMain.handle('plugins:registry-list', async () => {
+    try {
+      const data = await httpsGet(REGISTRY_URL);
+      return JSON.parse(data) as Array<{ name: string; description: string; author: string; version: string; repo: string; downloads?: number; tags?: string[] }>;
+    } catch {
+      return [];
+    }
+  });
+
+  ipcMain.handle('plugins:install', async (_event, repoUrl: string) => {
+    try {
+      // Validate URL format — only allow GitHub repos
+      const match = repoUrl.match(/^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)$/);
+      if (!match) return { success: false, error: 'Invalid GitHub repository URL' };
+      const [, owner, repo] = match;
+      const zipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/main.zip`;
+      const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+      fs.mkdirSync(pluginsDir, { recursive: true });
+      const tmpZip = path.join(pluginsDir, `${repo}-download.zip`);
+
+      // Download the zip
+      await new Promise<void>((resolve, reject) => {
+        const download = (url: string) => {
+          const parsedUrl = new URL(url);
+          https.get({ hostname: parsedUrl.hostname, path: parsedUrl.pathname + parsedUrl.search, headers: { 'User-Agent': 'Deyad' } }, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+              const location = res.headers.location;
+              if (location) { download(location); return; }
+            }
+            if (res.statusCode !== 200) { reject(new Error(`HTTP ${res.statusCode}`)); return; }
+            const file = fs.createWriteStream(tmpZip);
+            res.pipe(file);
+            file.on('finish', () => { file.close(); resolve(); });
+            file.on('error', reject);
+          }).on('error', reject);
+        };
+        download(zipUrl);
+      });
+
+      // Extract using unzip CLI
+      const destDir = path.join(pluginsDir, repo);
+      if (fs.existsSync(destDir)) fs.rmSync(destDir, { recursive: true });
+      await execFileAsync('unzip', ['-o', tmpZip, '-d', pluginsDir]);
+      // GitHub zips extract to repo-main/, rename to repo/
+      const extractedDir = path.join(pluginsDir, `${repo}-main`);
+      if (fs.existsSync(extractedDir)) fs.renameSync(extractedDir, destDir);
+      // Clean up zip
+      if (fs.existsSync(tmpZip)) fs.unlinkSync(tmpZip);
+
+      // Verify plugin.json exists
+      const manifestPath = path.join(destDir, 'plugin.json');
+      if (!fs.existsSync(manifestPath)) {
+        fs.rmSync(destDir, { recursive: true });
+        return { success: false, error: 'Repository does not contain a plugin.json manifest' };
+      }
+
+      // Reload plugins
+      loadPlugins();
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('plugins:uninstall', async (_event, pluginName: string) => {
+    try {
+      const pluginsDir = path.join(app.getPath('userData'), 'plugins');
+      const dirs = fs.readdirSync(pluginsDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory());
+      for (const d of dirs) {
+        const manifestPath = path.join(pluginsDir, d.name, 'plugin.json');
+        if (fs.existsSync(manifestPath)) {
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+          if (manifest.name === pluginName) {
+            fs.rmSync(path.join(pluginsDir, d.name), { recursive: true });
+            loadPlugins();
+            return { success: true };
+          }
+        }
+      }
+      return { success: false, error: `Plugin "${pluginName}" not found` };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // ── Package Manager ───────────────────────────────────────────────────────

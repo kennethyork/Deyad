@@ -26,6 +26,7 @@ describe('Sidebar', () => {
     onDeployApp: vi.fn(),
     onImportApp: vi.fn(),
     onOpenSettings: vi.fn(),
+    onOpenPlugins: vi.fn(),
     onOpenTaskQueue: vi.fn(),
     onOpenVersionHistory: vi.fn(),
     activeTasks: 0,

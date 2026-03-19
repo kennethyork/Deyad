@@ -257,6 +257,16 @@ contextBridge.exposeInMainWorld('deyad', {
   pluginListAgents: (): Promise<Array<{ name: string; description: string; systemPrompt: string; model?: string }>> =>
     ipcRenderer.invoke('plugins:list-agents'),
 
+  // Plugin Marketplace
+  pluginRegistryList: (): Promise<Array<{ name: string; description: string; author: string; version: string; repo: string; downloads?: number; tags?: string[] }>> =>
+    ipcRenderer.invoke('plugins:registry-list'),
+
+  pluginInstall: (repoUrl: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('plugins:install', repoUrl),
+
+  pluginUninstall: (pluginName: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('plugins:uninstall', pluginName),
+
   // ── Git ────────────────────────────────────────────────────────────────
   gitCommitAgent: (appId: string, message: string): Promise<{ success: boolean; output?: string; error?: string }> =>
     ipcRenderer.invoke('git:commit', appId, message),

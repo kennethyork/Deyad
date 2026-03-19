@@ -110,6 +110,16 @@ export interface PluginTheme {
   css: string;
 }
 
+export interface RegistryPlugin {
+  name: string;
+  description: string;
+  author: string;
+  version: string;
+  repo: string;
+  downloads?: number;
+  tags?: string[];
+}
+
 interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
@@ -216,6 +226,11 @@ interface DeyadAPI {
   pluginInvokeTool(toolName: string, params: Record<string, unknown>): Promise<string>;
   pluginListThemes(): Promise<PluginTheme[]>;
   pluginListAgents(): Promise<PluginAgent[]>;
+
+  // Plugin Marketplace
+  pluginRegistryList(): Promise<RegistryPlugin[]>;
+  pluginInstall(repoUrl: string): Promise<{ success: boolean; error?: string }>;
+  pluginUninstall(pluginName: string): Promise<{ success: boolean; error?: string }>;
 
   // Database inspection
   dbDescribe(appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }>;
