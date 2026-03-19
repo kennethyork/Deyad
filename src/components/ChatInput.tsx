@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 
 interface Props {
   input: string;
@@ -11,7 +11,7 @@ interface Props {
   onImagePaste: (e: React.ClipboardEvent) => void;
 }
 
-export default function ChatInput({
+export default memo(function ChatInput({
   input,
   setInput,
   streaming,
@@ -77,4 +77,4 @@ export default function ChatInput({
       </div>
     </div>
   );
-}
+});

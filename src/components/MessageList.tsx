@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -17,7 +18,7 @@ interface Props {
   onRejectPlan: () => void;
 }
 
-export default function MessageList({ messages, pendingPlan, streaming, onApprovePlan, onRejectPlan }: Props) {
+export default memo(function MessageList({ messages, pendingPlan, streaming, onApprovePlan, onRejectPlan }: Props) {
   return (
     <>
       {messages.map((m) => (
@@ -51,4 +52,4 @@ export default function MessageList({ messages, pendingPlan, streaming, onApprov
       ))}
     </>
   );
-}
+});

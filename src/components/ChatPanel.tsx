@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { AppProject } from '../App';
 import { buildSmartContext } from '../lib/contextBuilder';
 import { extractFilesFromResponse, FRONTEND_SYSTEM_PROMPT, getFullStackSystemPrompt, PLANNING_SYSTEM_PROMPT, PLAN_EXECUTION_PROMPT } from '../lib/codeParser';
@@ -62,17 +62,18 @@ export default function ChatPanel({
   const streamCleanupRef = useRef<(() => void) | null>(null);
   const agentAbortRef = useRef<(() => void) | null>(null);
   const [detectedErrors, setDetectedErrors] = useState<DetectedError[]>([]);
-  const [tokenCount, setTokenCount] = useState(0);
   const autoFixAttemptsRef = useRef(0);
   const autoFixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_AUTO_FIX_ATTEMPTS = 3;
   const embedModelRef = useRef('');
+  const rafRef = useRef<number>(0);
 
   // Clean up stream listeners on unmount
   useEffect(() => {
     return () => {
       streamCleanupRef.current?.();
       agentAbortRef.current?.();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
@@ -119,18 +120,17 @@ export default function ChatPanel({
     };
   }, [agentMode, streaming, detectedErrors, app.id]);
 
-  // Estimate token count from conversation
-  useEffect(() => {
+  // Estimate token count from conversation (derived, no extra state)
+  const tokenCount = useMemo(() => {
     let chars = 0;
     for (const m of messages) chars += m.content.length;
-    // Rough estimate: ~3.5 chars per token
-    setTokenCount(Math.round(chars / 3.5));
+    return Math.round(chars / 3.5);
   }, [messages]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' });
+  }, [messages, streaming]);
 
   // Load models on mount
   useEffect(() => {
@@ -315,10 +315,15 @@ export default function ChatPanel({
     const requestId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
       streamBuf.current += token;
-      const currentContent = streamBuf.current;
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, content: currentContent } : m)),
-      );
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = 0;
+          const snapshot = streamBuf.current;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: snapshot } : m)),
+          );
+        });
+      }
     });
 
     // Store cleanup so unmount can tear down listeners
@@ -331,6 +336,11 @@ export default function ChatPanel({
 
     const onDone = () => {
       cleanup();
+      // Cancel any pending RAF — we'll set the final content directly
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
       const finalContent = streamBuf.current;
 
       // Extract any generated files from the response
@@ -438,10 +448,16 @@ export default function ChatPanel({
       embedModel: embedModelRef.current || undefined,
       callbacks: {
         onContent: (fullText: string) => {
-          const display = stripToolMarkup(fullText);
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, content: display } : m)),
-          );
+          streamBuf.current = stripToolMarkup(fullText);
+          if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(() => {
+              rafRef.current = 0;
+              const snapshot = streamBuf.current;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: snapshot } : m)),
+              );
+            });
+          }
         },
         onToolStart: (toolName: string, params: Record<string, string>) => {
           const summary = toolName === 'run_command' ? `${toolName}: ${params.command ?? ''}` :
@@ -470,6 +486,15 @@ export default function ChatPanel({
           );
         },
         onDone: () => {
+          // Flush any pending RAF update
+          if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current);
+            rafRef.current = 0;
+            const snapshot = streamBuf.current;
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, content: snapshot } : m)),
+            );
+          }
           setStreaming(false);
           agentAbortRef.current = null;
           // Save messages
@@ -489,6 +514,8 @@ export default function ChatPanel({
     agentAbortRef.current = abort;
   };
 
+  const sendRef = useRef<(text?: string) => void>();
+
   const handleSend = () => {
     const text = input.trim().toLowerCase();
     // Auto-route git commands through the agent loop even when agent mode is off
@@ -497,15 +524,16 @@ export default function ChatPanel({
     else sendMessage();
   };
 
-  const handleApprovePlan = () => {
-    if (pendingPlan) {
-      sendMessage('Execute the plan above.');
-    }
-  };
+  // Keep ref fresh so memoized callbacks always call the latest send
+  sendRef.current = sendMessage;
 
-  const handleRejectPlan = () => {
+  const handleApprovePlan = useCallback(() => {
+    sendRef.current?.('Execute the plan above.');
+  }, []);
+
+  const handleRejectPlan = useCallback(() => {
     setPendingPlan(null);
-  };
+  }, []);
 
   const handleRetry = () => {
     setError(null);
