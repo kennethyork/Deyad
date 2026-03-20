@@ -4,21 +4,23 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Download — Deyad</title>
-  <meta name="description" content="Download Deyad for Windows, Ubuntu, Fedora, or as an AppImage. Free and open source." />
+  <meta name="description" content="Download Deyad for Windows, Ubuntu, Fedora, or AppImage. Free, open-source, and runs entirely on your machine." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
   <div class="container">
-    <a href="index.html" class="nav-brand"><span>&#9670;</span> Deyad</a>
+    <a href="index.html" class="nav-brand"><div class="nav-logo">D</div> Deyad</a>
     <div class="nav-links">
       <a href="index.html">Home</a>
       <a href="features.html">Features</a>
       <a href="docs.html">Docs</a>
       <a href="download.html" class="active">Download</a>
-      <a href="https://github.com/kennethyork/Deyad" class="btn-nav">GitHub</a>
+      <a href="https://github.com/kennethyork/Deyad" class="nav-cta">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
     </div>
     <button class="mobile-toggle" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('show')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -27,95 +29,118 @@
 </nav>
 
 <!-- HERO -->
-<section class="hero" style="padding-bottom:40px;">
+<section class="hero" style="padding-bottom:56px;">
   <div class="container">
-    <div class="section-label">Download</div>
-    <h1>Get Deyad <span class="gradient">for free</span></h1>
-    <p class="subtitle">Download the latest release for your platform. All builds are free, open source, and include every feature.</p>
+    <div class="section-eyebrow">Download</div>
+    <h1>Get Deyad for<br><span class="gradient">your platform.</span></h1>
+    <p class="lead">Free, open-source, and runs entirely on your machine. No account required.</p>
   </div>
 </section>
 
-<!-- DOWNLOADS -->
-<section style="padding-top:0;">
+<!-- PLATFORM DOWNLOADS -->
+<section>
   <div class="container">
     <div class="dl-grid">
 
       <div class="dl-card">
-        <div class="dl-icon">🪟</div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="1.5"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
         <h3>Windows</h3>
-        <div class="dl-file">Deyad-x64.exe</div>
-        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">Download .exe</a>
+        <div class="dl-file">Deyad-Setup.exe</div>
+        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary btn-sm">Download .exe</a>
       </div>
 
       <div class="dl-card">
-        <div class="dl-icon">🐧</div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <h3>Ubuntu / Debian</h3>
-        <div class="dl-file">Deyad-amd64.deb</div>
-        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">Download .deb</a>
+        <div class="dl-file">deyad_amd64.deb</div>
+        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary btn-sm">Download .deb</a>
       </div>
 
       <div class="dl-card">
-        <div class="dl-icon">🎩</div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
         <h3>Fedora / RHEL</h3>
-        <div class="dl-file">Deyad-x86_64.rpm</div>
-        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">Download .rpm</a>
+        <div class="dl-file">deyad.x86_64.rpm</div>
+        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary btn-sm">Download .rpm</a>
       </div>
 
       <div class="dl-card">
-        <div class="dl-icon">📦</div>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-light)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
         <h3>AppImage</h3>
-        <div class="dl-file">Deyad-x86_64.AppImage</div>
-        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">Download AppImage</a>
+        <div class="dl-file">Deyad.AppImage</div>
+        <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary btn-sm">Download AppImage</a>
       </div>
 
-    </div>
-
-    <!-- PREREQUISITES -->
-    <div style="margin-top:64px;">
-      <div class="section-header">
-        <div class="section-label">Before you start</div>
-        <h2 class="section-title">Prerequisites</h2>
-        <p class="section-desc">Deyad needs a few things installed on your system.</p>
-      </div>
-      <div class="grid grid-3">
-        <div class="card">
-          <div class="card-icon">⬢</div>
-          <h3>Node.js &ge; 18</h3>
-          <p>Runs generated apps, Vite dev server, and npm. <a href="https://nodejs.org">Install Node.js</a></p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🦙</div>
-          <h3>Ollama</h3>
-          <p>Local AI inference engine. <a href="https://ollama.ai">Install Ollama</a>, then run <code>ollama pull llama3.2</code></p>
-        </div>
-        <div class="card">
-          <div class="card-icon">🔀</div>
-          <h3>Git</h3>
-          <p>Auto-commit, version history, and GitHub sync. <a href="https://git-scm.com">Install Git</a></p>
-        </div>
-      </div>
-    </div>
-
-    <!-- BUILD FROM SOURCE -->
-    <div style="margin-top:64px;">
-      <div class="section-header">
-        <div class="section-label">Alternative</div>
-        <h2 class="section-title">Build from source</h2>
-      </div>
-      <div class="code-block">git clone https://github.com/kennethyork/Deyad.git
-cd Deyad
-npm install
-npm start</div>
-      <p style="color:var(--text-secondary);margin-top:16px;text-align:center;">To build distributable binaries: <code>npm run dist</code></p>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
+<!-- PREREQUISITES -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Prerequisites</h2>
+    <p class="section-desc">Install these before running Deyad.</p>
+
+    <div class="cards" style="max-width:880px;margin:0 auto;">
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        </div>
+        <h4>Node.js 18+</h4>
+        <p>JavaScript runtime. Download from <a href="https://nodejs.org" style="color:var(--accent-light);">nodejs.org</a></p>
+      </div>
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        </div>
+        <h4>Ollama</h4>
+        <p>Local AI runtime. Download from <a href="https://ollama.com" style="color:var(--accent-light);">ollama.com</a></p>
+      </div>
+      <div class="card">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><line x1="6" y1="9" x2="6" y2="12"/><line x1="18" y1="9" x2="18" y2="12"/><path d="M6 12a6 6 0 006 0 6 6 0 006 0"/></svg>
+        </div>
+        <h4>Git</h4>
+        <p>Version control. Download from <a href="https://git-scm.com" style="color:var(--accent-light);">git-scm.com</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BUILD FROM SOURCE -->
+<section>
+  <div class="container">
+    <h2 class="section-title">Build from source</h2>
+    <p class="section-desc">For contributors or anyone who prefers to compile locally.</p>
+    <div style="max-width:680px;margin:0 auto;">
+      <pre><code>git clone https://github.com/kennethyork/Deyad.git
+cd Deyad
+npm install
+
+# Run in development mode
+npm start
+
+# Build distributable packages
+npm run make</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <h2 class="section-title">Need help getting started?</h2>
+    <p class="section-desc">Check the documentation for a step-by-step walkthrough.</p>
+    <a href="docs.html" class="btn btn-primary">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
+      Read the Docs
+    </a>
+  </div>
+</section>
+
 <footer>
   <div class="container">
     <div class="footer-inner">
-      <div class="footer-left">&copy; 2025 Deyad. Open source under MIT.</div>
+      <div class="footer-left">&copy; 2025 Deyad &middot; Open source under MIT</div>
       <div class="footer-links">
         <a href="https://github.com/kennethyork/Deyad">GitHub</a>
         <a href="https://github.com/kennethyork/Deyad/issues">Issues</a>

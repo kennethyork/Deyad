@@ -4,21 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deyad — Local AI App Builder</title>
-  <meta name="description" content="Describe what you want. Get a working app. No cloud. No API keys. No limits. Open-source local-first AI app builder powered by Ollama." />
+  <meta name="description" content="Describe what you want. Get a working app. No cloud, no API keys, no limits. Open-source local-first AI app builder powered by Ollama." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
   <div class="container">
-    <a href="index.html" class="nav-brand"><span>&#9670;</span> Deyad</a>
+    <a href="index.html" class="nav-brand">
+      <div class="nav-logo">D</div>
+      Deyad
+    </a>
     <div class="nav-links">
       <a href="index.html" class="active">Home</a>
       <a href="features.html">Features</a>
       <a href="docs.html">Docs</a>
       <a href="download.html">Download</a>
-      <a href="https://github.com/kennethyork/Deyad" class="btn-nav">GitHub</a>
+      <a href="https://github.com/kennethyork/Deyad" class="nav-cta">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub
+      </a>
     </div>
     <button class="mobile-toggle" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('show')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -33,32 +38,20 @@
       <span class="dot"></span>
       Open source &middot; MIT license &middot; v1.4.35
     </div>
-    <h1>Build apps with AI.<br><span class="gradient">Entirely on your machine.</span></h1>
-    <p class="subtitle">Describe what you want in plain English. Deyad writes the code, runs commands, fixes errors, commits to Git, and deploys &mdash; all locally with Ollama. No cloud. No API keys. No limits.</p>
-    <div class="btn-group">
+    <h1>Build software with AI.<br><span class="gradient">Entirely on your machine.</span></h1>
+    <p class="lead">Describe what you want in plain English. Deyad writes code, runs commands, fixes errors, commits to Git, and deploys — all locally with Ollama.</p>
+    <div class="btn-row">
       <a href="download.html" class="btn btn-primary">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download for free
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
       </a>
-      <a href="features.html" class="btn btn-secondary">See all features</a>
+      <a href="features.html" class="btn btn-secondary">Explore features</a>
     </div>
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-value">5</div>
-        <div class="stat-label">App stacks</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">18</div>
-        <div class="stat-label">Agent tools</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">7</div>
-        <div class="stat-label">Deploy targets</div>
-      </div>
-      <div class="stat">
-        <div class="stat-value">100%</div>
-        <div class="stat-label">Local &amp; offline</div>
-      </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val">5</div><div class="stat-label">Stacks</div></div>
+      <div class="stat"><div class="stat-val">18</div><div class="stat-label">Agent tools</div></div>
+      <div class="stat"><div class="stat-val">7</div><div class="stat-label">Deploy targets</div></div>
+      <div class="stat"><div class="stat-val">100%</div><div class="stat-label">Local</div></div>
     </div>
   </div>
 </section>
@@ -67,22 +60,40 @@
 <section>
   <div class="container">
     <div class="section-header">
-      <div class="section-label">How it works</div>
-      <h2 class="section-title">From idea to working app in minutes</h2>
-      <p class="section-desc">Deyad's autonomous agent reads your codebase, plans the approach, writes files, runs commands, and self-corrects &mdash; up to 30 iterations per request.</p>
+      <div class="section-eyebrow">How it works</div>
+      <h2 class="section-title">From idea to working app</h2>
+      <p class="section-desc">The autonomous agent reads your codebase, plans an approach, writes files, runs commands, and self-corrects — up to 30 iterations per request.</p>
     </div>
     <div class="flow">
-      <div class="flow-step"><span class="step-icon">💬</span> Describe your app</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="step-icon">🔍</span> Agent reads codebase</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="step-icon">📝</span> Writes &amp; edits files</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="step-icon">▶️</span> Runs &amp; verifies</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="step-icon">🔧</span> Auto-fixes errors</div>
-      <span class="flow-arrow">→</span>
-      <div class="flow-step"><span class="step-icon">✅</span> Commits to Git</div>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Describe
+      </div>
+      <span class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Analyze
+      </div>
+      <span class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Write code
+      </div>
+      <span class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        Run &amp; verify
+      </div>
+      <span class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+        Auto-fix
+      </div>
+      <span class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      <div class="flow-step">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Commit
+      </div>
     </div>
   </div>
 </section>
@@ -91,33 +102,33 @@
 <section>
   <div class="container">
     <div class="section-header">
-      <div class="section-label">Stacks</div>
+      <div class="section-eyebrow">Stacks</div>
       <h2 class="section-title">Five production-ready stacks</h2>
-      <p class="section-desc">Pick a stack, and Deyad scaffolds a complete project with database, server, and live preview &mdash; ready to build on.</p>
+      <p class="section-desc">Each stack is scaffolded with a working database, dev server, and live preview — ready to build on instantly.</p>
     </div>
     <div class="grid grid-5">
       <div class="card">
-        <div class="card-icon">⚛️</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
         <h3>Frontend</h3>
         <p>React 18 + Vite + TypeScript</p>
       </div>
       <div class="card">
-        <div class="card-icon">🔗</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
         <h3>Full Stack</h3>
         <p>React + Express + Prisma + SQLite</p>
       </div>
       <div class="card">
-        <div class="card-icon">▲</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/></svg></div>
         <h3>Next.js</h3>
         <p>Next.js 14 App Router + API routes</p>
       </div>
       <div class="card">
-        <div class="card-icon">🐍</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg></div>
         <h3>Python</h3>
         <p>FastAPI + SQLModel + uvicorn</p>
       </div>
       <div class="card">
-        <div class="card-icon">🔵</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div>
         <h3>Go</h3>
         <p>Go + Chi v5 + modernc SQLite</p>
       </div>
@@ -129,39 +140,39 @@
 <section>
   <div class="container">
     <div class="section-header">
-      <div class="section-label">Why Deyad</div>
-      <h2 class="section-title">What sets us apart</h2>
+      <div class="section-eyebrow">Why Deyad</div>
+      <h2 class="section-title">Built different</h2>
     </div>
     <div class="grid grid-3">
       <div class="card card-highlight">
-        <div class="card-icon">🔒</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></div>
         <h3>100% local AI</h3>
-        <p>All inference runs on your machine via Ollama. Your code and data never leave your network. No accounts, no keys, no subscriptions.</p>
+        <p>All inference runs on your machine via Ollama. Your code never leaves your network. No accounts, no API keys.</p>
       </div>
       <div class="card">
-        <div class="card-icon">♾️</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
         <h3>Free forever</h3>
-        <p>Open source under MIT. No token limits, no usage caps, no paywalls. Run as many generations as your hardware allows.</p>
+        <p>Open source under MIT. No token limits, no usage caps. Run as many generations as your hardware allows.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🛠️</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
         <h3>Full IDE built in</h3>
-        <p>Monaco editor, terminal, live preview, file tree, package manager, search, and command palette &mdash; all in one window.</p>
+        <p>Monaco editor, terminal, live preview, file tree, package manager, search, and command palette in one window.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🗄️</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
         <h3>Zero-config database</h3>
-        <p>SQLite instead of PostgreSQL. No Docker, no server. Prisma ORM with a built-in table browser for inspecting your data.</p>
+        <p>SQLite instead of PostgreSQL. No Docker, no server process. Prisma ORM with a built-in table browser.</p>
       </div>
       <div class="card">
-        <div class="card-icon">📦</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg></div>
         <h3>Auto-commit</h3>
-        <p>Every agent iteration auto-saves to Git. Browse version history, preview diffs, and restore with one click.</p>
+        <p>Every agent iteration auto-saves to Git. Browse history, preview diffs, and restore any version in one click.</p>
       </div>
       <div class="card">
-        <div class="card-icon">🚀</div>
+        <div class="card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></div>
         <h3>Deploy anywhere</h3>
-        <p>Ship to Vercel, Netlify, Railway, Fly.io, Surge, any VPS, or package as a desktop app. 7 targets, one modal.</p>
+        <p>Vercel, Netlify, Railway, Fly.io, Surge, any VPS, or desktop packaging. Seven targets, one modal.</p>
       </div>
     </div>
   </div>
@@ -171,10 +182,10 @@
 <section>
   <div class="container">
     <div class="section-header">
-      <div class="section-label">Comparison</div>
+      <div class="section-eyebrow">Comparison</div>
       <h2 class="section-title">How Deyad compares</h2>
     </div>
-    <div class="table-wrapper">
+    <div class="table-wrap">
       <table>
         <thead>
           <tr>
@@ -187,21 +198,21 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td>100% local AI</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Free, no token limits</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Data stays on your machine</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Open source</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>5 production stacks</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Autonomous agent (30 iter.)</td><td class="check">✓</td><td class="cross">Partial</td><td class="cross">Partial</td><td class="check">✓</td><td class="cross">—</td></tr>
-          <tr><td>Error auto-fix</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Built-in database browser</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Git auto-commit</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>AI code completion (FIM)</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td></tr>
-          <tr><td>Image → code</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
-          <tr><td>Deploy (7 targets)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td class="cross">Vercel</td></tr>
-          <tr><td>Desktop packaging</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
-          <tr><td>Plugin system</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td></tr>
-          <tr><td>Works fully offline</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>100% local AI</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Free, no token limits</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Data stays on your machine</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Open source</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>5 production stacks</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Autonomous agent (30 iterations)</td><td class="y">&#10003;</td><td class="n">Partial</td><td class="n">Partial</td><td class="y">&#10003;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Error auto-fix</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Built-in database browser</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Git auto-commit</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>AI code completion (FIM)</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="y">&#10003;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Image &rarr; code</td><td class="y">&#10003;</td><td class="y">&#10003;</td><td class="y">&#10003;</td><td class="y">&#10003;</td><td class="y">&#10003;</td></tr>
+          <tr><td>Deploy (7 targets)</td><td class="y">&#10003;</td><td class="y">&#10003;</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">Vercel</td></tr>
+          <tr><td>Desktop packaging</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Plugin system</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="y">&#10003;</td><td class="n">&mdash;</td></tr>
+          <tr><td>Works fully offline</td><td class="y">&#10003;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td><td class="n">&mdash;</td></tr>
         </tbody>
       </table>
     </div>
@@ -209,22 +220,27 @@
 </section>
 
 <!-- CTA -->
-<section style="text-align:center;">
+<section class="cta-section">
   <div class="container">
     <h2 class="section-title">Ready to build?</h2>
-    <p class="section-desc" style="margin-bottom:32px;">Download Deyad and start shipping apps with local AI today.</p>
-    <div class="btn-group" style="justify-content:center;">
-      <a href="download.html" class="btn btn-primary">Download Deyad</a>
-      <a href="https://github.com/kennethyork/Deyad" class="btn btn-secondary">View on GitHub</a>
+    <p class="section-desc">Download Deyad and start shipping apps with local AI.</p>
+    <div class="btn-row">
+      <a href="download.html" class="btn btn-primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+      <a href="https://github.com/kennethyork/Deyad" class="btn btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        View on GitHub
+      </a>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
 <footer>
   <div class="container">
     <div class="footer-inner">
-      <div class="footer-left">&copy; 2025 Deyad. Open source under MIT.</div>
+      <div class="footer-left">&copy; 2025 Deyad &middot; Open source under MIT</div>
       <div class="footer-links">
         <a href="https://github.com/kennethyork/Deyad">GitHub</a>
         <a href="https://github.com/kennethyork/Deyad/issues">Issues</a>
