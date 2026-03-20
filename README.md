@@ -89,7 +89,17 @@ Deyad's autonomous agent reads your codebase, writes files, runs commands, detec
 
 ### Database
 
-- **SQLite** — zero-config, file-based, no Docker required
+Deyad uses SQLite instead of PostgreSQL — no Docker, no server process, no configuration:
+
+| | PostgreSQL | SQLite (Deyad) |
+| --- | --- | --- |
+| **Setup** | Install PostgreSQL + Docker, configure port, create database | Nothing — just a file (`dev.db`), zero config |
+| **Dependencies** | Docker Desktop + PostgreSQL container | None — built into most OSes |
+| **First run** | Wait for container to pull and start | Instant — Prisma creates the file on first migrate |
+| **Disk usage** | ~400MB+ (Docker image + PostgreSQL) | ~0 (single `.db` file) |
+| **Offline** | Needs Docker daemon running | Always works, it's just a file |
+| **Cross-platform** | Docker Desktop painful on Windows | Works identically everywhere |
+
 - **Prisma ORM** — type-safe schema management for JS/TS stacks
 - **Built-in table browser** — browse tables, view rows, inspect schema
 - **Schema introspection** — agent queries live structure while coding
