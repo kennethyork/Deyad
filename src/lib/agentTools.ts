@@ -33,7 +33,9 @@ export function parseToolCalls(text: string): ToolCall[] {
     const paramPattern = /<param\s+name="([^"]+)">([\s\S]*?)<\/param>/g;
     let pm: RegExpExecArray | null;
     while ((pm = paramPattern.exec(body)) !== null) {
-      params[pm[1].trim()] = pm[2];
+      // Strip the leading/trailing newlines that XML formatting adds between tags,
+      // but preserve internal whitespace (important for old_string / new_string / content).
+      params[pm[1].trim()] = pm[2].replace(/^\n/, '').replace(/\n[ \t]*$/, '');
     }
     calls.push({ name, params });
   }
@@ -72,7 +74,7 @@ export async function executeTool(
       }
 
       case 'read_file': {
-        const filePath = call.params.path;
+        const filePath = call.params.path?.trim();
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
         const files = await window.deyad.readFiles(appId);
         const content = files[filePath];
@@ -87,10 +89,10 @@ export async function executeTool(
         const fileMap: Record<string, string> = {};
         // Also support a single path/content pair
         if (call.params.path && call.params.content !== undefined) {
-          fileMap[call.params.path] = call.params.content;
+          fileMap[call.params.path.trim()] = call.params.content;
         }
         for (let i = 0; i < 50; i++) {
-          const p = call.params[`file_${i}_path`];
+          const p = call.params[`file_${i}_path`]?.trim();
           const c = call.params[`file_${i}_content`];
           if (!p) break;
           fileMap[p] = c ?? '';
@@ -107,13 +109,13 @@ export async function executeTool(
       }
 
       case 'run_command': {
-        const cmd = call.params.command;
+        const cmd = call.params.command?.trim();
         if (!cmd) return { tool: call.name, success: false, output: 'Missing "command" parameter.' };
         return await executeCommand(appId, cmd);
       }
 
       case 'search_files': {
-        const query = call.params.query;
+        const query = call.params.query?.trim();
         if (!query) return { tool: call.name, success: false, output: 'Missing "query" parameter.' };
         const files = await window.deyad.readFiles(appId);
         const lowerQ = query.toLowerCase();
@@ -152,7 +154,7 @@ export async function executeTool(
       }
 
       case 'git_remote_set': {
-        const url = call.params.url;
+        const url = call.params.url?.trim();
         if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
         const res = await window.deyad.gitRemoteSet(appId, url);
         return { tool: call.name, success: res.success, output: res.success ? `Remote origin set to ${url}` : `Failed: ${res.error}` };
@@ -180,14 +182,14 @@ export async function executeTool(
       }
 
       case 'git_branch_create': {
-        const name = call.params.name;
+        const name = call.params.name?.trim();
         if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
         const res = await window.deyad.gitBranchCreate(appId, name);
         return { tool: call.name, success: res.success, output: res.success ? `Created and switched to branch ${name}` : `Failed: ${res.error}` };
       }
 
       case 'git_branch_switch': {
-        const name = call.params.name;
+        const name = call.params.name?.trim();
         if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
         const res = await window.deyad.gitBranchSwitch(appId, name);
         return { tool: call.name, success: res.success, output: res.success ? `Switched to branch ${name}` : `Failed: ${res.error}` };
@@ -201,11 +203,11 @@ export async function executeTool(
       }
 
       case 'edit_file': {
-        const filePath = call.params.path;
+        const filePath = call.params.path?.trim();
         const oldStr = call.params.old_string;
         const newStr = call.params.new_string;
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
-        if (oldStr === undefined) return { tool: call.name, success: false, output: 'Missing "old_string" parameter.' };
+        if (oldStr === undefined || oldStr === '') return { tool: call.name, success: false, output: 'Missing or empty "old_string" parameter.' };
         if (newStr === undefined) return { tool: call.name, success: false, output: 'Missing "new_string" parameter.' };
 
         const files = await window.deyad.readFiles(appId);
@@ -229,12 +231,12 @@ export async function executeTool(
         // Parse indexed edit operations: edit_0_path, edit_0_old_string, edit_0_new_string, ...
         const edits: Array<{ path: string; oldStr: string; newStr: string }> = [];
         for (let i = 0; i < 20; i++) {
-          const p = call.params[`edit_${i}_path`];
+          const p = call.params[`edit_${i}_path`]?.trim();
           const o = call.params[`edit_${i}_old_string`];
           const n = call.params[`edit_${i}_new_string`];
           if (!p) break;
-          if (o === undefined || n === undefined) {
-            return { tool: call.name, success: false, output: `Edit ${i}: missing old_string or new_string.` };
+          if (o === undefined || o === '' || n === undefined) {
+            return { tool: call.name, success: false, output: `Edit ${i}: missing or empty old_string or missing new_string.` };
           }
           edits.push({ path: p, oldStr: o, newStr: n });
         }

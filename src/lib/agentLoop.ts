@@ -316,11 +316,12 @@ export function runAgentLoop(options: AgentOptions): () => void {
             filesChanged = true;
             const fileMap: Record<string, string> = {};
             if (call.params.path && call.params.content !== undefined) {
-              fileMap[call.params.path] = call.params.content;
-              allChangedFiles.add(call.params.path);
+              const trimmedPath = call.params.path.trim();
+              fileMap[trimmedPath] = call.params.content;
+              allChangedFiles.add(trimmedPath);
             }
             for (let i = 0; i < 50; i++) {
-              const p = call.params[`file_${i}_path`];
+              const p = call.params[`file_${i}_path`]?.trim();
               const c = call.params[`file_${i}_content`];
               if (!p) break;
               fileMap[p] = c ?? '';
@@ -334,25 +335,26 @@ export function runAgentLoop(options: AgentOptions): () => void {
           // edit_file also modifies files
           if (call.name === 'edit_file' && result.success) {
             filesChanged = true;
-            if (call.params.path) {
-              allChangedFiles.add(call.params.path);
+            const editPath = call.params.path?.trim();
+            if (editPath) {
+              allChangedFiles.add(editPath);
               // Read the updated file so the UI can show the diff
               try {
                 const freshFiles = await window.deyad.readFiles(appId);
-                const updatedContent = freshFiles[call.params.path];
+                const updatedContent = freshFiles[editPath];
                 if (updatedContent !== undefined) {
-                  await callbacks.onFilesWritten({ [call.params.path]: updatedContent });
+                  await callbacks.onFilesWritten({ [editPath]: updatedContent });
                 }
               } catch (err) { console.debug('ignore edit_file notify:', err); }
             }
           }
 
-          // multi_edit modifies files
-          if (call.name === 'multi_edit' && result.success) {
+          // multi_edit modifies files (check for any successful edits, not just overall success)
+          if (call.name === 'multi_edit' && result.output.includes(': OK')) {
             filesChanged = true;
             const editedPaths: string[] = [];
-            for (let i = 0; i < 50; i++) {
-              const p = call.params[`edit_${i}_path`] || call.params[`file_${i}_path`];
+            for (let i = 0; i < 20; i++) {
+              const p = call.params[`edit_${i}_path`]?.trim();
               if (!p) break;
               allChangedFiles.add(p);
               editedPaths.push(p);
