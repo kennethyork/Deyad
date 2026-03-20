@@ -417,7 +417,7 @@ type OAuthProvider = 'vercel' | 'netlify';
                 disabled={vpsWorking}
                 style={{ width: 80 }}
               />
-              <span style={{ color: '#94a3b8' }}>@</span>
+              <span style={{ color: 'var(--text-secondary)' }}>@</span>
               <input
                 className="deploy-vps-input"
                 placeholder="host or IP"
@@ -426,7 +426,7 @@ type OAuthProvider = 'vercel' | 'netlify';
                 disabled={vpsWorking}
                 style={{ width: 140 }}
               />
-              <span style={{ color: '#94a3b8' }}>:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>:</span>
               <input
                 className="deploy-vps-input"
                 placeholder="/var/www/html"

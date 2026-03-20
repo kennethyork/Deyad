@@ -111,7 +111,7 @@ export default function EnvVarsPanel({ appId }: Props) {
         )}
       </div>
 
-      {envError && <div className="env-status" style={{ color: '#ef4444' }}>{envError}</div>}
+      {envError && <div className="env-status" style={{ color: 'var(--danger)' }}>{envError}</div>}
 
       {status && <div className="env-status">{status}</div>}
 

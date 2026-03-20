@@ -219,7 +219,7 @@ export default function TerminalPanel({ appId }: Props) {
       <div
         className="terminal-panel"
         ref={containerRef}
-        style={{ width: '100%', flex: 1, background: '#000' }}
+        style={{ width: '100%', flex: 1, background: 'var(--bg-code)' }}
       />
     </div>
   );

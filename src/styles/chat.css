@@ -232,7 +232,7 @@
 .message-body p { margin-bottom: 0.5rem; }
 .message-body p:last-child { margin-bottom: 0; }
 .message-body pre {
-  background: #0d1526;
+  background: var(--bg-code);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 14px;
@@ -245,7 +245,7 @@
 .message-body code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: rgba(0,0,0,0.3);
+  background: var(--bg-code-inline);
   padding: 1px 5px;
   border-radius: 3px;
 }
