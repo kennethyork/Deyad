@@ -678,7 +678,7 @@ User's instructions: ${text}`;
                   <span className="stack-badge">Express</span>
                   <span className="stack-badge">Prisma</span>
                   <span className={`stack-badge stack-badge-db`}>
-                    PostgreSQL
+                    SQLite
                   </span>
                 </>
               )}

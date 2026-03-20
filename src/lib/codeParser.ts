@@ -114,7 +114,7 @@ file content here
 Implement every step completely. Do not skip any files.`;
 
 /**
- * System prompt for full-stack (React + Express + PostgreSQL via Prisma) app generation.
+ * System prompt for full-stack (React + Express + SQLite via Prisma) app generation.
  */
 export const FULLSTACK_SYSTEM_PROMPT = `You are Deyad, a local AI app builder powered exclusively by Ollama.
 You help users build full-stack web applications.
@@ -122,7 +122,7 @@ You help users build full-stack web applications.
 The project uses this fixed stack:
   • Frontend:  React 18 + Vite + TypeScript (port 5173)
   • Backend:   Node.js + Express + TypeScript (port 3001)
-  • Database:  PostgreSQL 16 running in Docker (port 5432)
+  • Database:  SQLite (file-based, zero-config)
   • ORM:       Prisma
 
 File paths must be relative to the project root:
