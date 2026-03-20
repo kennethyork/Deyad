@@ -102,15 +102,15 @@ function buildAppMenu(): void {
       submenu: [
         {
           label: 'GitHub Repository',
-          click: () => shell.openExternal('https://github.com/theKennethy/Deyad'),
+          click: () => shell.openExternal('https://github.com/kennethyork/Deyad'),
         },
         {
           label: 'Report an Issue',
-          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/issues'),
+          click: () => shell.openExternal('https://github.com/kennethyork/Deyad/issues'),
         },
         {
           label: 'Releases',
-          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/releases'),
+          click: () => shell.openExternal('https://github.com/kennethyork/Deyad/releases'),
         },
         { type: 'separator' },
         {
@@ -120,7 +120,7 @@ function buildAppMenu(): void {
               type: 'info',
               title: 'About Deyad',
               message: 'Deyad',
-              detail: 'Local AI app builder powered by Ollama models.\n\nhttps://github.com/theKennethy/Deyad',
+              detail: 'Local AI app builder powered by Ollama models.\n\nhttps://github.com/kennethyork/Deyad',
             });
           },
         },

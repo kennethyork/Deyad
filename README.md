@@ -12,7 +12,7 @@ Describe what you want. Get a working app. No cloud. No API keys. No limits.
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Version](https://img.shields.io/badge/Version-1.4.35-blue)
 
-[Download](https://github.com/theKennethy/Deyad/releases/latest) · [Report Bug](https://github.com/theKennethy/Deyad/issues) · [Request Feature](https://github.com/theKennethy/Deyad/issues)
+[Download](https://github.com/kennethyork/Deyad/releases/latest) · [Report Bug](https://github.com/kennethyork/Deyad/issues) · [Request Feature](https://github.com/kennethyork/Deyad/issues)
 
 ---
 
@@ -244,7 +244,7 @@ Start from a template or go blank:
 
 ### Download
 
-Grab the latest binary from [GitHub Releases](https://github.com/theKennethy/Deyad/releases/latest):
+Grab the latest binary from [GitHub Releases](https://github.com/kennethyork/Deyad/releases/latest):
 
 | Platform | File |
 | --- | --- |
@@ -305,7 +305,7 @@ ollama pull llama3.2
 ### From Source
 
 ```bash
-git clone https://github.com/theKennethy/Deyad.git
+git clone https://github.com/kennethyork/Deyad.git
 cd Deyad
 npm install
 npm start

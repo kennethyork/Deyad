@@ -127,7 +127,7 @@ export function registerSettingsHandlers(
 
   // ── Plugin Marketplace ────────────────────────────────────────────────────
 
-  const REGISTRY_URL = 'https://raw.githubusercontent.com/theKennethy/deyad-plugins/main/registry.json';
+  const REGISTRY_URL = 'https://raw.githubusercontent.com/kennethyork/Deyad-plugins/main/registry.json';
 
   function httpsGet(url: string): Promise<string> {
     return new Promise((resolve, reject) => {

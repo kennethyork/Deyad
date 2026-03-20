@@ -40,5 +40,5 @@ nsis:
 afterSign: build/notarize.cjs
 publish:
   provider: github
-  owner: theKennethy
+  owner: kennethyork
   repo: Deyad

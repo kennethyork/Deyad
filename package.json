@@ -5,7 +5,7 @@
   "description": "Local AI app builder powered by Ollama models",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kennethhy/Deyad"
+    "url": "https://github.com/kennethyork/Deyad.git"
   },
   "main": ".vite/build/main.js",
   "private": true,
