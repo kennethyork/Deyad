@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Download — Deyad</title>
+  <style>
+    :root { --bg:#030712; --surface:#0f172a; --text:#e2e8f0; --muted:#94a3b8; --accent:#6366f1; --border:rgba(148,163,184,.16); }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);}
+    nav{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:center;background:rgba(3,7,18,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);z-index:10;}
+    nav .container{width:min(1120px,calc(100%-32px));display:flex;align-items:center;justify-content:space-between;}
+    .menu{display:flex;gap:18px;font-size:.9rem;}
+    .menu a{color:var(--text-muted);text-decoration:none;padding:8px;transition:.2s;} .menu a:hover,.menu a.active{color:#fff;}
+    .page{padding:100px 24px 40px;max-width:980px;margin:0 auto;}
+    .page h1{font-size:2rem;margin-bottom:12px;}
+    .buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-top:20px;}
+    .dl{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;}
+    .dl h3{margin:0 0 8px;font-size:1.05rem;}
+    .dl p{margin:0 0 12px;color:var(--text-muted);}
+    .dl a{display:inline-block;padding:9px 14px;border-radius:8px;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;}
+    .footer{padding:24px;text-align:center;color:var(--muted);border-top:1px solid var(--border);}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="container"><div class="logo">Deyad</div><div class="menu"><a href="index.html">Home</a><a href="features.html">Features</a><a href="docs.html">Docs</a><a href="download.html" class="active">Download</a></div></div>
+</nav>
+<main>
+  <div class="page">
+    <h1>Download</h1>
+    <p>Get the latest version from GitHub Releases.</p>
+    <div class="buttons">
+      <div class="dl"><h3>Windows</h3><p>Deyad-x64.exe</p><a href="https://github.com/kennethyork/Deyad/releases/latest">Download</a></div>
+      <div class="dl"><h3>Ubuntu/Debian</h3><p>Deyad-amd64.deb</p><a href="https://github.com/kennethyork/Deyad/releases/latest">Download</a></div>
+      <div class="dl"><h3>RPM</h3><p>Deyad-x86_64.rpm</p><a href="https://github.com/kennethyork/Deyad/releases/latest">Download</a></div>
+      <div class="dl"><h3>AppImage</h3><p>Deyad-x86_64.AppImage</p><a href="https://github.com/kennethyork/Deyad/releases/latest">Download</a></div>
+    </div>
+  </div>
+</main>
+<footer class="footer">Back to <a href="index.html" style="color:var(--accent);">home</a>.</footer>
+</body>
+</html>

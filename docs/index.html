@@ -3,29 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Deyad — Local AI App Builder (GitHub Pages)</title>
-  <meta name="description" content="Deyad is a local-first AI app builder for Ollama with code generation, workflows, and deployments." />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <style>
-    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; font-family:Inter,system-ui,sans-serif; background: linear-gradient(135deg,#030712 0%,#0f172a 100%); color:#e2e8f0; }
-    .wrapper { text-align:center; max-width:720px; padding:24px; }
-    h1 { font-size:clamp(1.8rem,5vw,2.8rem); margin-bottom:12px; }
-    p { color:#94a3b8; margin-bottom:24px; }
-    .btn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; background:#6366f1; color:#fff; padding:12px 18px; border-radius:10px; font-weight:700; text-decoration:none; }
-    .list { text-align:left; margin:24px auto 0; max-width:420px; }
-    .list li { margin:8px 0; }
+  <title>Deyad — Local AI App Builder</title>
+  <meta name="de"utf-8" />
+  <meta name="viscription" content="Deyad is a local-first AI app builder for Ollama. Build software with natural language in a local desktop IDE." />
+  <style>"utf-8" />
+  <meta name="vi
+    :root { --bg:#030712; --surface:#0f172a; --card:#1f2937; --text:#e2e8f0; --muted:#94a3b8; --accent:#6366f1; --accent-l:#818cf8; --border:rgba(148,163,184,.16); }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+    nav{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:center;background:rgba(3,7,18,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);z-index:10;}
+    nav .container{width:min(1120px,calc(100%-32px));display:flex;align-items:center;justify-content:space-between;}
+    .logo{font-weight:800;letter-spacing:-.02em;font-size:1.15rem;}
+    .menu{display:flex;gap:18px;font-size:.9rem;}
+    .menu a{color:var(--text-muted);text-decoration:none;padding:8px;transition:.2s;} .menu a:hover,.menu a.active{color:#fff;}
+    .hero{padding:140px 24px 80px;text-align:center;max-width:820px;margin:0 auto;}
+    .hero h1{font-size:clamp(2rem,6vw,3.6rem);margin:0 0 18px;line-height:1.1;}
+    .hero p{color:var(--text-muted);font-size:1.05rem;margin:0 0 24px;}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;font-weight:700;text-decoration:none;border:1px solid transparent;"utf-8" />
+  <meta name="vitransition:.2s;}
+    .btn.primary{background:linear-gradient(135deg,#6366f1,#06b6d4);color:#fff;} .btn.primary:hover{transform:translateY(-2px);}
+    .btn.secondary{background:var(--surface);color:#fff;border-color:var(--border);} .btn.secondary:hover{background:var(--card);}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:1120px;margin:32px auto;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;}
+    .card h3{margin:0 0 6px;font-size:1.05rem;} .card p{margin:0;color:var(--text-muted);font-size:.9rem;}
+    .section{pad"utf-8" />
+  <meta name="viding:80px 24px;max-width:1120px;margin:0 auto;}
+    .section-title{font-size:clamp(1.75rem,4vw,2.3rem);margin:0 0 12px;}
+    .section-sub{color:var(--muted);margin:0 0 16px;max-width:700px;}
+    .footer{padding:36px 24px;text-align:center;color:var(--muted);font-size:.85rem;border-top:1px solid var(--border);}
+    @media (max-width:768px){.hero{padding:120px 16px 60px;}.menu{display:none;}}
   </style>
 </head>
 <body>
-  <article class="wrapper">
-    <h1>Deyad GitHub Pages is back</h1>
-    <p>Your Deyad marketing content is now served from docs/, while the main app still lives in the repo root.</p>
-    <a class="btn" href="/website/index.html">View self-hosted website</a>
-    <ul class="list">
-      <li>✅ GitHub Pages source: main / docs</li>
-      <li>✅ Advanced UI in website/ (kept for self-hosted use)</li>
-      <li>✅ Deploy workflow restored under .github/workflows/pages.yml</li>
-    </ul>
-  </article>
+<nav>
+  <div class="container"><div class="logo">Deyad</div><div class="menu"><a href="index.html" class="active">Home</a><a href="features.html">Features</a><a href="docs.html">Docs</a><a href="download.html">Download</a></div></div>
+</nav>
+<main>
+  <section class="hero">
+    <h1>Build full software locally with Ollama AI</h1>
+    <p>Pick a stack, describe your app, and Deyad auto-generates code, runs commands, resolves errors, commits changes, and deploys.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;"><a class="btn primary" href="download.html">Download Deyad</a><a class="btn secondary" href="features.html">Explore features</a></div>
+  </section>"utf-8" />
+  <meta name="vi
+  <section class="section">
+    <div class="section-title">5 stacks, 1 app</div>
+    <p class="section-sub">React+Vite, Full Stack, Next.js, Python, Go — all scaffolded with working database and live preview.</p>
+    <div class="grid"><div class="card"><h3>Frontend</h3><p>React 18 + Vite + TypeScript</p></div><div class="card"><h3>Full Stack</h3><p>React + Express + Prisma + SQLite</p></div><div class="card"><h3>Next.js</h3><p>Next.js 14 App Router + API routes</p></div><div class="card"><h3>Python</h3><p>FastAPI + SQLModel + uvicorn</p></div><div class="card"><h3>Go</h3><p>Go + Chi v5 + modernc SQLite</p></div></div>
+  </sect"utf-8" />
+  <meta name="viion>
+  <section class="section" style="background:var(--surface);border-top:1px solid var(--border);">
+    <div class="section-title">What makes us unique</div>
+    <div class="grid"><div class="card"><h3>100% local AI</h3><p>All generation happens on your machine via Ollama; no network data leaves your environment.</p></div><div class="card"><h3>Auto commit</h3><p>Every generation is auto-staged and committed with a changelog for full traceability.</p></div><div class="card"><h3>Deploy anywhere</h3><p>Vercel, Netlify, Railway, Fly.io, Surge, VPS, and desktop packagers supported.</p></div></div>
+  </section>
+</main>
+<footer class="footer">A product by <a href="https://github.com/kennethyork/Deyad" style="color:var(--accent);">kennethyork</a>. Hosted on GitHub Pages.</footer>
 </body>
 </html>

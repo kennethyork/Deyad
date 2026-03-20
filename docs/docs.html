@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Docs — Deyad</title>
+  <style>
+    :root { --bg:#030712; --surface:#0f172a; --text:#e2e8f0; --muted:#94a3b8; --accent:#6366f1; --border:rgba(148,163,184,.16); }
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);}
+    nav{position:fixed;top:0;left:0;right:0;height:64px;display:flex;align-items:center;justify-content:center;background:rgba(3,7,18,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);z-index:10;}
+    nav .container{width:min(1120px,calc(100%-32px));display:flex;align-items:center;justify-content:space-between;}
+    .menu{display:flex;gap:18px;font-size:.9rem;}
+    .menu a{color:var(--text-muted);text-decoration:none;padding:8px;transition:.2s;} .menu a:hover,.menu a.active{color:#fff;}
+    .page{padding:100px 24px 40px;max-width:980px;margin:0 auto;}
+    .page h1{font-size:2rem;margin-bottom:12px;}
+    .page p{color:var(--text-muted);margin:12px 0;}
+    pre{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;overflow-x:auto;font-family:monospace;color:#cbd5e1;}
+    .footer{padding:24px;text-align:center;color:var(--muted);border-top:1px solid var(--border);}
+  </style>
+</head>
+<body>
+<nav>
+  <div class="container"><div class="logo">Deyad</div><div class="menu"><a href="index.html">Home</a><a href="features.html">Features</a><a href="docs.html" class="active">Docs</a><a href="download.html">Download</a></div></div>
+</nav>
+<main>
+  <div class="page">
+    <h1>Getting Started</h1>
+    <p>1. Install Ollama and pull a model: <code>ollama pull llama3.2</code>.</p>
+    <p>2. Install Deyad and open the app.</p>
+    <p>3. Create a new project, choose a stack, and tell the chat what to build.</p>
+    <h2>Commands</h2>
+    <pre># Start local dev environment
+npm start
+
+# Build release binaries
+npm run dist
+</pre>
+    <h2>Reference</h2>
+    <p><b>Agent:</b> natural language planner, auto-generate files, fix compile errors.</p>
+    <p><b>Live preview:</b> internal browser showing localhost server.</p>
+  </div>
+</main>
+<footer class="footer">Back to <a href="index.html" style="color:var(--accent);">home</a>.</footer>
+</body>
+</html>
