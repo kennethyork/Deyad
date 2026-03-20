@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Deyad - Local AI App Builder</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <style>
+      :root { --bg:#031526; --surface:#0b1b3f; --text:#e7f0ff; --muted:#8cb0cf; --accent:#5d7cfa; }
+      *{box-sizing:border-box}
+      body{margin:0;font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5}
+      .container{max-width:980px;margin:0 auto;padding:52px 20px}
+      header{display:flex;align-items:center;justify-content:space-between;gap:20px}
+      h1{margin:0;font-size:clamp(2rem,5vw,3.5rem)}
+      p{color:var(--muted)}
+      .badge{background:var(--accent);padding:.35em .7em;border-radius:.45rem;font-weight:700;color:#fff;font-size:.8rem;letter-spacing:.03em}
+      .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.7rem 1.1rem;border-radius:.65rem;border:none;font-weight:700;color:#fff;background:linear-gradient(135deg,#5d7cfa,#49d9bd);text-decoration:none;cursor:pointer;transition:transform .16s ease,filter .16s ease}
+      .btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:32px}
+      .card{background:var(--surface);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:20px}
+      .card h3{margin-top:0}
+      footer{margin-top:70px;color:var(--muted);font-size:.9rem;text-align:center}
+      .cta{margin-top:30px;display:flex;gap:12px;flex-wrap:wrap}
+      code{background:rgba(255,255,255,.08);padding:.2rem .4rem;border-radius:.4rem;color:#9cc7ff}
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <span class="badge">Deyad</span>
+          <h1>Local AI App Builder for Developers</h1>
+          <p>Generate full-stack code, scaffold new projects, and iterate in real-time with your local Ollama model.</p>
+        </div>
+        <a class="btn" href="https://github.com/theKennethy/Deyad" target="_blank" rel="noopener">View on GitHub</a>
+      </header>
+
+      <section class="grid">
+        <article class="card">
+          <h3>Code generation</h3>
+          <p>Ask your AI assistant to build UI, routes, API endpoints, and tests. The editor updates automatically with code from the chat.</p>
+        </article>
+        <article class="card">
+          <h3>Stack support</h3>
+          <p>React+Vite, Express, Prisma (SQLite), and local dev-server preview are built-in. Add your own frameworks via plugins.</p>
+        </article>
+        <article class="card">
+          <h3>Terminal + git</h3>
+          <p>Integrated terminal, git commands, staging, and version history make Deyad a complete workspace.</p>
+        </article>
+        <article class="card">
+          <h3>Plugin marketplace</h3>
+          <p>Extend functionality with plugins (AI tools, deploy targets, lint/rules), all managed from inside the app.</p>
+        </article>
+      </section>
+
+      <div class="cta">
+        <a class="btn" href="https://github.com/theKennethy/Deyad/releases" target="_blank" rel="noopener">Download latest</a>
+        <a class="btn" href="https://deyad.ai/docs" target="_blank" rel="noopener">Documentation</a>
+      </div>
+
+      <footer>
+        <p>Already using Deyad? Open the app and type <code>make a todo app</code> to start.</p>
+      </footer>
+    </div>
+  </body>
+</html>
