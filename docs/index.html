@@ -2,54 +2,237 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Deyad — Local AI App Builder</title>
-  <meta name="description" content="Deyad is a local-first AI app builder for Ollama. Build software with natural language in a local desktop IDE." />
+  <meta name="description" content="Describe what you want. Get a working app. No cloud. No API keys. No limits. Open-source local-first AI app builder powered by Ollama." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+
+<!-- NAV -->
 <nav>
   <div class="container">
-    <div class="logo">Deyad</div>
-    <div class="menu">
+    <a href="index.html" class="nav-brand"><span>&#9670;</span> Deyad</a>
+    <div class="nav-links">
       <a href="index.html" class="active">Home</a>
       <a href="features.html">Features</a>
       <a href="docs.html">Docs</a>
       <a href="download.html">Download</a>
+      <a href="https://github.com/kennethyork/Deyad" class="btn-nav">GitHub</a>
     </div>
+    <button class="mobile-toggle" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('show')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
   </div>
 </nav>
-<main class="main-content">
-  <section class="hero">
-    <h1>Build full software locally with Ollama AI</h1>
-    <p>Pick a stack, describe your app, and Deyad auto-generates code, runs commands, resolves errors, commits changes, and deploys.</p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-      <a class="btn primary" href="download.html">Download Deyad</a>
-      <a class="btn secondary" href="features.html">Explore features</a>
-    </div>
-  </section>
 
-  <section class="section">
-    <h2 class="section-title">5 stacks, 1 app</h2>
-    <p class="section-sub">React+Vite, Full Stack, Next.js, Python, Go — all scaffolded with working database and live preview.</p>
-    <div class="grid">
-      <div class="card"><h3>Frontend</h3><p>React 18 + Vite + TypeScript</p></div>
-      <div class="card"><h3>Full Stack</h3><p>React + Express + Prisma + SQLite</p></div>
-      <div class="card"><h3>Next.js</h3><p>Next.js 14 App Router + API routes</p></div>
-      <div class="card"><h3>Python</h3><p>FastAPI + SQLModel + uvicorn</p></div>
-      <div class="card"><h3>Go</h3><p>Go + Chi v5 + modernc SQLite</p></div>
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Open source &middot; MIT license &middot; v1.4.35
     </div>
-  </section>
+    <h1>Build apps with AI.<br><span class="gradient">Entirely on your machine.</span></h1>
+    <p class="subtitle">Describe what you want in plain English. Deyad writes the code, runs commands, fixes errors, commits to Git, and deploys &mdash; all locally with Ollama. No cloud. No API keys. No limits.</p>
+    <div class="btn-group">
+      <a href="download.html" class="btn btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for free
+      </a>
+      <a href="features.html" class="btn btn-secondary">See all features</a>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">5</div>
+        <div class="stat-label">App stacks</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">18</div>
+        <div class="stat-label">Agent tools</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">7</div>
+        <div class="stat-label">Deploy targets</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">100%</div>
+        <div class="stat-label">Local &amp; offline</div>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <section class="section" style="background: var(--surface); border-top: 1px solid var(--border);">
-    <h2 class="section-title">What makes us unique</h2>
-    <div class="grid">
-      <div class="card"><h3>100% local AI</h3><p>All generation occurs on your machine with Ollama; none leaves your network.</p></div>
-      <div class="card"><h3>Auto commit</h3><p>Every agent iteration auto-saves to Git for full traceability.</p></div>
-      <div class="card"><h3>Deploy anywhere</h3><p>Vercel, Netlify, Railway, Fly.io, Surge, VPS, and desktop packaging.</p></div>
+<!-- HOW IT WORKS -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">From idea to working app in minutes</h2>
+      <p class="section-desc">Deyad's autonomous agent reads your codebase, plans the approach, writes files, runs commands, and self-corrects &mdash; up to 30 iterations per request.</p>
     </div>
-  </section>
-</main>
-<footer class="footer">A product by <a href="https://github.com/kennethyork/Deyad" style="color:var(--accent);">kennethyork</a>. Hosted on GitHub Pages.</footer>
+    <div class="flow">
+      <div class="flow-step"><span class="step-icon">💬</span> Describe your app</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="step-icon">🔍</span> Agent reads codebase</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="step-icon">📝</span> Writes &amp; edits files</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="step-icon">▶️</span> Runs &amp; verifies</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="step-icon">🔧</span> Auto-fixes errors</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step"><span class="step-icon">✅</span> Commits to Git</div>
+    </div>
+  </div>
+</section>
+
+<!-- STACKS -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <div class="section-label">Stacks</div>
+      <h2 class="section-title">Five production-ready stacks</h2>
+      <p class="section-desc">Pick a stack, and Deyad scaffolds a complete project with database, server, and live preview &mdash; ready to build on.</p>
+    </div>
+    <div class="grid grid-5">
+      <div class="card">
+        <div class="card-icon">⚛️</div>
+        <h3>Frontend</h3>
+        <p>React 18 + Vite + TypeScript</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <h3>Full Stack</h3>
+        <p>React + Express + Prisma + SQLite</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">▲</div>
+        <h3>Next.js</h3>
+        <p>Next.js 14 App Router + API routes</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🐍</div>
+        <h3>Python</h3>
+        <p>FastAPI + SQLModel + uvicorn</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔵</div>
+        <h3>Go</h3>
+        <p>Go + Chi v5 + modernc SQLite</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY DEYAD -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <div class="section-label">Why Deyad</div>
+      <h2 class="section-title">What sets us apart</h2>
+    </div>
+    <div class="grid grid-3">
+      <div class="card card-highlight">
+        <div class="card-icon">🔒</div>
+        <h3>100% local AI</h3>
+        <p>All inference runs on your machine via Ollama. Your code and data never leave your network. No accounts, no keys, no subscriptions.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">♾️</div>
+        <h3>Free forever</h3>
+        <p>Open source under MIT. No token limits, no usage caps, no paywalls. Run as many generations as your hardware allows.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🛠️</div>
+        <h3>Full IDE built in</h3>
+        <p>Monaco editor, terminal, live preview, file tree, package manager, search, and command palette &mdash; all in one window.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🗄️</div>
+        <h3>Zero-config database</h3>
+        <p>SQLite instead of PostgreSQL. No Docker, no server. Prisma ORM with a built-in table browser for inspecting your data.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">📦</div>
+        <h3>Auto-commit</h3>
+        <p>Every agent iteration auto-saves to Git. Browse version history, preview diffs, and restore with one click.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🚀</div>
+        <h3>Deploy anywhere</h3>
+        <p>Ship to Vercel, Netlify, Railway, Fly.io, Surge, any VPS, or package as a desktop app. 7 targets, one modal.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section>
+  <div class="container">
+    <div class="section-header">
+      <div class="section-label">Comparison</div>
+      <h2 class="section-title">How Deyad compares</h2>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Deyad</th>
+            <th>Bolt.new</th>
+            <th>Lovable</th>
+            <th>Cursor</th>
+            <th>v0</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>100% local AI</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Free, no token limits</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Data stays on your machine</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Open source</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>5 production stacks</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Autonomous agent (30 iter.)</td><td class="check">✓</td><td class="cross">Partial</td><td class="cross">Partial</td><td class="check">✓</td><td class="cross">—</td></tr>
+          <tr><td>Error auto-fix</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Built-in database browser</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Git auto-commit</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>AI code completion (FIM)</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td></tr>
+          <tr><td>Image → code</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Deploy (7 targets)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="cross">—</td><td class="cross">Vercel</td></tr>
+          <tr><td>Desktop packaging</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Plugin system</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="check">✓</td><td class="cross">—</td></tr>
+          <tr><td>Works fully offline</td><td class="check">✓</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align:center;">
+  <div class="container">
+    <h2 class="section-title">Ready to build?</h2>
+    <p class="section-desc" style="margin-bottom:32px;">Download Deyad and start shipping apps with local AI today.</p>
+    <div class="btn-group" style="justify-content:center;">
+      <a href="download.html" class="btn btn-primary">Download Deyad</a>
+      <a href="https://github.com/kennethyork/Deyad" class="btn btn-secondary">View on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">&copy; 2025 Deyad. Open source under MIT.</div>
+      <div class="footer-links">
+        <a href="https://github.com/kennethyork/Deyad">GitHub</a>
+        <a href="https://github.com/kennethyork/Deyad/issues">Issues</a>
+        <a href="https://github.com/kennethyork/Deyad/releases">Releases</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

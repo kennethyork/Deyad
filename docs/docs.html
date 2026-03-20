@@ -2,32 +2,209 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Docs — Deyad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Documentation — Deyad</title>
+  <meta name="description" content="Get started with Deyad. Install Ollama, pull a model, create your first project, and start building with AI." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-<nav>
-  <div class="container"><div class="logo">Deyad</div><div class="menu"><a href="index.html">Home</a><a href="features.html">Features</a><a href="docs.html" class="active">Docs</a><a href="download.html">Download</a></div></div>
-</nav>
-<main>
-  <div class="page">
-    <h1>Getting Started</h1>
-    <p>1. Install Ollama and pull a model: <code>ollama pull llama3.2</code>.</p>
-    <p>2. Install Deyad and open the app.</p>
-    <p>3. Create a new project, choose a stack, and tell the chat what to build.</p>
-    <h2>Commands</h2>
-    <pre># Start local dev environment
-npm start
 
-# Build release binaries
-npm run dist
-</pre>
-    <h2>Reference</h2>
-    <p><b>Agent:</b> natural language planner, auto-generate files, fix compile errors.</p>
-    <p><b>Live preview:</b> internal browser showing localhost server.</p>
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <a href="index.html" class="nav-brand"><span>&#9670;</span> Deyad</a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="docs.html" class="active">Docs</a>
+      <a href="download.html">Download</a>
+      <a href="https://github.com/kennethyork/Deyad" class="btn-nav">GitHub</a>
+    </div>
+    <button class="mobile-toggle" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('show')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
   </div>
-</main>
-<footer class="footer">Back to <a href="index.html" style="color:var(--accent);">home</a>.</footer>
+</nav>
+
+<!-- DOCS -->
+<div class="container">
+  <div class="docs-layout">
+    <aside class="docs-nav">
+      <a href="#getting-started" class="active">Getting Started</a>
+      <a href="#requirements">Requirements</a>
+      <a href="#installation">Installation</a>
+      <a href="#first-project">First Project</a>
+      <a href="#commands">Commands</a>
+      <a href="#settings">Settings</a>
+      <a href="#templates">Templates</a>
+      <a href="#tech-stack">Tech Stack</a>
+    </aside>
+
+    <div class="docs-content">
+      <h1 id="getting-started">Getting Started</h1>
+      <p>Get Deyad running in three steps.</p>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Install Ollama</h3>
+          <p>Download from <a href="https://ollama.ai">ollama.ai</a> and pull a model:</p>
+        </div>
+      </div>
+      <div class="code-block">ollama pull llama3.2</div>
+
+      <div class="step" style="margin-top:24px;">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Install Deyad</h3>
+          <p>Grab the latest release from the <a href="download.html">downloads page</a> and install it.</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Create a project</h3>
+          <p>Open Deyad, click <strong>New App</strong>, choose a stack, and describe what you want to build in the chat panel.</p>
+        </div>
+      </div>
+
+      <h2 id="requirements">Requirements</h2>
+
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Dependency</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Node.js &ge; 18</td><td>Runs generated apps, Vite dev server, npm</td></tr>
+            <tr><td>Ollama</td><td>Local AI inference (required)</td></tr>
+            <tr><td>Git</td><td>Auto-commit, version history, GitHub sync</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin-top:16px;">Optional dependencies for deployment:</p>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Feature</th><th>Dependency</th></tr></thead>
+          <tbody>
+            <tr><td>Vercel deploy</td><td>Vercel CLI or OAuth token</td></tr>
+            <tr><td>Netlify deploy</td><td>Netlify CLI or OAuth token</td></tr>
+            <tr><td>Surge deploy</td><td><code>npm i -g surge</code></td></tr>
+            <tr><td>Railway deploy</td><td><code>npm i -g @railway/cli</code></td></tr>
+            <tr><td>Fly.io deploy</td><td>flyctl CLI</td></tr>
+            <tr><td>VPS deploy</td><td>rsync + SSH</td></tr>
+            <tr><td>Mobile (Android)</td><td>Android SDK via Android Studio</td></tr>
+            <tr><td>Mobile (iOS)</td><td>Xcode (macOS only)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="installation">Installation</h2>
+
+      <h3>Ubuntu / Debian</h3>
+      <div class="code-block">curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs git
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull llama3.2</div>
+
+      <p>Then download <code>Deyad-amd64.deb</code> from <a href="https://github.com/kennethyork/Deyad/releases/latest">GitHub Releases</a> and install:</p>
+      <div class="code-block">sudo dpkg -i Deyad-amd64.deb</div>
+
+      <h3>Windows</h3>
+      <p>Install <a href="https://nodejs.org">Node.js</a>, <a href="https://git-scm.com">Git</a>, and <a href="https://ollama.ai">Ollama</a>. Then download and run <code>Deyad-x64.exe</code> from <a href="https://github.com/kennethyork/Deyad/releases/latest">GitHub Releases</a>.</p>
+
+      <h3>From source</h3>
+      <div class="code-block">git clone https://github.com/kennethyork/Deyad.git
+cd Deyad
+npm install
+npm start</div>
+
+      <h2 id="first-project">First Project</h2>
+      <ol style="color:var(--text-secondary);padding-left:20px;line-height:2.2;">
+        <li>Click <strong>New App</strong> in the sidebar</li>
+        <li>Name your project and pick a stack (e.g. Full Stack)</li>
+        <li>Wait for scaffolding to finish</li>
+        <li>Open the chat panel and describe what you want</li>
+        <li>Watch the agent write code, install packages, start the dev server, and fix any errors</li>
+        <li>Use the live preview panel to see your app running</li>
+      </ol>
+
+      <h2 id="commands">Commands</h2>
+      <div class="code-block"># Development
+npm start          # Start Deyad in dev mode
+npm run dev        # Alias for npm start
+
+# Production build
+npm run dist       # Build platform-specific binaries
+
+# Testing
+npm test           # Run Vitest test suite</div>
+
+      <h2 id="settings">Settings</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>Theme</td><td>Dark or light, persisted across sessions</td></tr>
+            <tr><td>Ollama host</td><td>Configurable endpoint (default <code>http://localhost:11434</code>)</td></tr>
+            <tr><td>Model</td><td>Choose from any installed Ollama model</td></tr>
+            <tr><td>Completion model</td><td>Separate model for FIM autocomplete</td></tr>
+            <tr><td>Embedding model</td><td>For RAG search (or TF-IDF-only mode)</td></tr>
+            <tr><td>Temperature</td><td>Controls generation randomness</td></tr>
+            <tr><td>Top P</td><td>Nucleus sampling threshold</td></tr>
+            <tr><td>Repeat Penalty</td><td>Reduces repetition in output</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="templates">Templates</h2>
+      <p>Start from a pre-built template or go blank:</p>
+      <div class="grid grid-3" style="margin-top:16px;">
+        <div class="card"><h3>Todo App</h3><p>Classic full-stack todo with CRUD operations</p></div>
+        <div class="card"><h3>Dashboard</h3><p>Admin dashboard with charts and tables</p></div>
+        <div class="card"><h3>Landing Page</h3><p>Marketing landing page with responsive design</p></div>
+        <div class="card"><h3>Chat UI</h3><p>Real-time chat interface</p></div>
+        <div class="card"><h3>Blog</h3><p>Blog with posts, comments, and markdown</p></div>
+        <div class="card"><h3>E-commerce</h3><p>Product listings, cart, and checkout</p></div>
+      </div>
+
+      <h2 id="tech-stack">Tech Stack</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Layer</th><th>Technology</th></tr></thead>
+          <tbody>
+            <tr><td>Desktop</td><td>Electron 40 + Vite</td></tr>
+            <tr><td>Renderer</td><td>React 18 + TypeScript 5</td></tr>
+            <tr><td>Editor</td><td>Monaco (VS Code engine)</td></tr>
+            <tr><td>Terminal</td><td>xterm.js + node-pty</td></tr>
+            <tr><td>AI</td><td>Ollama (any local model)</td></tr>
+            <tr><td>Database</td><td>SQLite (zero-config)</td></tr>
+            <tr><td>ORM</td><td>Prisma (JS/TS) &middot; SQLModel (Python) &middot; modernc (Go)</td></tr>
+            <tr><td>VCS</td><td>Git (auto-commit + GitHub integration)</td></tr>
+            <tr><td>Deploy</td><td>OAuth + CLI + SSH/rsync + Electron Builder</td></tr>
+            <tr><td>Plugins</td><td>Custom tools, agents, themes via plugin.json</td></tr>
+            <tr><td>Testing</td><td>Vitest</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer style="margin-top:80px;">
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">&copy; 2025 Deyad. Open source under MIT.</div>
+      <div class="footer-links">
+        <a href="https://github.com/kennethyork/Deyad">GitHub</a>
+        <a href="https://github.com/kennethyork/Deyad/issues">Issues</a>
+        <a href="https://github.com/kennethyork/Deyad/releases">Releases</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

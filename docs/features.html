@@ -2,25 +2,255 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Features — Deyad</title>
+  <meta name="description" content="Explore Deyad's full feature set: autonomous AI agent, Monaco editor, live preview, database browser, Git integration, deploy targets, and plugin ecosystem." />
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
+
+<!-- NAV -->
 <nav>
-  <div class="container"><div class="logo">Deyad</div><div class="menu"><a href="index.html">Home</a><a href="features.html" class="active">Features</a><a href="docs.html">Docs</a><a href="download.html">Download</a></div></div>
-</nav>
-<main>
-  <section class="hero"><h1>Features</h1><p>Core capabilities of Deyad, from autonomous agents to full local development workflow.</p></section>
-  <div class="content">
-    <div class="section"><h2>AI Agent</h2><p>Autonomous planning, code generation, error auto-fix, and task queue with up to 30 iterations per request.</p></div>
-    <div class="section"><h2>Editor</h2><p>Monaco editor with multiple language support, FIM completion, and powerful multi-cursor controls.</p></div>
-    <div class="section"><h2>Database</h2><p>SQLite with Prisma integration and in-app browser; no database server required.</p></div>
-    <div class="section"><h2>Deploy</h2><p>7 deployment targets including Vercel, Netlify, Railway, Fly.io, Surge, VPS, and desktop packager.</p></div>
-    <div class="section"><h2>Plugin ecosystem</h2><p>Add tools, agents, and themes via plugins. Plugins are auto-discovered in user data or registry.</p></div>
-    <div class="section"><h2>Git</h2><p>Auto-commit, diff previews, version history, and safe rollbacks.</p></div>
+  <div class="container">
+    <a href="index.html" class="nav-brand"><span>&#9670;</span> Deyad</a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html" class="active">Features</a>
+      <a href="docs.html">Docs</a>
+      <a href="download.html">Download</a>
+      <a href="https://github.com/kennethyork/Deyad" class="btn-nav">GitHub</a>
+    </div>
+    <button class="mobile-toggle" aria-label="Menu" onclick="document.querySelector('.nav-links').classList.toggle('show')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
   </div>
-</main>
-<footer class="footer">Back to <a href="index.html" style="color:var(--accent);">home</a>.</footer>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="padding-bottom:60px;">
+  <div class="container">
+    <div class="section-label">Features</div>
+    <h1>Everything you need to<br><span class="gradient">build, test, and ship.</span></h1>
+    <p class="subtitle">A complete local IDE with an autonomous AI agent, database browser, version control, deploy pipeline, and plugin system.</p>
+  </div>
+</section>
+
+<!-- AI AGENT -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row">
+      <div class="feature-content">
+        <div class="feature-label">AI Agent</div>
+        <h2 class="feature-title">Autonomous agent with 18 tools</h2>
+        <p class="feature-desc">The agent reads your codebase, plans its approach, writes and edits files, runs shell commands, detects errors from dev server logs, and self-corrects &mdash; up to 30 iterations per request.</p>
+        <ul class="feature-list">
+          <li>18 tools: read, write, edit, search, run commands, git operations, database queries</li>
+          <li>Error auto-recovery: watches dev server, auto-sends up to 3 fix attempts</li>
+          <li>Planning mode: generates a plan for your approval before executing</li>
+          <li>RAG retrieval: semantic search via Ollama embeddings + TF-IDF fallback</li>
+          <li>Vision support: paste a screenshot or mockup, get working UI code</li>
+          <li>Task queue: queue multiple prompts for batch processing</li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <div style="font-family:var(--mono);font-size:.8rem;color:var(--text-muted);margin-bottom:8px;">agent tools</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <code>list_files</code><code>read_file</code><code>write_files</code><code>edit_file</code><code>multi_edit</code><code>run_command</code><code>search_files</code><code>db_schema</code><code>git_status</code><code>git_commit</code><code>git_push</code><code>git_pull</code><code>git_remote_get</code><code>git_remote_set</code><code>git_branch</code><code>git_branch_create</code><code>git_branch_switch</code><code>git_log</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EDITOR / IDE -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row reverse">
+      <div class="feature-content">
+        <div class="feature-label">IDE</div>
+        <h2 class="feature-title">Full-featured editor and workspace</h2>
+        <p class="feature-desc">Monaco (the VS Code engine) with syntax highlighting for 15+ languages, fill-in-the-middle code completion, a real terminal, and live preview &mdash; all integrated into one window.</p>
+        <ul class="feature-list">
+          <li>Monaco editor with multi-cursor, find &amp; replace, minimap</li>
+          <li>FIM autocomplete with any compatible Ollama model</li>
+          <li>Nested file tree with quick-open search (Ctrl+P)</li>
+          <li>Full xterm.js PTY terminal with copy/paste</li>
+          <li>Embedded Vite dev server with run / stop / refresh</li>
+          <li>Package manager: install and remove npm packages from UI</li>
+          <li>Multi-file .env editor</li>
+          <li>Full-text project search (Ctrl+Shift+F)</li>
+          <li>Command palette (Ctrl+K)</li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <div style="display:flex;gap:6px;margin-bottom:12px;">
+          <span style="width:12px;height:12px;border-radius:50%;background:#ef4444;"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:#eab308;"></span>
+          <span style="width:12px;height:12px;border-radius:50%;background:#22c55e;"></span>
+        </div>
+        <div style="font-family:var(--mono);font-size:.75rem;color:var(--text-muted);line-height:2;">
+          <div><span style="color:var(--accent-light);">import</span> { useState } <span style="color:var(--accent-light);">from</span> <span style="color:#22c55e;">'react'</span></div>
+          <div>&nbsp;</div>
+          <div><span style="color:var(--accent-light);">export default function</span> <span style="color:#f472b6;">App</span>() {</div>
+          <div>&nbsp;&nbsp;<span style="color:var(--accent-light);">const</span> [count, setCount] = <span style="color:#f472b6;">useState</span>(<span style="color:#eab308;">0</span>)</div>
+          <div>&nbsp;&nbsp;<span style="color:var(--accent-light);">return</span> &lt;<span style="color:#22c55e;">button</span>&gt;{count}&lt;/<span style="color:#22c55e;">button</span>&gt;</div>
+          <div>}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DATABASE -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row">
+      <div class="feature-content">
+        <div class="feature-label">Database</div>
+        <h2 class="feature-title">SQLite, zero config, built-in browser</h2>
+        <p class="feature-desc">No Docker, no PostgreSQL server, no configuration. Deyad uses SQLite &mdash; your database is just a file. Prisma ORM handles schema migrations, and the built-in table browser lets you inspect data in real time.</p>
+        <ul class="feature-list">
+          <li>SQLite: always works, even fully offline</li>
+          <li>Prisma ORM for type-safe schema management</li>
+          <li>Browse tables, view rows, and inspect schema in-app</li>
+          <li>Agent can query database structure while coding</li>
+          <li>Zero disk overhead vs ~400MB+ for PostgreSQL + Docker</li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <div style="font-family:var(--mono);font-size:.8rem;color:var(--text-muted);margin-bottom:8px;">schema.prisma</div>
+        <div style="font-family:var(--mono);font-size:.75rem;color:var(--text-secondary);line-height:2;">
+          <div><span style="color:var(--accent-light);">model</span> <span style="color:#f472b6;">User</span> {</div>
+          <div>&nbsp;&nbsp;id&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#eab308;">Int</span>&nbsp;&nbsp;&nbsp;&nbsp;@id @default(autoincrement())</div>
+          <div>&nbsp;&nbsp;email&nbsp;<span style="color:#eab308;">String</span>&nbsp;@unique</div>
+          <div>&nbsp;&nbsp;name&nbsp;&nbsp;<span style="color:#eab308;">String</span>?</div>
+          <div>&nbsp;&nbsp;posts&nbsp;<span style="color:#eab308;">Post</span>[]</div>
+          <div>}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VERSION CONTROL -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row reverse">
+      <div class="feature-content">
+        <div class="feature-label">Version Control</div>
+        <h2 class="feature-title">Git-first, auto everything</h2>
+        <p class="feature-desc">Every AI generation is automatically committed. Browse a visual timeline of commits, preview diffs, and restore any version with one click. Push, pull, and manage branches from the UI or natural language.</p>
+        <ul class="feature-list">
+          <li>Auto-commit every agent iteration</li>
+          <li>GitHub / GitLab push, pull, and remote management</li>
+          <li>Create, switch, and list branches from UI or chat</li>
+          <li>Visual commit timeline with one-click restore</li>
+          <li>Diff preview before accepting changes</li>
+          <li>Say "push to github" or "create a feature branch" in chat</li>
+        </ul>
+      </div>
+      <div class="feature-visual" style="gap:8px;">
+        <div style="font-family:var(--mono);font-size:.8rem;color:var(--text-muted);margin-bottom:4px;">git log</div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0;"></span>
+          <span style="font-size:.8rem;"><strong>Agent:</strong> Add user authentication</span>
+          <span style="margin-left:auto;font-size:.7rem;color:var(--text-muted);">2m ago</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--accent);flex-shrink:0;"></span>
+          <span style="font-size:.8rem;"><strong>Agent:</strong> Create database schema</span>
+          <span style="margin-left:auto;font-size:.7rem;color:var(--text-muted);">5m ago</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--accent-light);flex-shrink:0;"></span>
+          <span style="font-size:.8rem;"><strong>Agent:</strong> Scaffold project</span>
+          <span style="margin-left:auto;font-size:.7rem;color:var(--text-muted);">8m ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DEPLOY -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row">
+      <div class="feature-content">
+        <div class="feature-label">Deploy</div>
+        <h2 class="feature-title">Ship to 7 targets, one click</h2>
+        <p class="feature-desc">Deploy from a single modal to Vercel, Netlify, Railway, Fly.io, Surge, any VPS via SSH, or package as a desktop app with Electron Builder.</p>
+        <ul class="feature-list">
+          <li>Vercel &amp; Netlify: OAuth or CLI, one-click deploy</li>
+          <li>Railway &amp; Fly.io: full-stack with database support</li>
+          <li>Surge: instant static site hosting</li>
+          <li>VPS: SSH + rsync with optional nginx + Let's Encrypt SSL</li>
+          <li>Desktop: package as AppImage / .exe / .dmg</li>
+          <li>Mobile preview via Capacitor (Android &amp; iOS)</li>
+          <li>ZIP and PWA export</li>
+        </ul>
+      </div>
+      <div class="feature-visual">
+        <div style="font-family:var(--mono);font-size:.8rem;color:var(--text-muted);margin-bottom:8px;">deploy targets</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">▲ Vercel</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">◆ Netlify</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">🚂 Railway</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">🪁 Fly.io</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">⚡ Surge</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;">🖥️ VPS</div>
+          <div style="background:var(--bg);padding:10px 14px;border-radius:8px;font-size:.85rem;font-weight:500;grid-column:span 2;text-align:center;">📦 Desktop (Electron)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLUGINS -->
+<section class="feature-section">
+  <div class="container">
+    <div class="feature-row reverse">
+      <div class="feature-content">
+        <div class="feature-label">Plugins</div>
+        <h2 class="feature-title">Extend with custom tools, agents, and themes</h2>
+        <p class="feature-desc">Browse, install, and uninstall community plugins directly from the app. Plugins are auto-discovered from your data directory and the online registry.</p>
+        <ul class="feature-list">
+          <li>Custom tools: new agent tools the AI can call</li>
+          <li>Custom agents: specialized personas with system prompts</li>
+          <li>Custom themes: CSS themes loaded on startup</li>
+          <li>Plugin marketplace built into the app</li>
+        </ul>
+      </div>
+      <div class="feature-visual" style="text-align:center;padding:48px 32px;">
+        <div style="font-size:3rem;margin-bottom:16px;">🧩</div>
+        <div style="font-weight:600;margin-bottom:6px;">Plugin Marketplace</div>
+        <div style="color:var(--text-muted);font-size:.85rem;">Tools &middot; Agents &middot; Themes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align:center;">
+  <div class="container">
+    <h2 class="section-title">Start building now</h2>
+    <p class="section-desc" style="margin-bottom:32px;">Download Deyad for free and start shipping apps with local AI.</p>
+    <a href="download.html" class="btn btn-primary">Download Deyad</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-left">&copy; 2025 Deyad. Open source under MIT.</div>
+      <div class="footer-links">
+        <a href="https://github.com/kennethyork/Deyad">GitHub</a>
+        <a href="https://github.com/kennethyork/Deyad/issues">Issues</a>
+        <a href="https://github.com/kennethyork/Deyad/releases">Releases</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>
