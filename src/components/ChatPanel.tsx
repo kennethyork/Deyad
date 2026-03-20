@@ -339,11 +339,15 @@ User's instructions: ${text}`;
       }
     });
 
+    // Set up placeholder unsub functions - will be assigned below
+    let unsubDone: (() => void) | null = null;
+    let unsubError: (() => void) | null = null;
+
     // Store cleanup so unmount can tear down listeners
     const cleanup = () => {
       unsubToken();
-      unsubDone();
-      unsubError();
+      unsubDone?.();
+      unsubError?.();
       streamCleanupRef.current = null;
     };
 
@@ -393,9 +397,9 @@ User's instructions: ${text}`;
       setStreaming(false);
     };
 
-    const unsubDone = window.deyad.onStreamDone(requestId, onDone);
+    unsubDone = window.deyad.onStreamDone(requestId, onDone);
 
-    const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
+    unsubError = window.deyad.onStreamError(requestId, (err: string) => {
       cleanup();
       setError(`Ollama error: ${err}`);
       setStreaming(false);
