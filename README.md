@@ -1,5 +1,3 @@
-<div align="center">
-
 # Deyad
 
 **The open-source, local-first AI app builder.**
@@ -15,8 +13,6 @@ Describe what you want. Get a working app. No cloud. No API keys. No limits.
 ![Version](https://img.shields.io/badge/Version-1.4.35-blue)
 
 [Download](https://github.com/theKennethy/Deyad/releases/latest) · [Report Bug](https://github.com/theKennethy/Deyad/issues) · [Request Feature](https://github.com/theKennethy/Deyad/issues)
-
-</div>
 
 ---
 
@@ -44,7 +40,7 @@ Your code never leaves your machine. There are no API keys, no subscriptions, an
 
 ## How It Works
 
-```
+```text
 You describe your app in chat
   → The agent reads your codebase
   → Plans the approach
@@ -320,9 +316,11 @@ npm start
 ## Getting Started
 
 1. Make sure **Ollama** is running with at least one model:
+
    ```bash
    ollama pull llama3.2
    ```
+
 2. Launch Deyad. The **Welcome Wizard** will verify your Ollama connection and let you select a model.
 3. Click **+ New App**, pick a stack and template, and start chatting.
 
@@ -339,7 +337,7 @@ npm start
 
 ### Full-Stack Project Structure
 
-```
+```text
 your-app/
 ├── frontend/           # React + Vite + TypeScript
 │   ├── src/
