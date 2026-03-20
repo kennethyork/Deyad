@@ -57,6 +57,7 @@ export default function ChatPanel({
   const assistantIdRef = useRef('');
   const streamCleanupRef = useRef<(() => void) | null>(null);
   const agentAbortRef = useRef<(() => void) | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
   const [detectedErrors, setDetectedErrors] = useState<DetectedError[]>([]);
   const autoFixAttemptsRef = useRef(0);
   const autoFixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -324,6 +325,7 @@ User's instructions: ${text}`;
 
     // Set up stream listeners
     const requestId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    activeRequestIdRef.current = requestId;
     const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
       streamBuf.current += token;
       if (!rafRef.current) {
@@ -347,6 +349,7 @@ User's instructions: ${text}`;
 
     const onDone = () => {
       cleanup();
+      activeRequestIdRef.current = null;
       // Cancel any pending RAF — we'll set the final content directly
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -561,6 +564,36 @@ User's instructions: ${text}`;
 
   const handleDismissErrors = () => setDetectedErrors([]);
 
+  const handleCancel = () => {
+    // Cancel the HTTP request on the main process
+    if (activeRequestIdRef.current) {
+      window.deyad.cancelStream(activeRequestIdRef.current);
+      activeRequestIdRef.current = null;
+    }
+    // Abort agent loop if running
+    agentAbortRef.current?.();
+    agentAbortRef.current = null;
+    // Clean up stream listeners
+    streamCleanupRef.current?.();
+    streamCleanupRef.current = null;
+    // Flush final content
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
+    const finalContent = streamBuf.current;
+    if (finalContent) {
+      const aid = assistantIdRef.current;
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === aid ? { ...m, content: finalContent + '\n\n*— cancelled —*' } : m,
+        );
+        saveMessages(updated);
+        return updated;
+      });
+    }
+    setStreaming(false);
+  };
   return (
     <div className="chat-panel" tabIndex={0}>
       {/* Header */}
@@ -729,6 +762,7 @@ User's instructions: ${text}`;
         imageAttachment={imageAttachment}
         setImageAttachment={setImageAttachment}
         onSend={handleSend}
+        onCancel={handleCancel}
         onImagePaste={handleImagePaste}
       />
     </div>

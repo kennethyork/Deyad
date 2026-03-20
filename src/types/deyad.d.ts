@@ -124,6 +124,7 @@ interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }): Promise<void>;
+  cancelStream(requestId: string): Promise<void>;
   fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
   embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
   onStreamToken(requestId: string, cb: (token: string) => void): () => void;

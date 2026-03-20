@@ -4,6 +4,9 @@
 
 import { ipcMain, net } from 'electron';
 
+/** Track active streaming requests so they can be cancelled. */
+const activeRequests = new Map<string, Electron.ClientRequest>();
+
 async function listOllamaModels(baseUrl: string): Promise<{ models: { name: string; modified_at: string; size: number; details?: Record<string, string> }[] }> {
   return new Promise((resolve, reject) => {
     const request = net.request(`${baseUrl}/api/tags`);
@@ -26,11 +29,13 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     const body: Record<string, unknown> = { model, messages, stream: true };
     if (options && Object.keys(options).length > 0) body.options = options;
     const request = net.request({ method: 'POST', url: `${baseUrl}/api/chat` });
+    activeRequests.set(requestId, request);
     let buffer = '';
     let resolved = false;
     const finish = () => {
       if (resolved) return;
       resolved = true;
+      activeRequests.delete(requestId);
       if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done', requestId);
       resolve();
     };
@@ -55,6 +60,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     request.on('error', (err: Error) => {
       if (!resolved) {
         resolved = true;
+        activeRequests.delete(requestId);
         if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, err.message);
         reject(err);
       }
@@ -72,6 +78,14 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
 
   ipcMain.handle('ollama:chat-stream', async (event, { model, messages, requestId, options }: { model: string; messages: { role: string; content: string }[]; requestId: string; options?: Record<string, number> }) => {
     return streamOllama(getOllamaBaseUrl(), event, model, messages, requestId, options);
+  });
+
+  ipcMain.handle('ollama:cancel-stream', (_event, requestId: string) => {
+    const req = activeRequests.get(requestId);
+    if (req) {
+      req.abort();
+      activeRequests.delete(requestId);
+    }
   });
 
   /** Fill-in-the-middle completion for inline autocomplete. */

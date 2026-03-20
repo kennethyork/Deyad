@@ -45,6 +45,9 @@ contextBridge.exposeInMainWorld('deyad', {
   chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>): Promise<void> =>
     ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options }),
 
+  cancelStream: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke('ollama:cancel-stream', requestId),
+
   fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
     ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
 
