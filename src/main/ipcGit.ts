@@ -12,6 +12,10 @@ const execFileAsync = promisify(execFile);
 
 const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.json\n';
 
+// Fallback identity used for automated tool commits (overridden by global git config when present)
+const GIT_USER_NAME = 'Deyad';
+const GIT_USER_EMAIL = 'deyad@localhost';
+
 export async function gitInit(appDir: (id: string) => string, appId: string): Promise<void> {
   const dir = appDir(appId);
   if (fs.existsSync(path.join(dir, '.git'))) return;
@@ -20,8 +24,8 @@ export async function gitInit(appDir: (id: string) => string, appId: string): Pr
     fs.writeFileSync(path.join(dir, '.gitignore'), DEFAULT_GITIGNORE, 'utf-8');
     await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
     await execFileAsync('git', [
-      '-c', 'user.email=deyad@localhost',
-      '-c', 'user.name=Deyad',
+      '-c', `user.email=${GIT_USER_EMAIL}`,
+      '-c', `user.name=${GIT_USER_NAME}`,
       'commit', '-m', 'Initial scaffold',
     ], { cwd: dir, timeout: 10000 });
   } catch (err) { console.debug('git may not be installed:', err); }
@@ -35,8 +39,8 @@ export async function gitCommit(appDir: (id: string) => string, appId: string, m
     const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: dir, timeout: 10000 });
     if (stdout.trim()) {
       await execFileAsync('git', [
-        '-c', 'user.email=deyad@localhost',
-        '-c', 'user.name=Deyad',
+        '-c', `user.email=${GIT_USER_EMAIL}`,
+        '-c', `user.name=${GIT_USER_NAME}`,
         'commit', '-m', message,
       ], { cwd: dir, timeout: 10000 });
     }
