@@ -19,7 +19,11 @@ export async function gitInit(appDir: (id: string) => string, appId: string): Pr
     await execFileAsync('git', ['init'], { cwd: dir, timeout: 10000 });
     fs.writeFileSync(path.join(dir, '.gitignore'), DEFAULT_GITIGNORE, 'utf-8');
     await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
-    await execFileAsync('git', ['commit', '-m', 'Initial scaffold'], { cwd: dir, timeout: 10000 });
+    await execFileAsync('git', [
+      '-c', 'user.email=deyad@localhost',
+      '-c', 'user.name=Deyad',
+      'commit', '-m', 'Initial scaffold',
+    ], { cwd: dir, timeout: 10000 });
   } catch (err) { console.debug('git may not be installed:', err); }
 }
 
@@ -30,7 +34,11 @@ export async function gitCommit(appDir: (id: string) => string, appId: string, m
     await execFileAsync('git', ['add', '.'], { cwd: dir, timeout: 10000 });
     const { stdout } = await execFileAsync('git', ['status', '--porcelain'], { cwd: dir, timeout: 10000 });
     if (stdout.trim()) {
-      await execFileAsync('git', ['commit', '-m', message], { cwd: dir, timeout: 10000 });
+      await execFileAsync('git', [
+        '-c', 'user.email=deyad@localhost',
+        '-c', 'user.name=Deyad',
+        'commit', '-m', message,
+      ], { cwd: dir, timeout: 10000 });
     }
   } catch (err) { console.debug('git may not be installed:', err); }
 }

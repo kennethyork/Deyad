@@ -5,6 +5,21 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { v4 as uuidv4 } from 'uuid';
 
+// Load node-pty at module level so vi.mock('node-pty') can intercept it in tests.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _pty: { spawn: (...args: any[]) => any } | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  _pty = require('node-pty');
+} catch {
+  _pty = null;
+}
+
+/** @internal For testing only. Injects a mock node-pty implementation. */
+export function _setPtyForTest(pty: typeof _pty): void {
+  _pty = pty;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const terminals = new Map<string, any>();
 
@@ -14,18 +29,14 @@ export function getTerminals(): typeof terminals {
 
 export function registerTerminalHandlers(appDir: (id: string) => string): void {
   ipcMain.handle('terminal:start', (_event, { appId }: { appId?: string }) => {
-    let pty;
-    try {
-      pty = require('node-pty');
-    } catch (err) {
-      console.debug('Handled error:', err);
+    if (!_pty) {
       throw new Error('node-pty is not available. Rebuild native modules with electron-rebuild.');
     }
     const cwd = appId ? appDir(appId) : undefined;
     const shellPath = process.platform === 'win32' ? 'cmd.exe' : process.env.SHELL || '/bin/bash';
     let term;
     try {
-      term = pty.spawn(shellPath, [], { cwd, env: process.env });
+      term = _pty.spawn(shellPath, [], { cwd, env: process.env });
     } catch (spawnErr) {
       throw new Error(`Failed to spawn terminal: ${spawnErr instanceof Error ? spawnErr.message : String(spawnErr)}`);
     }
