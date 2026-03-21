@@ -234,7 +234,15 @@ async function autoInstallNodeDeps(
   if (allImports.size === 0) return [];
 
   const installed = await getInstalledPackages(appId);
-  const missing = [...allImports].filter(pkg => !installed.has(pkg));
+  const missing = [...allImports].filter(pkg => {
+    if (installed.has(pkg)) return false;
+    // Never auto-install @types/ for packages that ship their own types
+    if (pkg.startsWith('@types/')) {
+      const basePkg = pkg.slice(7); // '@types/react-router-dom' → 'react-router-dom'
+      if (SELF_TYPED_PACKAGES.has(basePkg)) return false;
+    }
+    return true;
+  });
   if (missing.length === 0) return [];
 
   sendLog(`Auto-installing missing npm packages: ${missing.join(', ')}\n`);
@@ -360,6 +368,23 @@ async function autoInstallGoDeps(
 /** Maximum autonomous iterations before forcing a stop. */
 const MAX_ITERATIONS = 30;
 
+/**
+ * Packages that bundle their own TypeScript types — never install @types/ for these.
+ * Also includes @types/ packages that have been removed from DefinitelyTyped.
+ */
+const SELF_TYPED_PACKAGES = new Set([
+  'react-router-dom', 'react-router', 'react-query', '@tanstack/react-query',
+  'zustand', 'jotai', 'valtio', 'immer', 'zod', 'yup',
+  'framer-motion', 'motion', '@emotion/react', '@emotion/styled',
+  '@mui/material', '@mui/icons-material', '@chakra-ui/react',
+  'next', 'prisma', '@prisma/client', 'drizzle-orm',
+  'hono', 'elysia', 'fastify', 'trpc', '@trpc/server', '@trpc/client',
+  'three', '@react-three/fiber', '@react-three/drei',
+  'lucide-react', 'date-fns', 'dayjs', 'axios', 'ky', 'got',
+  'tailwind-merge', 'clsx', 'class-variance-authority',
+  'vitest', 'playwright', '@playwright/test',
+]);
+
 /** Approximate character budget for the full conversation (≈ 32k tokens at ~3.5 chars/token). */
 const MAX_CONVERSATION_CHARS = 112_000;
 
@@ -474,6 +499,7 @@ RULES:
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
 - When you import a new third-party package, the system will auto-detect and install it. You do NOT need to run npm install, pip install, or go get manually for imports.
+- NEVER add @types/react-router-dom, @types/react-router, @types/zustand, @types/framer-motion, or @types/ for any package that bundles its own TypeScript types. Most modern packages (react-router-dom v6+, zustand, zod, @tanstack/react-query, etc.) include their own types.
 - Keep your prose explanations concise — focus on actions.
 - Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response.

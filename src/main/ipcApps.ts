@@ -350,6 +350,46 @@ async function ensureGo(sendLog: (msg: string) => void): Promise<string | null> 
   }
 }
 
+// ── Deprecated @types/ packages that no longer exist on npm ─────────────────
+
+/** Packages that bundle their own types — @types/ versions are deprecated/removed. */
+const DEPRECATED_TYPES = new Set([
+  '@types/react-router-dom', '@types/react-router', '@types/react-query',
+  '@types/zustand', '@types/framer-motion', '@types/immer',
+  '@types/zod', '@types/yup', '@types/jotai', '@types/valtio',
+  '@types/next', '@types/prisma', '@types/hono', '@types/elysia',
+  '@types/vitest', '@types/lucide-react', '@types/date-fns', '@types/dayjs',
+  '@types/clsx', '@types/tailwind-merge', '@types/three',
+  '@types/axios', '@types/ky', '@types/got',
+]);
+
+/**
+ * Remove deprecated @types/ packages from a project's package.json before npm install.
+ * This prevents ETARGET errors when the AI adds @types/ for packages that bundle own types.
+ */
+function sanitizePackageJson(projectDir: string, sendLog: (msg: string) => void): void {
+  const pkgPath = path.join(projectDir, 'package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  try {
+    const raw = fs.readFileSync(pkgPath, 'utf-8');
+    const pkg = JSON.parse(raw);
+    let changed = false;
+    for (const section of ['dependencies', 'devDependencies']) {
+      if (!pkg[section]) continue;
+      for (const dep of Object.keys(pkg[section])) {
+        if (DEPRECATED_TYPES.has(dep)) {
+          sendLog(`Removing deprecated ${dep} (package ships its own types)\n`);
+          delete pkg[section][dep];
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    }
+  } catch { /* ignore parse errors */ }
+}
+
 // ── Registration ────────────────────────────────────────────────────────────
 
 export function registerAppHandlers(
@@ -675,6 +715,7 @@ export function registerAppHandlers(
     }
 
     // Always run npm install to pick up any new dependencies added by the AI
+    sanitizePackageJson(viteRoot, sendLog);
     sendLog('Installing dependencies…\n');
     try {
       await execFileAsync('npm', ['install'], { cwd: viteRoot, timeout: 180000 });
