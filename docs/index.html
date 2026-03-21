@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deyad — Local AI App Builder</title>
+  <meta name="description" content="The open-source, local-first AI app builder. Build full-stack apps with Ollama — no cloud, no API keys, no limits." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a26;
+      --border: #1e1e2e;
+      --text: #e4e4ef;
+      --text-muted: #8888a0;
+      --accent: #6366f1;
+      --accent-light: #818cf8;
+      --accent-glow: rgba(99, 102, 241, 0.15);
+      --success: #22c55e;
+      --gradient-1: linear-gradient(135deg, #6366f1 0%, #a78bfa 50%, #f472b6 100%);
+      --gradient-2: linear-gradient(135deg, #6366f1 0%, #22d3ee 100%);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Nav ──────────────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 40px;
+      background: rgba(10, 10, 15, 0.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-size: 22px; font-weight: 800; letter-spacing: -0.5px;
+      background: var(--gradient-1); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a {
+      color: var(--text-muted); text-decoration: none; font-size: 14px;
+      font-weight: 500; transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    /* ── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 10px; font-size: 15px;
+      font-weight: 600; text-decoration: none; border: none;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    }
+    .btn-primary:hover {
+      background: var(--accent-light);
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
+      transform: translateY(-1px);
+    }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover {
+      border-color: var(--accent); background: var(--accent-glow);
+    }
+    .btn-sm { padding: 8px 18px; font-size: 13px; border-radius: 8px; }
+
+    /* ── Hero ──────────────────────────────────────────────────────────── */
+    .hero {
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center; padding: 160px 24px 100px;
+      position: relative;
+    }
+    .hero::before {
+      content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; border-radius: 100px; font-size: 13px;
+      font-weight: 500; color: var(--accent-light);
+      background: var(--accent-glow); border: 1px solid rgba(99,102,241,0.2);
+      margin-bottom: 28px;
+    }
+    .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+    .hero h1 {
+      font-size: clamp(42px, 6vw, 72px); font-weight: 900;
+      line-height: 1.05; letter-spacing: -2px; max-width: 800px;
+      margin-bottom: 24px;
+    }
+    .hero h1 .gradient {
+      background: var(--gradient-1); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero p {
+      font-size: 18px; color: var(--text-muted); max-width: 560px;
+      margin-bottom: 40px; line-height: 1.7;
+    }
+    .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+    /* ── Stats row ──────────────────────────────────────────────────────── */
+    .stats {
+      display: flex; justify-content: center; gap: 60px;
+      padding: 40px 24px; margin-top: 20px;
+    }
+    .stat { text-align: center; }
+    .stat-value {
+      font-size: 32px; font-weight: 800; letter-spacing: -1px;
+      background: var(--gradient-2); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── Section ──────────────────────────────────────────────────────── */
+    section { padding: 100px 24px; max-width: 1200px; margin: 0 auto; }
+    .section-label {
+      font-size: 13px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 2px; color: var(--accent-light); margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: clamp(28px, 4vw, 44px); font-weight: 800;
+      letter-spacing: -1px; margin-bottom: 16px;
+    }
+    .section-desc {
+      font-size: 17px; color: var(--text-muted); max-width: 580px;
+      margin-bottom: 56px; line-height: 1.7;
+    }
+    .section-center { text-align: center; }
+    .section-center .section-desc { margin-left: auto; margin-right: auto; }
+
+    /* ── Feature grid ──────────────────────────────────────────────────── */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 32px; transition: all 0.25s;
+    }
+    .feature-card:hover {
+      border-color: rgba(99,102,241,0.3); background: var(--bg-card-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 20px;
+      background: var(--accent-glow); border: 1px solid rgba(99,102,241,0.15);
+    }
+    .feature-card h3 {
+      font-size: 17px; font-weight: 700; margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 14px; color: var(--text-muted); line-height: 1.65;
+    }
+
+    /* ── Comparison table ──────────────────────────────────────────────── */
+    .compare-wrapper {
+      overflow-x: auto; border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+    .compare-table {
+      width: 100%; border-collapse: collapse; font-size: 14px;
+      min-width: 800px;
+    }
+    .compare-table thead { background: var(--bg-card); }
+    .compare-table th {
+      padding: 16px 18px; text-align: left; font-weight: 600;
+      color: var(--text-muted); font-size: 13px; text-transform: uppercase;
+      letter-spacing: 1px; border-bottom: 1px solid var(--border);
+    }
+    .compare-table th:first-child { border-radius: 16px 0 0 0; }
+    .compare-table th:last-child { border-radius: 0 16px 0 0; }
+    .compare-table th.highlight {
+      color: var(--accent-light); background: rgba(99,102,241,0.06);
+    }
+    .compare-table td {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    .compare-table td:first-child { color: var(--text); font-weight: 500; }
+    .compare-table td.highlight {
+      color: var(--success); font-weight: 600;
+      background: rgba(99,102,241,0.03);
+    }
+    .compare-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+    .check { color: var(--success); }
+    .cross { color: #ef4444; }
+    .partial { color: #f59e0b; }
+
+    /* ── Grading section ──────────────────────────────────────────────── */
+    .grade-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+    .grade-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px; text-align: center;
+      transition: all 0.25s;
+    }
+    .grade-card:hover {
+      border-color: rgba(99,102,241,0.3); transform: translateY(-2px);
+    }
+    .grade-name {
+      font-size: 18px; font-weight: 700; margin-bottom: 8px;
+    }
+    .grade-score {
+      font-size: 48px; font-weight: 900; letter-spacing: -2px;
+      margin: 12px 0;
+    }
+    .grade-score.s-deyad {
+      background: var(--gradient-1); -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .grade-score.s-good { color: var(--success); }
+    .grade-score.s-mid { color: #f59e0b; }
+    .grade-score.s-low { color: #ef4444; }
+    .grade-bar {
+      width: 100%; height: 6px; background: rgba(255,255,255,0.05);
+      border-radius: 3px; overflow: hidden; margin: 12px 0 16px;
+    }
+    .grade-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .grade-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    .grade-tag {
+      font-size: 11px; padding: 3px 10px; border-radius: 100px;
+      background: rgba(255,255,255,0.04); color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+    .grade-tag.pro { color: var(--success); border-color: rgba(34,197,94,0.2); background: rgba(34,197,94,0.06); }
+    .grade-tag.con { color: #ef4444; border-color: rgba(239,68,68,0.2); background: rgba(239,68,68,0.06); }
+
+    /* ── Deploy grid ──────────────────────────────────────────────────── */
+    .deploy-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .deploy-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 12px; padding: 20px; text-align: center;
+      transition: all 0.2s;
+    }
+    .deploy-card:hover { border-color: rgba(99,102,241,0.3); transform: translateY(-2px); }
+    .deploy-card .icon { font-size: 28px; margin-bottom: 8px; }
+    .deploy-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .deploy-card p { font-size: 12px; color: var(--text-muted); }
+
+    /* ── CTA ──────────────────────────────────────────────────────────── */
+    .cta-section {
+      text-align: center; padding: 100px 24px;
+      background: radial-gradient(ellipse at center, rgba(99,102,241,0.08) 0%, transparent 70%);
+    }
+    .cta-section h2 {
+      font-size: clamp(32px, 4vw, 48px); font-weight: 900;
+      letter-spacing: -1px; margin-bottom: 16px;
+    }
+    .cta-section p {
+      font-size: 17px; color: var(--text-muted); margin-bottom: 36px;
+      max-width: 480px; margin-left: auto; margin-right: auto;
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────────── */
+    footer {
+      text-align: center; padding: 40px 24px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted); font-size: 13px;
+    }
+    footer a { color: var(--accent-light); text-decoration: none; }
+
+    /* ── Responsive ──────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      nav { padding: 12px 20px; }
+      .nav-links { gap: 16px; }
+      .stats { gap: 32px; flex-wrap: wrap; }
+      .hero { padding: 130px 20px 60px; }
+      section { padding: 60px 20px; }
+    }
+    @media (max-width: 480px) {
+      .nav-links a:not(:last-child) { display: none; }
+      .hero-cta { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">Deyad</div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#comparison">Compare</a>
+    <a href="#grades">Grades</a>
+    <a href="#deploy">Deploy</a>
+    <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-sm btn-primary">Download</a>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────── -->
+<div class="hero">
+  <div class="hero-badge"><span class="dot"></span> 100% Local &middot; 100% Free &middot; 100% Open Source</div>
+  <h1>Build apps with AI.<br><span class="gradient">On your machine.</span></h1>
+  <p>Describe what you want, get a working full-stack app. No cloud, no API keys, no token limits. Powered by Ollama running on your hardware.</p>
+  <div class="hero-cta">
+    <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Download for Free
+    </a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn btn-outline">
+      <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      View on GitHub
+    </a>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">18</div><div class="stat-label">Agent Tools</div></div>
+    <div class="stat"><div class="stat-value">7</div><div class="stat-label">Deploy Targets</div></div>
+    <div class="stat"><div class="stat-value">$0</div><div class="stat-label">Forever</div></div>
+    <div class="stat"><div class="stat-value">0</div><div class="stat-label">Cloud Dependency</div></div>
+  </div>
+</div>
+
+<!-- ── Features ──────────────────────────────────────────────────────── -->
+<section id="features">
+  <div class="section-center">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Everything you need. Nothing in the cloud.</h2>
+    <p class="section-desc">A complete IDE with an autonomous AI agent, live preview, database admin, terminal, git, and deploy — all running locally.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>Autonomous Agent</h3>
+      <p>Multi-step agent reads code, writes files, runs commands, auto-fixes errors, and iterates up to 30 times — hands-free.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>100% Local AI</h3>
+      <p>Powered by Ollama — inference happens on your machine. Your code never leaves your computer. No API keys needed.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🗄️</div>
+      <h3>Full-Stack + SQLite</h3>
+      <p>React + Express + SQLite stack with schema introspection. The AI agent can query your database schema while coding.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">✏️</div>
+      <h3>Monaco Editor</h3>
+      <p>Same editor engine as VS Code with syntax highlighting, AI code completions, file search, and diff preview.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">👁️</div>
+      <h3>Live Preview</h3>
+      <p>Embedded Vite dev server with HMR. See your changes in real-time as the AI writes them.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🖼️</div>
+      <h3>Image to Code</h3>
+      <p>Paste a screenshot or mockup and vision-capable models generate the UI code to match it.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔀</div>
+      <h3>Git + GitHub</h3>
+      <p>Every AI generation auto-commits to Git. Push, pull, branch, and manage remotes from the UI or just type "push to github" in chat.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚀</div>
+      <h3>7 Deploy Targets</h3>
+      <p>Vercel, Netlify, Surge, Railway, Fly.io, VPS via SSH, and Electron desktop packaging — all built in.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <h3>Mobile Preview</h3>
+      <p>Test on real Android/iOS devices via Capacitor. Live reload your AI-generated app on your phone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Grades ──────────────────────────────────────────────────────── -->
+<section id="grades">
+  <div class="section-center">
+    <div class="section-label">Report Card</div>
+    <h2 class="section-title">How Deyad stacks up</h2>
+    <p class="section-desc">Scored across privacy, capability, and value against the leading AI app builders.</p>
+  </div>
+  <div class="grade-grid">
+    <div class="grade-card">
+      <div class="grade-name">Deyad</div>
+      <div class="grade-score s-deyad">A</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:92%;background:var(--gradient-1)"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">100% local</span>
+        <span class="grade-tag pro">Free forever</span>
+        <span class="grade-tag pro">Full-stack</span>
+        <span class="grade-tag pro">Open source</span>
+        <span class="grade-tag con">Requires local GPU</span>
+      </div>
+    </div>
+    <div class="grade-card">
+      <div class="grade-name">v0 (Vercel)</div>
+      <div class="grade-score s-mid">B-</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:62%;background:#f59e0b"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">Beautiful UI gen</span>
+        <span class="grade-tag pro">Fast iteration</span>
+        <span class="grade-tag con">Frontend only</span>
+        <span class="grade-tag con">Cloud required</span>
+        <span class="grade-tag con">Paid</span>
+      </div>
+    </div>
+    <div class="grade-card">
+      <div class="grade-name">Base44</div>
+      <div class="grade-score s-mid">B-</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:60%;background:#f59e0b"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">App builder</span>
+        <span class="grade-tag pro">Quick deploy</span>
+        <span class="grade-tag con">Closed source</span>
+        <span class="grade-tag con">Cloud required</span>
+        <span class="grade-tag con">Limited stack</span>
+      </div>
+    </div>
+    <div class="grade-card">
+      <div class="grade-name">Bolt.new</div>
+      <div class="grade-score s-mid">B</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:68%;background:#f59e0b"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">In-browser IDE</span>
+        <span class="grade-tag pro">Live preview</span>
+        <span class="grade-tag con">No database</span>
+        <span class="grade-tag con">Cloud LLM</span>
+        <span class="grade-tag con">Token limits</span>
+      </div>
+    </div>
+    <div class="grade-card">
+      <div class="grade-name">Lovable</div>
+      <div class="grade-score s-mid">B</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:66%;background:#f59e0b"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">Polished UX</span>
+        <span class="grade-tag pro">Supabase integration</span>
+        <span class="grade-tag con">Cloud only</span>
+        <span class="grade-tag con">Paid</span>
+        <span class="grade-tag con">No terminal</span>
+      </div>
+    </div>
+    <div class="grade-card">
+      <div class="grade-name">Cursor</div>
+      <div class="grade-score s-good">A-</div>
+      <div class="grade-bar"><div class="grade-bar-fill" style="width:85%;background:var(--success)"></div></div>
+      <div class="grade-tags">
+        <span class="grade-tag pro">Best code editor AI</span>
+        <span class="grade-tag pro">Multi-file edits</span>
+        <span class="grade-tag con">Cloud LLM</span>
+        <span class="grade-tag con">$20/mo</span>
+        <span class="grade-tag con">No app scaffold</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Comparison ──────────────────────────────────────────────────── -->
+<section id="comparison">
+  <div class="section-center">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title">Feature-by-feature</h2>
+    <p class="section-desc">The full breakdown of what each platform can — and can't — do.</p>
+  </div>
+  <div class="compare-wrapper">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th class="highlight">Deyad</th>
+          <th>v0</th>
+          <th>Base44</th>
+          <th>Bolt.new</th>
+          <th>Lovable</th>
+          <th>Cursor</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>100% local AI</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Free forever</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Open source</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>No API keys required</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Autonomous agent (30 iterations)</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="check">&#10003;</span></td>
+        </tr>
+        <tr>
+          <td>Full-stack with database</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Error auto-detect &amp; self-fix</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Git auto-commit</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>AI code completion (FIM)</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="check">&#10003;</span></td>
+        </tr>
+        <tr>
+          <td>Image &rarr; Code</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+        </tr>
+        <tr>
+          <td>Live preview</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Integrated terminal</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="partial">Partial</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="check">&#10003;</span></td>
+        </tr>
+        <tr>
+          <td>Deploy (7+ targets)</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td>Vercel only</td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Desktop app packaging</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Mobile preview</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+        <tr>
+          <td>Works offline</td>
+          <td class="highlight"><span class="check">&#10003;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+          <td><span class="cross">&#10007;</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ── Deploy ──────────────────────────────────────────────────────── -->
+<section id="deploy">
+  <div class="section-center">
+    <div class="section-label">Deploy Anywhere</div>
+    <h2 class="section-title">Ship to 7 targets in one click</h2>
+    <p class="section-desc">From static sites to full-stack servers to desktop apps — deploy straight from the UI.</p>
+  </div>
+  <div class="deploy-grid">
+    <div class="deploy-card"><div class="icon">▲</div><h4>Vercel</h4><p>Free tier</p></div>
+    <div class="deploy-card"><div class="icon">◆</div><h4>Netlify</h4><p>Free tier</p></div>
+    <div class="deploy-card"><div class="icon">⚡</div><h4>Surge</h4><p>Free</p></div>
+    <div class="deploy-card"><div class="icon">🚂</div><h4>Railway</h4><p>Full-stack</p></div>
+    <div class="deploy-card"><div class="icon">🪁</div><h4>Fly.io</h4><p>Containers</p></div>
+    <div class="deploy-card"><div class="icon">🖥️</div><h4>VPS (SSH)</h4><p>Any server</p></div>
+    <div class="deploy-card"><div class="icon">💻</div><h4>Electron</h4><p>Desktop app</p></div>
+  </div>
+</section>
+
+<!-- ── CTA ──────────────────────────────────────────────────────────── -->
+<div class="cta-section">
+  <h2>Ready to build?</h2>
+  <p>Download Deyad, install Ollama, and start building full-stack apps in minutes. It's free — forever.</p>
+  <div class="hero-cta">
+    <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-primary">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Download Now
+    </a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn btn-outline">Star on GitHub</a>
+  </div>
+</div>
+
+<!-- ── Footer ──────────────────────────────────────────────────────── -->
+<footer>
+  <p>&copy; 2026 <a href="https://github.com/kennethyork/Deyad">Deyad</a> &middot; MIT License &middot; Built with Ollama</p>
+</footer>
+
+</body>
+</html>
