@@ -162,6 +162,143 @@ function copyRecursiveSync(src: string, dest: string) {
   }
 }
 
+// ── Runtime Detection & Auto-Install ────────────────────────────────────────
+
+/** Check if a command exists on the system. */
+async function commandExists(cmd: string): Promise<boolean> {
+  try {
+    await execFileAsync(cmd, ['--version'], { timeout: 10000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Detect the OS package manager available. */
+function detectPkgManager(): 'apt' | 'brew' | 'dnf' | 'pacman' | 'winget' | null {
+  const platform = process.platform;
+  if (platform === 'win32') return 'winget';
+  if (platform === 'darwin') {
+    try { fs.accessSync('/opt/homebrew/bin/brew', fs.constants.X_OK); return 'brew'; } catch {}
+    try { fs.accessSync('/usr/local/bin/brew', fs.constants.X_OK); return 'brew'; } catch {}
+    return null;
+  }
+  // Linux: try common package managers
+  for (const pm of ['apt', 'dnf', 'pacman'] as const) {
+    try { fs.accessSync(`/usr/bin/${pm}`, fs.constants.X_OK); return pm; } catch {}
+  }
+  return null;
+}
+
+/**
+ * Ensure Python 3 is installed. If not, install it via the OS package manager.
+ * Returns the path to the python3 binary, or null if installation failed.
+ */
+async function ensurePython(sendLog: (msg: string) => void): Promise<string | null> {
+  // Try common Python binary names
+  for (const cmd of ['python3', 'python']) {
+    if (await commandExists(cmd)) {
+      try {
+        const { stdout } = await execFileAsync(cmd, ['--version'], { timeout: 10000 });
+        sendLog(`Found ${stdout.trim()}\n`);
+      } catch { /* ignore */ }
+      return cmd;
+    }
+  }
+
+  sendLog('Python not found — installing automatically…\n');
+  const pm = detectPkgManager();
+  if (!pm) {
+    sendLog('Error: Could not detect package manager. Please install Python 3.10+ manually.\n');
+    return null;
+  }
+
+  try {
+    switch (pm) {
+      case 'apt':
+        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
+        await execFileAsync('sudo', ['apt', 'install', '-y', 'python3', 'python3-venv', 'python3-pip'], { timeout: 300000 });
+        break;
+      case 'dnf':
+        await execFileAsync('sudo', ['dnf', 'install', '-y', 'python3', 'python3-pip'], { timeout: 300000 });
+        break;
+      case 'pacman':
+        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'python', 'python-pip'], { timeout: 300000 });
+        break;
+      case 'brew':
+        await execFileAsync('brew', ['install', 'python@3.11'], { timeout: 300000 });
+        break;
+      case 'winget':
+        await execFileAsync('winget', ['install', '--id', 'Python.Python.3.11', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
+        break;
+    }
+    sendLog('Python installed successfully.\n');
+    // Verify it's now available
+    for (const cmd of ['python3', 'python']) {
+      if (await commandExists(cmd)) return cmd;
+    }
+    sendLog('Warning: Python was installed but the command is not in PATH. You may need to restart Deyad.\n');
+    return 'python3';
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    sendLog(`Error installing Python: ${msg}\n`);
+    sendLog('Please install Python 3.10+ manually from https://python.org\n');
+    return null;
+  }
+}
+
+/**
+ * Ensure Go is installed. If not, install it via the OS package manager.
+ * Returns the path to the go binary, or null if installation failed.
+ */
+async function ensureGo(sendLog: (msg: string) => void): Promise<string | null> {
+  if (await commandExists('go')) {
+    try {
+      const { stdout } = await execFileAsync('go', ['version'], { timeout: 10000 });
+      sendLog(`Found ${stdout.trim()}\n`);
+    } catch { /* ignore */ }
+    return 'go';
+  }
+
+  sendLog('Go not found — installing automatically…\n');
+  const pm = detectPkgManager();
+  if (!pm) {
+    sendLog('Error: Could not detect package manager. Please install Go 1.22+ manually.\n');
+    return null;
+  }
+
+  try {
+    switch (pm) {
+      case 'apt':
+        // Use the official Go installer for a recent version on apt-based systems
+        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
+        await execFileAsync('sudo', ['apt', 'install', '-y', 'golang-go'], { timeout: 300000 });
+        break;
+      case 'dnf':
+        await execFileAsync('sudo', ['dnf', 'install', '-y', 'golang'], { timeout: 300000 });
+        break;
+      case 'pacman':
+        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'go'], { timeout: 300000 });
+        break;
+      case 'brew':
+        await execFileAsync('brew', ['install', 'go'], { timeout: 300000 });
+        break;
+      case 'winget':
+        await execFileAsync('winget', ['install', '--id', 'GoLang.Go', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
+        break;
+    }
+    sendLog('Go installed successfully.\n');
+    if (await commandExists('go')) return 'go';
+    sendLog('Warning: Go was installed but the command is not in PATH. You may need to restart Deyad.\n');
+    return 'go';
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    sendLog(`Error installing Go: ${msg}\n`);
+    sendLog('Please install Go 1.22+ manually from https://go.dev/dl\n');
+    return null;
+  }
+}
+
 // ── Registration ────────────────────────────────────────────────────────────
 
 export function registerAppHandlers(
@@ -216,6 +353,15 @@ export function registerAppHandlers(
       meta.dbProvider = 'sqlite';
     }
     fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
+
+    // Pre-install Python or Go runtime in the background if not already present
+    const silentLog = (msg: string) => console.log(`[runtime-setup] ${msg.trim()}`);
+    if (resolvedAppType === 'python') {
+      ensurePython(silentLog).catch((err) => console.debug('python pre-install:', err));
+    } else if (resolvedAppType === 'go') {
+      ensureGo(silentLog).catch((err) => console.debug('go pre-install:', err));
+    }
+
     await gitInit(appDir, id);
     return { id, ...meta };
   });
@@ -397,13 +543,18 @@ export function registerAppHandlers(
       backendChild.on('close', () => { devProcesses.delete(`${appId}:backend`); });
     }
 
-    // ── Python project: pip install + uvicorn ────────────────────────
+    // ── Python project: ensure runtime + pip install + uvicorn ────────
     if (projectLang === 'python') {
+      const pythonCmd = await ensurePython(sendLog);
+      if (!pythonCmd) {
+        return { success: false, error: 'Python is not installed and automatic installation failed. Please install Python 3.10+ manually.' };
+      }
+
       sendLog('Installing Python dependencies…\n');
       try {
         // Create venv if missing
         if (!fs.existsSync(path.join(appRoot, '.venv'))) {
-          await execFileAsync('python3', ['-m', 'venv', '.venv'], { cwd: appRoot, timeout: 60000 });
+          await execFileAsync(pythonCmd, ['-m', 'venv', '.venv'], { cwd: appRoot, timeout: 60000 });
         }
         const pip = path.join(appRoot, '.venv', 'bin', 'pip');
         if (fs.existsSync(path.join(appRoot, 'requirements.txt'))) {
@@ -433,8 +584,13 @@ export function registerAppHandlers(
       return { success: true };
     }
 
-    // ── Go project: go mod tidy + go run ─────────────────────────────
+    // ── Go project: ensure runtime + go mod tidy + go run ───────────
     if (projectLang === 'go') {
+      const goCmd = await ensureGo(sendLog);
+      if (!goCmd) {
+        return { success: false, error: 'Go is not installed and automatic installation failed. Please install Go 1.22+ manually.' };
+      }
+
       sendLog('Installing Go dependencies…\n');
       try {
         await execFileAsync('go', ['mod', 'tidy'], { cwd: appRoot, timeout: 120000 });
