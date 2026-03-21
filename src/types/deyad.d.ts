@@ -33,6 +33,7 @@ interface OllamaModel {
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  images?: string[];
 }
 
 type DbProvider = 'sqlite';

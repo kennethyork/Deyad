@@ -16,6 +16,7 @@ export interface OllamaModel {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  images?: string[];
 }
 
 export type DbProvider = 'sqlite';

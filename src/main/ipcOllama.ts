@@ -40,6 +40,22 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
       resolve();
     };
     request.on('response', (response) => {
+      // Check for HTTP errors (Ollama returns 4xx/5xx for bad requests)
+      if (response.statusCode && response.statusCode >= 400) {
+        let errBody = '';
+        response.on('data', (chunk: Buffer) => { errBody += chunk.toString(); });
+        response.on('end', () => {
+          if (!resolved) {
+            resolved = true;
+            activeRequests.delete(requestId);
+            let errMsg = `Ollama returned HTTP ${response.statusCode}`;
+            try { const parsed = JSON.parse(errBody); if (parsed.error) errMsg = parsed.error; } catch { /* use default */ }
+            if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, errMsg);
+            reject(new Error(errMsg));
+          }
+        });
+        return;
+      }
       response.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
         const lines = buffer.split('\n');
@@ -48,6 +64,12 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
           if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line);
+            // Handle Ollama error responses (e.g. model not found, context overflow)
+            if (parsed.error) {
+              if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, parsed.error);
+              finish();
+              return;
+            }
             if (parsed.message?.content && !event.sender.isDestroyed()) {
               event.sender.send('ollama:stream-token', requestId, parsed.message.content);
             }

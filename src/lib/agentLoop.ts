@@ -288,8 +288,18 @@ export function runAgentLoop(options: AgentOptions): () => void {
         const toolCalls = parseToolCalls(turnResponse);
 
         if (toolCalls.length === 0 || isDone(turnResponse)) {
-          // If the visible content is too short, append an auto-generated summary
+          // If the model returned an empty or very short response with no tool calls
+          // on the first iteration, it likely didn't understand the tool format.
+          // Retry once with a nudge to use tools.
           const visibleContent = stripToolMarkup(fullOutput).trim();
+          if (iteration === 1 && toolCalls.length === 0 && !isDone(turnResponse) && allChangedFiles.size === 0 && visibleContent.length > 0) {
+            // The model responded with prose but no tool calls — nudge it
+            messages.push({ role: 'assistant', content: turnResponse });
+            messages.push({ role: 'user', content: 'You must use the XML tool call format to make changes. Do not write code in prose — use <tool_call><name>write_files</name>...</tool_call> to create or modify files. Please try again using the tools.' });
+            fullOutput += '\n\n---\n\n';
+            callbacks.onContent(fullOutput);
+            continue;
+          }
           if (visibleContent.length < 40 && allChangedFiles.size > 0) {
             const fileList = [...allChangedFiles].map(f => `- ${f}`).join('\n');
             const summary = `\n\n**Changes made:**\n${fileList}`;
