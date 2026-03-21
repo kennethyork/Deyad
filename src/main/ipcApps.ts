@@ -381,15 +381,14 @@ export function registerAppHandlers(
       backendChild.on('close', () => { devProcesses.delete(`${appId}:backend`); });
     }
 
-    if (!fs.existsSync(path.join(viteRoot, 'node_modules'))) {
-      sendLog('Installing dependencies…\n');
-      try {
-        await execFileAsync('npm', ['install'], { cwd: viteRoot, timeout: 180000 });
-        sendLog('Dependencies installed\n');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, error: `npm install failed: ${msg}` };
-      }
+    // Always run npm install to pick up any new dependencies added by the AI
+    sendLog('Installing dependencies…\n');
+    try {
+      await execFileAsync('npm', ['install'], { cwd: viteRoot, timeout: 180000 });
+      sendLog('Dependencies installed\n');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: `npm install failed: ${msg}` };
     }
 
     const child = spawn('npm', ['run', 'dev'], { cwd: viteRoot, stdio: 'pipe' });

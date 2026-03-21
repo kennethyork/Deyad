@@ -87,9 +87,13 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
   };
 
   const filteredProviders = PROVIDERS.filter((p) => {
+    if (appType === 'python' || appType === 'go') return p.type === 'fullstack'; // Python/Go → container-based only
     if (appType === 'fullstack') return true; // show all
     return p.type === 'frontend' || p.type === 'both';
   });
+
+  const showMobile = appType !== 'python' && appType !== 'go';
+  const showDesktop = appType !== 'python' && appType !== 'go';
 
   const handleDeploy = async () => {
     if (!selected) return;
@@ -269,7 +273,7 @@ type OAuthProvider = 'vercel' | 'netlify';
           )}
 
           {/* ── Mobile / Capacitor ──────────────────────────────────── */}
-          <div className="deploy-mobile-section">
+          {showMobile && <div className="deploy-mobile-section">
             <h3>Mobile (Capacitor)</h3>
 
             {/* Row 1: Init + Platform selector */}
@@ -399,7 +403,7 @@ type OAuthProvider = 'vercel' | 'netlify';
             </div>
 
             {mobileStatus && <div className="deploy-mobile-status">{mobileStatus}</div>}
-          </div>
+          </div>}
 
           {/* ── VPS (SSH + rsync) ───────────────────────────────────── */}
           <div className="deploy-mobile-section">
@@ -490,7 +494,7 @@ type OAuthProvider = 'vercel' | 'netlify';
           </div>
 
           {/* ── Desktop / Electron ──────────────────────────────────── */}
-          <div className="deploy-mobile-section">
+          {showDesktop && <div className="deploy-mobile-section">
             <h3>Desktop (Electron + Ollama)</h3>
             <p className="deploy-hint" style={{ margin: '0 0 8px' }}>
               Package this app as a standalone desktop application with built-in Ollama AI support.
@@ -529,7 +533,7 @@ type OAuthProvider = 'vercel' | 'netlify';
             </div>
 
             {desktopStatus && <div className="deploy-mobile-status">{desktopStatus}</div>}
-          </div>
+          </div>}
 
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose} disabled={deploying}>

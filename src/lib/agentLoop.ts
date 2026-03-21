@@ -11,6 +11,112 @@ import type { ToolResult } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
 
+/** Well-known built-in Node/browser modules that never need installing. */
+const BUILTIN_MODULES = new Set([
+  'react', 'react-dom', 'react/jsx-runtime', 'vite',
+  'path', 'fs', 'os', 'url', 'util', 'events', 'stream', 'http', 'https',
+  'crypto', 'child_process', 'net', 'tls', 'dns', 'assert', 'buffer',
+  'querystring', 'zlib', 'readline', 'worker_threads', 'cluster',
+  'node:path', 'node:fs', 'node:os', 'node:url', 'node:util',
+  'node:events', 'node:stream', 'node:http', 'node:https', 'node:crypto',
+  'node:child_process', 'node:net', 'node:tls', 'node:dns', 'node:assert',
+  'node:buffer', 'node:querystring', 'node:zlib', 'node:readline',
+  'node:worker_threads', 'node:cluster',
+]);
+
+/**
+ * Extract npm package names from import/require statements in source code.
+ * Returns only third-party package names (not relative imports or builtins).
+ */
+function extractImportedPackages(code: string): Set<string> {
+  const packages = new Set<string>();
+  // Match: import ... from 'pkg'  |  import 'pkg'  |  require('pkg')
+  const patterns = [
+    /\bimport\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g,
+    /\bimport\s+['"]([^'"]+)['"]/g,
+    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ];
+  for (const pattern of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(code)) !== null) {
+      const spec = m[1];
+      // Skip relative imports and builtins
+      if (spec.startsWith('.') || spec.startsWith('/')) continue;
+      if (BUILTIN_MODULES.has(spec)) continue;
+      // Extract package name: @scope/pkg or pkg (ignore subpath)
+      const pkgName = spec.startsWith('@')
+        ? spec.split('/').slice(0, 2).join('/')
+        : spec.split('/')[0];
+      if (pkgName && !BUILTIN_MODULES.has(pkgName)) packages.add(pkgName);
+    }
+  }
+  return packages;
+}
+
+/**
+ * Read package.json from the project and return all dependency names.
+ */
+async function getInstalledPackages(appId: string): Promise<Set<string>> {
+  const installed = new Set<string>();
+  try {
+    const files = await window.deyad.readFiles(appId);
+    // Check root package.json and frontend/package.json
+    for (const pkgPath of ['package.json', 'frontend/package.json']) {
+      const raw = files[pkgPath];
+      if (!raw) continue;
+      const pkg = JSON.parse(raw);
+      for (const key of ['dependencies', 'devDependencies', 'peerDependencies']) {
+        if (pkg[key]) {
+          for (const name of Object.keys(pkg[key])) installed.add(name);
+        }
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return installed;
+}
+
+/**
+ * Auto-detect imports in changed files and install missing npm packages.
+ * Returns the list of packages installed (empty if none needed).
+ */
+async function autoInstallDeps(
+  appId: string,
+  changedFiles: Record<string, string>,
+  sendLog: (msg: string) => void,
+): Promise<string[]> {
+  // Gather all imported packages from changed files
+  const allImports = new Set<string>();
+  for (const [filePath, content] of Object.entries(changedFiles)) {
+    if (!/\.(tsx?|jsx?|mjs|cjs)$/.test(filePath)) continue;
+    for (const pkg of extractImportedPackages(content)) {
+      allImports.add(pkg);
+    }
+  }
+  if (allImports.size === 0) return [];
+
+  // Compare against what's already in package.json
+  const installed = await getInstalledPackages(appId);
+  const missing = [...allImports].filter(pkg => !installed.has(pkg));
+  if (missing.length === 0) return [];
+
+  // Install missing packages
+  sendLog(`Auto-installing missing dependencies: ${missing.join(', ')}\n`);
+  try {
+    const result = await executeTool(
+      { name: 'run_command', params: { command: `npm install ${missing.join(' ')}` } },
+      appId,
+    );
+    if (result.success) {
+      sendLog(`Dependencies installed successfully.\n`);
+    } else {
+      sendLog(`Warning: npm install had issues: ${result.output.slice(0, 200)}\n`);
+    }
+  } catch (err) {
+    sendLog(`Warning: auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+  return missing;
+}
+
 /** Maximum autonomous iterations before forcing a stop. */
 const MAX_ITERATIONS = 30;
 
@@ -127,6 +233,7 @@ RULES:
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
+- When you import a new third-party package, the system will auto-detect and install it. You do NOT need to run npm install manually for imports.
 - Keep your prose explanations concise — focus on actions.
 - Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response.
@@ -388,6 +495,29 @@ export function runAgentLoop(options: AgentOptions): () => void {
           if (call.name === 'run_command' && call.params.command) {
             allCommands.push(call.params.command);
           }
+        }
+
+        // Auto-install missing npm dependencies after file writes
+        if (filesChanged && !aborted) {
+          try {
+            const freshFilesForDeps = await window.deyad.readFiles(appId);
+            // Collect content of all changed files for import scanning
+            const changedFileContents: Record<string, string> = {};
+            for (const f of allChangedFiles) {
+              if (freshFilesForDeps[f] !== undefined) changedFileContents[f] = freshFilesForDeps[f];
+            }
+            const installed = await autoInstallDeps(appId, changedFileContents, (msg) => {
+              fullOutput += msg;
+              callbacks.onContent(fullOutput);
+            });
+            if (installed.length > 0) {
+              // Re-read files since npm install may have updated package.json
+              const updatedFiles = await window.deyad.readFiles(appId);
+              if (updatedFiles['package.json']) {
+                await callbacks.onFilesWritten({ 'package.json': updatedFiles['package.json'] });
+              }
+            }
+          } catch (err) { console.debug('ignore auto-install:', err); }
         }
 
         // Re-read project files after writes so the next iteration sees updated code

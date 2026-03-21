@@ -927,6 +927,15 @@ uvicorn main:app --reload
 
 API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
 `,
+
+    'Dockerfile': `FROM python:3.11-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+`,
   };
 }
 
@@ -1080,6 +1089,20 @@ go run .
 \\\`\\\`\\\`
 
 Server runs at [http://localhost:8080](http://localhost:8080)
+`,
+
+    'Dockerfile': `FROM golang:1.22-alpine AS build
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o server .
+
+FROM alpine:3.19
+WORKDIR /app
+COPY --from=build /app/server .
+EXPOSE 8080
+CMD ["./server"]
 `,
   };
 }

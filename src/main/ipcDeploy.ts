@@ -60,6 +60,11 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
     } catch (err) { console.debug('use defaults:', err); }
 
+    // Python and Go apps should use container-based deploy (Railway/Fly.io), not static hosting
+    if (appType === 'python' || appType === 'go') {
+      return { success: false, error: `${appType} apps should be deployed via Railway or Fly.io (container deploy). Use the fullstack deploy option.` };
+    }
+
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
 
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -117,9 +122,11 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
     let appName = 'deyad-app';
+    let appType = 'fullstack';
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+      appType = meta.appType || appType;
     } catch (err) { console.debug('use default:', err); }
 
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -129,7 +136,16 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       let url = '';
 
       if (provider === 'railway') {
-        sendLog('Deploying fullstack app to Railway...\n');
+        sendLog(`Deploying ${appType} app to Railway...\n`);
+
+        // Ensure Dockerfile exists for Python/Go apps
+        if ((appType === 'python' || appType === 'go') && !fs.existsSync(path.join(dir, 'Dockerfile'))) {
+          const dockerfile = appType === 'python'
+            ? `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]\n`
+            : `FROM golang:1.22-alpine AS build\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o server .\n\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=build /app/server .\nEXPOSE 8080\nCMD ["./server"]\n`;
+          fs.writeFileSync(path.join(dir, 'Dockerfile'), dockerfile);
+          sendLog('Generated Dockerfile.\n');
+        }
 
         const hasRailway = fs.existsSync(path.join(dir, '.railway'));
         if (!hasRailway) {
@@ -150,28 +166,20 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
           url = '(check Railway dashboard for URL)';
         }
       } else if (provider === 'flyio') {
-        sendLog('Deploying fullstack app to Fly.io...\n');
+        sendLog(`Deploying ${appType} app to Fly.io...\n`);
 
         const hasFlyToml = fs.existsSync(path.join(dir, 'fly.toml'));
         if (!hasFlyToml) {
           sendLog('Launching new Fly.io app...\n');
           if (!fs.existsSync(path.join(dir, 'Dockerfile'))) {
-            const dockerfile = `FROM node:20-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN cd frontend && npm ci && npx vite build
-
-FROM node:20-alpine
-WORKDIR /app
-COPY --from=build /app/backend ./backend
-COPY --from=build /app/frontend/dist ./frontend/dist
-COPY --from=build /app/package*.json ./
-RUN cd backend && npm ci --production
-EXPOSE 3001
-CMD ["node", "backend/src/index.js"]
-`;
+            let dockerfile: string;
+            if (appType === 'python') {
+              dockerfile = `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]\n`;
+            } else if (appType === 'go') {
+              dockerfile = `FROM golang:1.22-alpine AS build\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o server .\n\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=build /app/server .\nEXPOSE 8080\nCMD ["./server"]\n`;
+            } else {
+              dockerfile = `FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN cd frontend && npm ci && npx vite build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=build /app/backend ./backend\nCOPY --from=build /app/frontend/dist ./frontend/dist\nCOPY --from=build /app/package*.json ./\nRUN cd backend && npm ci --production\nEXPOSE 3001\nCMD ["node", "backend/src/index.js"]\n`;
+            }
             fs.writeFileSync(path.join(dir, 'Dockerfile'), dockerfile);
             sendLog('Generated Dockerfile.\n');
           }
@@ -225,13 +233,25 @@ CMD ["node", "backend/src/index.js"]
 
     try {
       // 1. Build
-      const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
-      sendLog('Building project…\n');
-      await spawnWithLogs('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 }, sendLog);
-      sendLog('Build complete.\n');
-
-      const distDir = path.join(webDir, 'dist');
-      if (!fs.existsSync(distDir)) return { success: false, error: 'Build output (dist/) not found' };
+      let distDir: string;
+      if (appType === 'python') {
+        // Python: no build step, rsync the whole project
+        sendLog('Preparing Python project for upload…\n');
+        distDir = dir;
+      } else if (appType === 'go') {
+        // Go: build binary
+        sendLog('Building Go binary…\n');
+        await spawnWithLogs('go', ['build', '-o', 'server', '.'], { cwd: dir, timeout: 120_000 }, sendLog);
+        sendLog('Build complete.\n');
+        distDir = dir;
+      } else {
+        const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
+        sendLog('Building project…\n');
+        await spawnWithLogs('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 }, sendLog);
+        sendLog('Build complete.\n');
+        distDir = path.join(webDir, 'dist');
+        if (!fs.existsSync(distDir)) return { success: false, error: 'Build output (dist/) not found' };
+      }
 
       // 2. rsync to VPS
       const remoteDest = `${opts.user}@${opts.host}:${opts.path}`;
@@ -247,22 +267,81 @@ CMD ["node", "backend/src/index.js"]
       const code = await spawnWithLogs('rsync', rsyncArgs, { cwd: dir, timeout: 300_000 }, sendLog);
       if (code !== 0) return { success: false, error: `rsync exited with code ${code}` };
 
-      // 3. Set up nginx + SSL if domain provided
+      // 3. Start service on VPS for Python/Go
+      if (appType === 'python' || appType === 'go') {
+        sendLog('\nSetting up systemd service on VPS…\n');
+        const serviceName = `deyad-${appId.slice(0, 12)}`;
+        const execStart = appType === 'python'
+          ? `/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000`
+          : `${opts.path}/server`;
+        const servicePort = appType === 'python' ? 8000 : 8080;
+        const serviceUnit = [
+          '[Unit]',
+          `Description=${serviceName}`,
+          'After=network.target',
+          '',
+          '[Service]',
+          `WorkingDirectory=${opts.path}`,
+          `ExecStart=${execStart}`,
+          'Restart=always',
+          'Environment=PATH=/usr/local/bin:/usr/bin:/bin',
+          '',
+          '[Install]',
+          'WantedBy=multi-user.target',
+        ].join('\n');
+
+        const setupCmd = [
+          `echo '${serviceUnit}' | sudo tee /etc/systemd/system/${serviceName}.service`,
+          'sudo systemctl daemon-reload',
+          `sudo systemctl enable --now ${serviceName}`,
+        ].join(' && ');
+
+        const svcCode = await spawnWithLogs(
+          'ssh',
+          ['-p', sshPort, '-o', 'StrictHostKeyChecking=accept-new', `${opts.user}@${opts.host}`, setupCmd],
+          { cwd: dir, timeout: 30_000 },
+          sendLog,
+        );
+        if (svcCode !== 0) {
+          sendLog('\n⚠ Service setup failed — files were uploaded but the service was not configured.\n');
+          sendLog('Make sure the SSH user has sudo access and Python3/Go is installed on the server.\n');
+        } else {
+          sendLog('Service started!\n');
+        }
+      }
+
+      // 4. Set up nginx + SSL if domain provided
       if (opts.domain) {
         sendLog(`\nConfiguring nginx for ${opts.domain}…\n`);
         const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=accept-new ${opts.user}@${opts.host}`;
 
-        const nginxConf = [
-          `server {`,
-          `    listen 80;`,
-          `    server_name ${opts.domain};`,
-          `    root ${opts.path};`,
-          `    index index.html;`,
-          `    location / {`,
-          `        try_files \\$uri \\$uri/ /index.html;`,
-          `    }`,
-          `}`,
-        ].join('\n');
+        const isApiApp = appType === 'python' || appType === 'go';
+        const apiPort = appType === 'python' ? 8000 : 8080;
+        const nginxConf = isApiApp
+          ? [
+              `server {`,
+              `    listen 80;`,
+              `    server_name ${opts.domain};`,
+              `    location / {`,
+              `        proxy_pass http://127.0.0.1:${apiPort};`,
+              `        proxy_set_header Host \$host;`,
+              `        proxy_set_header X-Real-IP \$remote_addr;`,
+              `        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;`,
+              `        proxy_set_header X-Forwarded-Proto \$scheme;`,
+              `    }`,
+              `}`,
+            ].join('\n')
+          : [
+              `server {`,
+              `    listen 80;`,
+              `    server_name ${opts.domain};`,
+              `    root ${opts.path};`,
+              `    index index.html;`,
+              `    location / {`,
+              `        try_files \$uri \$uri/ /index.html;`,
+              `    }`,
+              `}`,
+            ].join('\n');
 
         // Write nginx config
         const confPath = `/etc/nginx/sites-available/${opts.domain}`;
@@ -326,6 +405,11 @@ CMD ["node", "backend/src/index.js"]
     const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
 
     try {
+      // Python/Go apps cannot be packaged as Electron desktop apps
+      if (appType === 'python' || appType === 'go') {
+        return { success: false, error: `${appType} apps cannot be packaged as Electron desktop apps. Use Railway, Fly.io, or VPS deploy instead.` };
+      }
+
       // 1. Build the Vite frontend
       const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
       sendLog('Building frontend…\n');
