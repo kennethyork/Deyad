@@ -1,61 +1,33 @@
 /**
- * Docker / Container / Database IPC handlers.
+ * Database / Prisma Studio IPC handlers.
+ *
+ * For SQLite-backed full-stack apps, there is no Docker or container engine
+ * required. The "database viewer" is Prisma Studio, launched as a local
+ * child process on demand.
  */
 
 import { ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import nodeNet from 'node:net';
-import { promisify } from 'node:util';
-import { execFile } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 
-const execFileAsync = promisify(execFile);
-const DOCKER_CHECK_TIMEOUT_MS = 5000;
+// ── Prisma Studio process registry ───────────────────────────────────────────
 
-// ── Container Engine (Podman / Docker) ──────────────────────────────────────
+const studioProcesses = new Map<string, ChildProcess>();
 
-/** Detect whether podman or docker is available (prefer podman). */
-let _containerEngine: string | null = null;
-async function getContainerEngine(): Promise<string> {
-  if (_containerEngine) return _containerEngine;
-  for (const cmd of ['podman', 'docker']) {
-    try {
-      await execFileAsync(cmd, ['info'], { timeout: DOCKER_CHECK_TIMEOUT_MS });
-      _containerEngine = cmd;
-      return cmd;
-    } catch (err) { console.debug('try next:', err); }
-  }
-  throw new Error('No container engine found (tried podman, docker)');
-}
-
-/** Build env for compose commands — sets DOCKER_HOST for podman so docker-compose v1 can connect. */
-function composeEnv(): NodeJS.ProcessEnv {
-  const env = { ...process.env };
-  if (_containerEngine === 'podman') {
-    const uid = process.getuid?.() ?? 1000;
-    env.DOCKER_HOST = `unix:///run/user/${uid}/podman/podman.sock`;
-  }
-  return env;
-}
-
-async function checkDockerAvailable(): Promise<boolean> {
-  try {
-    await getContainerEngine();
-    return true;
-  } catch (err) { console.debug('Handled error:', err); return false; }
-}
-
-export async function stopCompose(appDir: (id: string) => string, appId: string): Promise<void> {
-  const dir = appDir(appId);
-  const composeFile = path.join(dir, 'docker-compose.yml');
-  if (fs.existsSync(composeFile)) {
-    try {
-      const engine = await getContainerEngine();
-      await execFileAsync(engine, ['compose', '-f', composeFile, 'down'], { timeout: 30000, env: composeEnv() });
-    } catch (err) { console.debug('best-effort:', err); }
+function killStudio(appId: string): void {
+  const proc = studioProcesses.get(appId);
+  if (proc) {
+    try { proc.kill(); } catch (err) { console.debug('kill studio:', err); }
+    studioProcesses.delete(appId);
   }
 }
 
+/** No-op — kept for backward compatibility with ipcApps.ts import. */
+export async function stopCompose(_appDir: (id: string) => string, appId: string): Promise<void> {
+  killStudio(appId);
+}
 export function registerDockerHandlers(appDir: (id: string) => string): void {
   // ── Database inspection ─────────────────────────────────────────────────
   ipcMain.handle('db:describe', (_event, appId: string) => {
@@ -86,18 +58,44 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
     return result;
   });
 
-  // ── Container handlers ──────────────────────────────────────────────────
-  ipcMain.handle('docker:check', async () => checkDockerAvailable());
+  // ── Docker check — always true since SQLite needs no container engine ───
+  ipcMain.handle('docker:check', async () => true);
 
+  // ── Start Prisma Studio ─────────────────────────────────────────────────
   ipcMain.handle('docker:db-start', async (event, appId: string) => {
     const dir = appDir(appId);
-    const composeFile = path.join(dir, 'docker-compose.yml');
-    if (!fs.existsSync(composeFile)) {
-      return { success: false, error: 'No docker-compose.yml found in app directory' };
+    const backendDir = path.join(dir, 'backend');
+    if (!fs.existsSync(backendDir)) {
+      return { success: false, error: 'No backend directory found in app directory' };
     }
+
+    // Read guiPort from deyad.json
+    let guiPort = 5555;
     try {
-      const engine = await getContainerEngine();
-      await execFileAsync(engine, ['compose', '-f', composeFile, 'up', '-d'], { timeout: 120000, env: composeEnv() });
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      if (meta.guiPort) guiPort = meta.guiPort;
+    } catch (err) { console.debug('Could not read guiPort from deyad.json:', err); }
+
+    // Stop any existing instance
+    killStudio(appId);
+
+    try {
+      const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+      const proc = spawn(npx, ['prisma', 'studio', '--port', String(guiPort), '--browser=none'], {
+        cwd: backendDir,
+        stdio: 'pipe',
+        env: { ...process.env },
+      });
+
+      studioProcesses.set(appId, proc);
+
+      proc.on('exit', () => {
+        studioProcesses.delete(appId);
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('docker:db-status', { appId, status: 'stopped' });
+        }
+      });
+
       event.sender.send('docker:db-status', { appId, status: 'running' });
       return { success: true };
     } catch (err: unknown) {
@@ -106,10 +104,11 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
     }
   });
 
+  // ── Stop Prisma Studio ──────────────────────────────────────────────────
   ipcMain.handle('docker:db-stop', async (event, appId: string) => {
     try {
+      killStudio(appId);
       event.sender.send('docker:db-status', { appId, status: 'stopped' });
-      await stopCompose(appDir, appId);
       return { success: true };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -117,26 +116,20 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
     }
   });
 
+  // ── DB status — check whether Prisma Studio process is alive ───────────
   ipcMain.handle('docker:db-status', async (_event, appId: string) => {
     const dir = appDir(appId);
-    const composeFile = path.join(dir, 'docker-compose.yml');
-    if (!fs.existsSync(composeFile)) return { status: 'none' };
-    try {
-      const engine = await getContainerEngine();
-      const { stdout } = await execFileAsync(
-        engine, ['compose', '-f', composeFile, 'ps', '--format', 'json'],
-        { timeout: 10000, env: composeEnv() },
-      );
-      const lines = stdout.trim().split('\n').filter(Boolean);
-      if (!lines.length) return { status: 'stopped' };
-      const containers = lines
-        .map((l) => { try { return JSON.parse(l); } catch (err) { console.debug('JSON parse failed:', err); return null; } })
-        .filter(Boolean);
-      const running = containers.some((c: { State?: string }) => c?.State === 'running');
-      return { status: running ? 'running' : 'stopped' };
-    } catch (err) { console.debug('Handled error:', err); return { status: 'stopped' }; }
+    const backendDir = path.join(dir, 'backend');
+    if (!fs.existsSync(backendDir)) return { status: 'none' };
+    const proc = studioProcesses.get(appId);
+    if (!proc || proc.exitCode !== null || proc.killed) {
+      studioProcesses.delete(appId);
+      return { status: 'stopped' };
+    }
+    return { status: 'running' };
   });
 
+  // ── Port availability check ─────────────────────────────────────────────
   ipcMain.handle('docker:port-check', (_event, port: number) => {
     if (!Number.isInteger(port) || port < 1 || port > 65535) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {

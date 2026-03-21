@@ -8,7 +8,12 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('node:child_process', () => ({
-  execFile: vi.fn(),
+  spawn: vi.fn(() => ({
+    on: vi.fn(),
+    kill: vi.fn(),
+    exitCode: null,
+    killed: false,
+  })),
 }));
 
 vi.mock('node:net', () => ({
@@ -19,7 +24,6 @@ vi.mock('node:net', () => ({
 const handlers = new Map<string, Function>();
 
 import { ipcMain } from 'electron';
-import { execFile } from 'node:child_process';
 
 beforeEach(() => {
   handlers.clear();
@@ -91,22 +95,57 @@ model Post {
     expect(result.tables[1].name).toBe('Post');
   });
 
-  it('docker:db-start returns error when no docker-compose.yml', async () => {
+  it('docker:check always returns true (no container engine needed for SQLite)', async () => {
+    const { registerDockerHandlers } = await import('./ipcDocker');
+    registerDockerHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('docker:check')!;
+    const result = await handler();
+    expect(result).toBe(true);
+  });
+
+  it('docker:db-start returns error when no backend directory', async () => {
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
 
     const handler = handlers.get('docker:db-start')!;
-    const event = { sender: { send: vi.fn() } };
+    const event = { sender: { send: vi.fn(), isDestroyed: vi.fn(() => false) } };
     const result = await handler(event, 'app1');
-    expect(result).toEqual({ success: false, error: 'No docker-compose.yml found in app directory' });
+    expect(result).toEqual({ success: false, error: 'No backend directory found in app directory' });
   });
 
-  it('docker:db-status returns none when no docker-compose.yml', async () => {
+  it('docker:db-start succeeds when backend directory exists', async () => {
+    const backendDir = path.join(tmpDir, 'backend');
+    fs.mkdirSync(backendDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'deyad.json'), JSON.stringify({ guiPort: 5555 }));
+
+    const { registerDockerHandlers } = await import('./ipcDocker');
+    registerDockerHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('docker:db-start')!;
+    const event = { sender: { send: vi.fn(), isDestroyed: vi.fn(() => false) } };
+    const result = await handler(event, 'app1');
+    expect(result.success).toBe(true);
+  });
+
+  it('docker:db-status returns none when no backend directory', async () => {
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
 
     const handler = handlers.get('docker:db-status')!;
     const result = await handler({}, 'app1');
     expect(result).toEqual({ status: 'none' });
+  });
+
+  it('docker:db-status returns stopped when backend exists but no process running', async () => {
+    const backendDir = path.join(tmpDir, 'backend');
+    fs.mkdirSync(backendDir, { recursive: true });
+
+    const { registerDockerHandlers } = await import('./ipcDocker');
+    registerDockerHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('docker:db-status')!;
+    const result = await handler({}, 'app1');
+    expect(result).toEqual({ status: 'stopped' });
   });
 });

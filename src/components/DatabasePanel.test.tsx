@@ -9,9 +9,8 @@ const fullApp = {
   description: '',
   createdAt: new Date().toISOString(),
   appType: 'fullstack' as const,
-  dbProvider: 'postgresql' as const,
-  dbPort: 15432,
-  guiPort: 15050,
+  dbProvider: 'sqlite' as const,
+  guiPort: 15555,
 };
 
 const simpleSchema = {
@@ -26,7 +25,6 @@ describe('DatabasePanel', () => {
     (window as any).deyad = {
       dbDescribe: vi.fn().mockResolvedValue(simpleSchema),
       portCheck: vi.fn().mockResolvedValue(true),
-      getSettings: vi.fn().mockResolvedValue({ pgAdminEmail: 'admin@admin.com', pgAdminPassword: 'admin' }),
     };
   });
 
@@ -42,7 +40,7 @@ describe('DatabasePanel', () => {
 
   it('shows placeholder when DB stopped', () => {
     render(<DatabasePanel app={fullApp} dbStatus="stopped" onDbToggle={vi.fn()} />);
-    expect(screen.getByText(/start the database/i)).toBeTruthy();
+    expect(screen.getByText(/start the db viewer/i)).toBeTruthy();
   });
 
   it('renders webview when DB is running', async () => {
@@ -50,14 +48,14 @@ describe('DatabasePanel', () => {
     await waitFor(() => {
       const webview = container.querySelector('webview');
       expect(webview).toBeTruthy();
-      expect(webview?.getAttribute('src')).toContain('15050');
+      expect(webview?.getAttribute('src')).toContain('15555');
     });
   });
 
   it('shows starting placeholder when port not ready', () => {
     (window as any).deyad.portCheck = vi.fn().mockResolvedValue(false);
     render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
-    expect(screen.getByText(/starting pgadmin/i)).toBeTruthy();
+    expect(screen.getByText(/starting prisma studio/i)).toBeTruthy();
   });
 
   it('switches to schema view and shows tables', async () => {

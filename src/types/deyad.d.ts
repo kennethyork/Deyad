@@ -35,7 +35,7 @@ interface ChatMessage {
   content: string;
 }
 
-type DbProvider = 'postgresql';
+type DbProvider = 'sqlite';
 
 type AppType = 'frontend' | 'fullstack';
 
@@ -46,7 +46,6 @@ interface AppProject {
   createdAt: string;
   appType: AppType;
   dbProvider?: DbProvider;
-  dbPort?: number;
   guiPort?: number;
 }
 
@@ -65,8 +64,6 @@ interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
-  pgAdminEmail: string;
-  pgAdminPassword: string;
   theme: 'dark' | 'light';
   temperature: number;
   topP: number;

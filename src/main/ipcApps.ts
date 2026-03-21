@@ -61,14 +61,12 @@ async function allocateAppPorts(appId: string): Promise<[number, number]> {
   for (let i = 0; i < appId.length; i++) {
     h = ((h << 5) - h + appId.charCodeAt(i)) | 0;
   }
-  let dbPort = ((h >>> 0) % 50000) + 10000;
+  let guiPort = ((h >>> 0) % 50000) + 10000;
   for (let attempt = 0; attempt < 100; attempt++) {
-    const guiPort = dbPort + 1;
-    const [dbFree, guiFree] = await Promise.all([isPortFree(dbPort), isPortFree(guiPort)]);
-    if (dbFree && guiFree) return [dbPort, guiPort];
-    dbPort = ((dbPort - 10000 + 2) % 50000) + 10000;
+    if (await isPortFree(guiPort)) return [guiPort, guiPort];
+    guiPort = ((guiPort - 10000 + 1) % 50000) + 10000;
   }
-  throw new Error('Could not find two free consecutive ports after 100 attempts');
+  throw new Error('Could not find a free port after 100 attempts');
 }
 
 // ── ZIP builder ─────────────────────────────────────────────────────────────
@@ -214,9 +212,8 @@ export function registerAppHandlers(
       appType: resolvedAppType,
     };
     if (resolvedAppType === 'fullstack') {
-      meta.dbProvider = 'postgresql';
-      const [dbPort, guiPort] = await allocateAppPorts(id);
-      meta.dbPort = dbPort;
+      meta.dbProvider = 'sqlite';
+      const [, guiPort] = await allocateAppPorts(id);
       meta.guiPort = guiPort;
     }
     fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
@@ -343,18 +340,9 @@ export function registerAppHandlers(
 
     const appRoot = appDir(appId);
     const backendDir = path.join(appRoot, 'backend');
-    const isFullstack = fs.existsSync(backendDir) && fs.existsSync(path.join(appRoot, 'docker-compose.yml'));
+    const isFullstack = fs.existsSync(backendDir);
 
     if (isFullstack) {
-      sendLog('Starting database containers…\n');
-      try {
-        await execFileAsync('podman', ['compose', 'up', '-d'], { cwd: appRoot, timeout: 120000 });
-        sendLog('Containers started\n');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        sendLog(`Warning: container start failed: ${msg}\n`);
-      }
-
       if (!fs.existsSync(path.join(backendDir, 'node_modules'))) {
         sendLog('Installing backend dependencies…\n');
         try {
@@ -579,9 +567,8 @@ export function registerAppHandlers(
 
     const meta: Record<string, unknown> = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
     if (appType === 'fullstack') {
-      meta.dbProvider = 'postgresql';
-      const [dbPort, guiPort] = await allocateAppPorts(id);
-      meta.dbPort = dbPort;
+      meta.dbProvider = 'sqlite';
+      const [, guiPort] = await allocateAppPorts(id);
       meta.guiPort = guiPort;
     }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));

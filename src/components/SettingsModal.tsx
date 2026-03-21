@@ -12,8 +12,6 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
   const [completionModel, setCompletionModel] = useState('');
   const [embedModel, setEmbedModel] = useState('');
-  const [pgAdminEmail, setPgAdminEmail] = useState('admin@admin.com');
-  const [pgAdminPassword, setPgAdminPassword] = useState('admin');
   const [temperature, setTemperature] = useState(0.7);
   const [topP, setTopP] = useState(0.9);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
@@ -33,8 +31,6 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     setAutocompleteEnabled(settings.autocompleteEnabled ?? false);
     setCompletionModel(settings.completionModel ?? '');
     setEmbedModel(settings.embedModel ?? '');
-    setPgAdminEmail(settings.pgAdminEmail ?? 'admin@admin.com');
-    setPgAdminPassword(settings.pgAdminPassword ?? 'admin');
     setTemperature(settings.temperature ?? 0.7);
     setTopP(settings.topP ?? 0.9);
     setRepeatPenalty(settings.repeatPenalty ?? 1.1);
@@ -57,8 +53,6 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
       autocompleteEnabled,
       completionModel,
       embedModel,
-      pgAdminEmail: pgAdminEmail.trim(),
-      pgAdminPassword,
       temperature,
       topP,
       repeatPenalty,
@@ -68,11 +62,6 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     setSaved(true);
     loadModels();
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleResetPgAdmin = () => {
-    setPgAdminEmail('admin@admin.com');
-    setPgAdminPassword('admin');
   };
 
   const handleTest = async () => {
@@ -259,40 +248,6 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
               <span className="settings-slider-value">{repeatPenalty.toFixed(2)}</span>
             </div>
             <span className="settings-hint">Penalize repetition in output (default: 1.1)</span>
-          </div>
-
-          <hr className="settings-divider" />
-
-          <div className="form-field">
-            <div className="settings-host-row">
-              <label>pgAdmin Credentials</label>
-              <button type="button" className="btn-secondary btn-test" onClick={handleResetPgAdmin}>
-                Reset to Defaults
-              </button>
-            </div>
-            <span className="settings-hint">Login credentials for the pgAdmin database GUI. Defaults: admin@admin.com / admin</span>
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="pgadmin-email">pgAdmin Email</label>
-            <input
-              id="pgadmin-email"
-              type="email"
-              value={pgAdminEmail}
-              onChange={(e) => setPgAdminEmail(e.target.value)}
-              placeholder="admin@admin.com"
-            />
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="pgadmin-password">pgAdmin Password</label>
-            <input
-              id="pgadmin-password"
-              type="password"
-              value={pgAdminPassword}
-              onChange={(e) => setPgAdminPassword(e.target.value)}
-              placeholder="admin"
-            />
           </div>
 
         </div>

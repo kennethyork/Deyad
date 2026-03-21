@@ -154,7 +154,7 @@ const createWindow = () => {
   mainWindow.webContents.session.clearCache().then(() => {
 
     // Helper: register header stripping on a session so embedded webviews
-    // (pgAdmin etc.) can load without X-Frame-Options / CSP blocking.
+    // (Prisma Studio etc.) can load without X-Frame-Options / CSP blocking.
     // SECURITY: Only strips headers for localhost origins — external sites
     // retain their full CSP and X-Frame-Options protections.
     const registerHeaderStripping = (ses: Electron.Session) => {
@@ -170,18 +170,8 @@ const createWindow = () => {
           for (const key of Object.keys(headers)) {
             const lk = key.toLowerCase();
             if (lk === 'x-frame-options') delete headers[key];
-            // Fully remove CSP — pgAdmin's policy blocks inline scripts/styles
-            // needed for its own UI, causing a blank white screen in webviews.
+            // Remove CSP to allow Prisma Studio UI to render correctly in webviews
             if (lk === 'content-security-policy') delete headers[key];
-            // Strip SameSite & Secure from Set-Cookie so pgAdmin login
-            // cookies are persisted inside the webview partition.
-            if (lk === 'set-cookie') {
-              headers[key] = headers[key].map((v: string) =>
-                v
-                  .replace(/;\s*SameSite\s*=\s*\w+/gi, '')
-                  .replace(/;\s*Secure/gi, '')
-              );
-            }
           }
           callback({ responseHeaders: headers });
         },
@@ -191,15 +181,11 @@ const createWindow = () => {
     // Strip headers on the main session
     registerHeaderStripping(mainWindow.webContents.session);
 
-    // pgAdmin webview partition – strip headers & allow cookies
-    const pgadminSession = session.fromPartition('persist:pgadmin');
-    registerHeaderStripping(pgadminSession);
+    // Prisma Studio webview partition – strip headers
+    const prismaStudioSession = session.fromPartition('persist:prisma-studio');
+    registerHeaderStripping(prismaStudioSession);
 
-    // Ensure the pgAdmin partition permits all cookies (no third-party blocking)
-    pgadminSession.cookies.flushStore().catch((err) => console.warn('flushStore:', err));
-
-    // When a webview is attached, ensure its session allows all cookies from
-    // localhost so pgAdmin login works reliably inside the Electron webview.
+    // When a webview is attached, ensure its session allows requests from localhost
     mainWindow.webContents.on('did-attach-webview', (_event, webContents) => {
       webContents.session.webRequest.onBeforeSendHeaders(
         { urls: ['http://localhost:*/*'] },
