@@ -11,9 +11,15 @@ vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
 }));
 
+vi.mock('node:net', () => ({
+  default: { createConnection: vi.fn() },
+  createConnection: vi.fn(),
+}));
+
 const handlers = new Map<string, Function>();
 
 import { ipcMain } from 'electron';
+import { execFile } from 'node:child_process';
 
 beforeEach(() => {
   handlers.clear();
@@ -26,7 +32,7 @@ beforeEach(() => {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-sqlite-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-docker-test-'));
 });
 
 afterEach(() => {
@@ -36,13 +42,16 @@ afterEach(() => {
 });
 
 describe('ipcDocker handler registration', () => {
-  it('registers all 3 SQLite handlers', async () => {
+  it('registers all 6 docker handlers', async () => {
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
 
     expect(handlers.has('db:describe')).toBe(true);
-    expect(handlers.has('db:tables')).toBe(true);
-    expect(handlers.has('db:query')).toBe(true);
+    expect(handlers.has('docker:check')).toBe(true);
+    expect(handlers.has('docker:db-start')).toBe(true);
+    expect(handlers.has('docker:db-stop')).toBe(true);
+    expect(handlers.has('docker:db-status')).toBe(true);
+    expect(handlers.has('docker:port-check')).toBe(true);
   });
 
   it('db:describe returns empty tables when no prisma schema', async () => {
@@ -82,21 +91,22 @@ model Post {
     expect(result.tables[1].name).toBe('Post');
   });
 
-  it('db:tables returns empty when no db file exists', async () => {
+  it('docker:db-start returns error when no docker-compose.yml', async () => {
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
 
-    const handler = handlers.get('db:tables')!;
-    const result = await handler({}, 'app1');
-    expect(result).toEqual([]);
+    const handler = handlers.get('docker:db-start')!;
+    const event = { sender: { send: vi.fn() } };
+    const result = await handler(event, 'app1');
+    expect(result).toEqual({ success: false, error: 'No docker-compose.yml found in app directory' });
   });
 
-  it('db:query returns empty when no db file exists', async () => {
+  it('docker:db-status returns none when no docker-compose.yml', async () => {
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
 
-    const handler = handlers.get('db:query')!;
-    const result = await handler({}, { appId: 'app1', sql: 'SELECT 1' });
-    expect(result).toEqual([]);
+    const handler = handlers.get('docker:db-status')!;
+    const result = await handler({}, 'app1');
+    expect(result).toEqual({ status: 'none' });
   });
 });

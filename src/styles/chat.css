@@ -232,7 +232,7 @@
 .message-body p { margin-bottom: 0.5rem; }
 .message-body p:last-child { margin-bottom: 0; }
 .message-body pre {
-  background: var(--bg-code);
+  background: #0d1526;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 14px;
@@ -245,7 +245,7 @@
 .message-body code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: var(--bg-code-inline);
+  background: rgba(0,0,0,0.3);
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -521,24 +521,6 @@
 }
 .btn-send:hover:not(:disabled) { background: var(--accent-hover); }
 .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.btn-cancel {
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  width: 40px;
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-self: flex-end;
-  height: 40px;
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-.btn-cancel:hover { background: #b91c1c; }
 
 
 /* ─── Token Counter ──────────────────────────────────────────────────── */

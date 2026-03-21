@@ -16,11 +16,10 @@ export interface OllamaModel {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  images?: string[];
 }
 
-export type DbProvider = 'sqlite';
-export type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
+export type DbProvider = 'postgresql';
+export type AppType = 'frontend' | 'fullstack';
 
 export interface AppProject {
   id: string;
@@ -45,9 +44,6 @@ contextBridge.exposeInMainWorld('deyad', {
 
   chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>): Promise<void> =>
     ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options }),
-
-  cancelStream: (requestId: string): Promise<void> =>
-    ipcRenderer.invoke('ollama:cancel-stream', requestId),
 
   fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
     ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
@@ -141,12 +137,27 @@ contextBridge.exposeInMainWorld('deyad', {
     return () => ipcRenderer.removeListener('apps:dev-status', handler);
   },
 
-  // ── Database (SQLite) ────────────────────────────────────────────────────
-  dbTables: (appId: string): Promise<string[]> =>
-    ipcRenderer.invoke('db:tables', appId),
+  // ── Docker / Database ───────────────────────────────────────────────────
+  checkDocker: (): Promise<boolean> =>
+    ipcRenderer.invoke('docker:check'),
 
-  dbQuery: (appId: string, sql: string): Promise<Record<string, unknown>[]> =>
-    ipcRenderer.invoke('db:query', { appId, sql }),
+  dbStart: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('docker:db-start', appId),
+
+  dbStop: (appId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('docker:db-stop', appId),
+
+  dbStatus: (appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }> =>
+    ipcRenderer.invoke('docker:db-status', appId),
+
+  portCheck: (port: number): Promise<boolean> =>
+    ipcRenderer.invoke('docker:port-check', port),
+
+  onDbStatus: (cb: (payload: { appId: string; status: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; status: string }) => cb(payload);
+    ipcRenderer.on('docker:db-status', handler);
+    return () => ipcRenderer.removeListener('docker:db-status', handler);
+  },
 
   dbDescribe: (appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }> =>
     ipcRenderer.invoke('db:describe', appId),
@@ -231,18 +242,6 @@ contextBridge.exposeInMainWorld('deyad', {
   deployVps: (appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }): Promise<{ success: boolean; url?: string; error?: string }> =>
     ipcRenderer.invoke('apps:deploy-vps', appId, opts),
 
-  deployOAuth: (appId: string, provider: 'vercel' | 'netlify', token: string): Promise<{ success: boolean; url?: string; error?: string }> =>
-    ipcRenderer.invoke('apps:deploy-oauth', appId, provider, token),
-
-  deployTokenGet: (provider: 'vercel' | 'netlify'): Promise<string | null> =>
-    ipcRenderer.invoke('apps:deploy-token-get', provider),
-
-  deployTokenSet: (provider: 'vercel' | 'netlify', token: string): Promise<boolean> =>
-    ipcRenderer.invoke('apps:deploy-token-set', provider, token),
-
-  deployTokenClear: (provider: 'vercel' | 'netlify'): Promise<boolean> =>
-    ipcRenderer.invoke('apps:deploy-token-clear', provider),
-
   onDeployLog: (cb: (payload: { appId: string; data: string }) => void) => {
     const handler = (_: Electron.IpcRendererEvent, payload: { appId: string; data: string }) => cb(payload);
     ipcRenderer.on('apps:deploy-log', handler);
@@ -251,25 +250,6 @@ contextBridge.exposeInMainWorld('deyad', {
 
   // Plugins
   listPlugins: (): Promise<PluginManifest[]> => ipcRenderer.invoke('plugins:list'),
-
-  pluginInvokeTool: (toolName: string, params: Record<string, unknown>): Promise<string> =>
-    ipcRenderer.invoke('plugins:invoke-tool', { toolName, params }),
-
-  pluginListThemes: (): Promise<Array<{ name: string; css: string }>> =>
-    ipcRenderer.invoke('plugins:list-themes'),
-
-  pluginListAgents: (): Promise<Array<{ name: string; description: string; systemPrompt: string; model?: string }>> =>
-    ipcRenderer.invoke('plugins:list-agents'),
-
-  // Plugin Marketplace
-  pluginRegistryList: (): Promise<Array<{ name: string; description: string; author: string; version: string; repo: string; downloads?: number; tags?: string[] }>> =>
-    ipcRenderer.invoke('plugins:registry-list'),
-
-  pluginInstall: (repoUrl: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('plugins:install', repoUrl),
-
-  pluginUninstall: (pluginName: string): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('plugins:uninstall', pluginName),
 
   // ── Git ────────────────────────────────────────────────────────────────
   gitCommitAgent: (appId: string, message: string): Promise<{ success: boolean; output?: string; error?: string }> =>

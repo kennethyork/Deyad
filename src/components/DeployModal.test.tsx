@@ -14,10 +14,6 @@ beforeEach(() => {
     capacitorRun: vi.fn().mockResolvedValue({ success: true }),
     capacitorOpen: vi.fn().mockResolvedValue({ success: true }),
     capacitorLiveReload: vi.fn().mockResolvedValue({ success: true }),
-    deployTokenGet: vi.fn().mockResolvedValue(null),
-    deployTokenSet: vi.fn().mockResolvedValue({ success: true }),
-    deployTokenClear: vi.fn().mockResolvedValue({ success: true }),
-    deployOAuth: vi.fn().mockResolvedValue({ success: true, url: 'https://example.vercel.app' }),
   };
 });
 

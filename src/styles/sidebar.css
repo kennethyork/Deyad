@@ -139,21 +139,6 @@
   color: var(--text-primary);
 }
 
-/* ─── Sidebar Plugins Button ─────────────────────────────────────────────── */
-.sidebar-plugins-btn {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 4px 0;
-  transition: color 0.15s;
-  text-align: left;
-}
-.sidebar-plugins-btn:hover {
-  color: var(--accent);
-}
-
 
 /* ─── Sidebar Export Button ──────────────────────────────────────────────── */
 .sidebar-export {
@@ -266,7 +251,7 @@
 /* ── Deploy Log Panel ─────────────────────────────────────────────────── */
 .deploy-log-panel {
   border-top: 1px solid var(--border);
-  background: var(--bg-code);
+  background: #0c1220;
   display: flex;
   flex-direction: column;
   max-height: 180px;

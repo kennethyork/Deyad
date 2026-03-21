@@ -17,6 +17,7 @@ import {
   deleteSnapshot as deleteSnapshotUtil,
 } from '../lib/mainUtils';
 import { gitInit, gitCommit } from './ipcGit';
+import { stopCompose } from './ipcDocker';
 
 const execFileAsync = promisify(execFile);
 
@@ -162,234 +163,6 @@ function copyRecursiveSync(src: string, dest: string) {
   }
 }
 
-// ── Runtime Detection & Auto-Install ────────────────────────────────────────
-
-/** Check if a command exists on the system. */
-async function commandExists(cmd: string): Promise<boolean> {
-  try {
-    await execFileAsync(cmd, ['--version'], { timeout: 10000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Detect the OS package manager available. */
-function detectPkgManager(): 'apt' | 'brew' | 'dnf' | 'pacman' | 'winget' | null {
-  const platform = process.platform;
-  if (platform === 'win32') return 'winget';
-  if (platform === 'darwin') {
-    try { fs.accessSync('/opt/homebrew/bin/brew', fs.constants.X_OK); return 'brew'; } catch {}
-    try { fs.accessSync('/usr/local/bin/brew', fs.constants.X_OK); return 'brew'; } catch {}
-    return null;
-  }
-  // Linux: try common package managers
-  for (const pm of ['apt', 'dnf', 'pacman'] as const) {
-    try { fs.accessSync(`/usr/bin/${pm}`, fs.constants.X_OK); return pm; } catch {}
-  }
-  return null;
-}
-
-/**
- * Ensure Python 3 is installed. If not, install it via the OS package manager.
- * Returns the path to the python3 binary, or null if installation failed.
- */
-async function ensurePython(sendLog: (msg: string) => void): Promise<string | null> {
-  // Try common Python binary names
-  for (const cmd of ['python3', 'python']) {
-    if (await commandExists(cmd)) {
-      try {
-        const { stdout } = await execFileAsync(cmd, ['--version'], { timeout: 10000 });
-        sendLog(`Found ${stdout.trim()}\n`);
-      } catch { /* ignore */ }
-      return cmd;
-    }
-  }
-
-  sendLog('Python not found — installing automatically…\n');
-  const pm = detectPkgManager();
-  if (!pm) {
-    sendLog('Error: Could not detect package manager. Please install Python 3.10+ manually.\n');
-    return null;
-  }
-
-  try {
-    switch (pm) {
-      case 'apt':
-        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
-        await execFileAsync('sudo', ['apt', 'install', '-y', 'python3', 'python3-venv', 'python3-pip'], { timeout: 300000 });
-        break;
-      case 'dnf':
-        await execFileAsync('sudo', ['dnf', 'install', '-y', 'python3', 'python3-pip'], { timeout: 300000 });
-        break;
-      case 'pacman':
-        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'python', 'python-pip'], { timeout: 300000 });
-        break;
-      case 'brew':
-        await execFileAsync('brew', ['install', 'python@3.11'], { timeout: 300000 });
-        break;
-      case 'winget':
-        await execFileAsync('winget', ['install', '--id', 'Python.Python.3.11', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
-        break;
-    }
-    sendLog('Python installed successfully.\n');
-    // Verify it's now available
-    for (const cmd of ['python3', 'python']) {
-      if (await commandExists(cmd)) return cmd;
-    }
-    sendLog('Warning: Python was installed but the command is not in PATH. You may need to restart Deyad.\n');
-    return 'python3';
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    sendLog(`Error installing Python: ${msg}\n`);
-    sendLog('Please install Python 3.10+ manually from https://python.org\n');
-    return null;
-  }
-}
-
-/**
- * Ensure Node.js is installed. If not, install it via the OS package manager.
- * Returns the path to the node binary, or null if installation failed.
- */
-async function ensureNode(sendLog: (msg: string) => void): Promise<string | null> {
-  if (await commandExists('node')) {
-    try {
-      const { stdout } = await execFileAsync('node', ['--version'], { timeout: 10000 });
-      sendLog(`Found Node.js ${stdout.trim()}\n`);
-    } catch { /* ignore */ }
-    return 'node';
-  }
-
-  sendLog('Node.js not found \u2014 installing automatically\u2026\n');
-  const pm = detectPkgManager();
-  if (!pm) {
-    sendLog('Error: Could not detect package manager. Please install Node.js 18+ manually.\n');
-    return null;
-  }
-
-  try {
-    switch (pm) {
-      case 'apt':
-        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
-        await execFileAsync('sudo', ['apt', 'install', '-y', 'nodejs', 'npm'], { timeout: 300000 });
-        break;
-      case 'dnf':
-        await execFileAsync('sudo', ['dnf', 'install', '-y', 'nodejs', 'npm'], { timeout: 300000 });
-        break;
-      case 'pacman':
-        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'nodejs', 'npm'], { timeout: 300000 });
-        break;
-      case 'brew':
-        await execFileAsync('brew', ['install', 'node'], { timeout: 300000 });
-        break;
-      case 'winget':
-        await execFileAsync('winget', ['install', '--id', 'OpenJS.NodeJS.LTS', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
-        break;
-    }
-    sendLog('Node.js installed successfully.\n');
-    if (await commandExists('node')) return 'node';
-    sendLog('Warning: Node.js was installed but the command is not in PATH. You may need to restart Deyad.\n');
-    return 'node';
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    sendLog(`Error installing Node.js: ${msg}\n`);
-    sendLog('Please install Node.js 18+ manually from https://nodejs.org\n');
-    return null;
-  }
-}
-
-/**
- * Ensure Go is installed. If not, install it via the OS package manager.
- * Returns the path to the go binary, or null if installation failed.
- */
-async function ensureGo(sendLog: (msg: string) => void): Promise<string | null> {
-  if (await commandExists('go')) {
-    try {
-      const { stdout } = await execFileAsync('go', ['version'], { timeout: 10000 });
-      sendLog(`Found ${stdout.trim()}\n`);
-    } catch { /* ignore */ }
-    return 'go';
-  }
-
-  sendLog('Go not found — installing automatically…\n');
-  const pm = detectPkgManager();
-  if (!pm) {
-    sendLog('Error: Could not detect package manager. Please install Go 1.22+ manually.\n');
-    return null;
-  }
-
-  try {
-    switch (pm) {
-      case 'apt':
-        // Use the official Go installer for a recent version on apt-based systems
-        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
-        await execFileAsync('sudo', ['apt', 'install', '-y', 'golang-go'], { timeout: 300000 });
-        break;
-      case 'dnf':
-        await execFileAsync('sudo', ['dnf', 'install', '-y', 'golang'], { timeout: 300000 });
-        break;
-      case 'pacman':
-        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'go'], { timeout: 300000 });
-        break;
-      case 'brew':
-        await execFileAsync('brew', ['install', 'go'], { timeout: 300000 });
-        break;
-      case 'winget':
-        await execFileAsync('winget', ['install', '--id', 'GoLang.Go', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
-        break;
-    }
-    sendLog('Go installed successfully.\n');
-    if (await commandExists('go')) return 'go';
-    sendLog('Warning: Go was installed but the command is not in PATH. You may need to restart Deyad.\n');
-    return 'go';
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    sendLog(`Error installing Go: ${msg}\n`);
-    sendLog('Please install Go 1.22+ manually from https://go.dev/dl\n');
-    return null;
-  }
-}
-
-// ── Deprecated @types/ packages that no longer exist on npm ─────────────────
-
-/** Packages that bundle their own types — @types/ versions are deprecated/removed. */
-const DEPRECATED_TYPES = new Set([
-  '@types/react-router-dom', '@types/react-router', '@types/react-query',
-  '@types/zustand', '@types/framer-motion', '@types/immer',
-  '@types/zod', '@types/yup', '@types/jotai', '@types/valtio',
-  '@types/next', '@types/prisma', '@types/hono', '@types/elysia',
-  '@types/vitest', '@types/lucide-react', '@types/date-fns', '@types/dayjs',
-  '@types/clsx', '@types/tailwind-merge', '@types/three',
-  '@types/axios', '@types/ky', '@types/got',
-]);
-
-/**
- * Remove deprecated @types/ packages from a project's package.json before npm install.
- * This prevents ETARGET errors when the AI adds @types/ for packages that bundle own types.
- */
-function sanitizePackageJson(projectDir: string, sendLog: (msg: string) => void): void {
-  const pkgPath = path.join(projectDir, 'package.json');
-  if (!fs.existsSync(pkgPath)) return;
-  try {
-    const raw = fs.readFileSync(pkgPath, 'utf-8');
-    const pkg = JSON.parse(raw);
-    let changed = false;
-    for (const section of ['dependencies', 'devDependencies']) {
-      if (!pkg[section]) continue;
-      for (const dep of Object.keys(pkg[section])) {
-        if (DEPRECATED_TYPES.has(dep)) {
-          sendLog(`Removing deprecated ${dep} (package ships its own types)\n`);
-          delete pkg[section][dep];
-          changed = true;
-        }
-      }
-    }
-    if (changed) {
-      fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
-    }
-  } catch { /* ignore parse errors */ }
-}
-
 // ── Registration ────────────────────────────────────────────────────────────
 
 export function registerAppHandlers(
@@ -441,20 +214,12 @@ export function registerAppHandlers(
       appType: resolvedAppType,
     };
     if (resolvedAppType === 'fullstack') {
-      meta.dbProvider = 'sqlite';
+      meta.dbProvider = 'postgresql';
+      const [dbPort, guiPort] = await allocateAppPorts(id);
+      meta.dbPort = dbPort;
+      meta.guiPort = guiPort;
     }
     fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
-
-    // Pre-install runtimes in the background so they're ready before first preview
-    const silentLog = (msg: string) => console.log(`[runtime-setup] ${msg.trim()}`);
-    if (resolvedAppType === 'python') {
-      ensurePython(silentLog).catch((err) => console.debug('python pre-install:', err));
-    } else if (resolvedAppType === 'go') {
-      ensureGo(silentLog).catch((err) => console.debug('go pre-install:', err));
-    } else {
-      ensureNode(silentLog).catch((err) => console.debug('node pre-install:', err));
-    }
-
     await gitInit(appDir, id);
     return { id, ...meta };
   });
@@ -512,6 +277,7 @@ export function registerAppHandlers(
       proc.kill();
       devProcesses.delete(appId);
     }
+    await stopCompose(appDir, appId).catch((err) => console.warn('stopCompose:', err));
     const dir = appDir(appId);
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
     deleteSnapshot(appId);
@@ -579,22 +345,6 @@ export function registerAppHandlers(
     const backendDir = path.join(appRoot, 'backend');
     const isFullstack = fs.existsSync(backendDir) && fs.existsSync(path.join(appRoot, 'docker-compose.yml'));
 
-    // Detect project language from deyad.json or file markers
-    let projectLang = 'node';
-    try {
-      const metaPath = path.join(appRoot, 'deyad.json');
-      if (fs.existsSync(metaPath)) {
-        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
-        if (meta.appType === 'python') projectLang = 'python';
-        else if (meta.appType === 'go') projectLang = 'go';
-      }
-    } catch { /* ignore */ }
-    // Fallback: detect from files
-    if (projectLang === 'node') {
-      if (fs.existsSync(path.join(appRoot, 'go.mod'))) projectLang = 'go';
-      else if (fs.existsSync(path.join(appRoot, 'requirements.txt')) || fs.existsSync(path.join(appRoot, 'main.py'))) projectLang = 'python';
-    }
-
     if (isFullstack) {
       sendLog('Starting database containers…\n');
       try {
@@ -636,93 +386,15 @@ export function registerAppHandlers(
       backendChild.on('close', () => { devProcesses.delete(`${appId}:backend`); });
     }
 
-    // ── Python project: ensure runtime + pip install + uvicorn ────────
-    if (projectLang === 'python') {
-      const pythonCmd = await ensurePython(sendLog);
-      if (!pythonCmd) {
-        return { success: false, error: 'Python is not installed and automatic installation failed. Please install Python 3.10+ manually.' };
-      }
-
-      sendLog('Installing Python dependencies…\n');
+    if (!fs.existsSync(path.join(viteRoot, 'node_modules'))) {
+      sendLog('Installing dependencies…\n');
       try {
-        // Create venv if missing
-        if (!fs.existsSync(path.join(appRoot, '.venv'))) {
-          await execFileAsync(pythonCmd, ['-m', 'venv', '.venv'], { cwd: appRoot, timeout: 60000 });
-        }
-        const pip = path.join(appRoot, '.venv', 'bin', 'pip');
-        if (fs.existsSync(path.join(appRoot, 'requirements.txt'))) {
-          await execFileAsync(pip, ['install', '-r', 'requirements.txt'], { cwd: appRoot, timeout: 180000 });
-        }
-        sendLog('Python dependencies installed\n');
+        await execFileAsync('npm', ['install'], { cwd: viteRoot, timeout: 180000 });
+        sendLog('Dependencies installed\n');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        sendLog(`Warning: pip install failed: ${msg}\n`);
+        return { success: false, error: `npm install failed: ${msg}` };
       }
-
-      sendLog('Starting Python server…\n');
-      const uvicorn = path.join(appRoot, '.venv', 'bin', 'uvicorn');
-      const pythonChild = spawn(uvicorn, ['main:app', '--reload', '--port', '8000'], {
-        cwd: appRoot, stdio: 'pipe',
-      });
-      devProcesses.set(appId, pythonChild);
-      pythonChild.stdout?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
-      pythonChild.stderr?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
-      pythonChild.on('close', () => {
-        devProcesses.delete(appId);
-        if (!event.sender.isDestroyed()) {
-          event.sender.send('apps:dev-status', { appId, status: 'stopped' });
-        }
-      });
-      event.sender.send('apps:dev-status', { appId, status: 'starting' });
-      return { success: true };
-    }
-
-    // ── Go project: ensure runtime + go mod tidy + go run ───────────
-    if (projectLang === 'go') {
-      const goCmd = await ensureGo(sendLog);
-      if (!goCmd) {
-        return { success: false, error: 'Go is not installed and automatic installation failed. Please install Go 1.22+ manually.' };
-      }
-
-      sendLog('Installing Go dependencies…\n');
-      try {
-        await execFileAsync('go', ['mod', 'tidy'], { cwd: appRoot, timeout: 120000 });
-        sendLog('Go dependencies installed\n');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        sendLog(`Warning: go mod tidy failed: ${msg}\n`);
-      }
-
-      sendLog('Starting Go server…\n');
-      const goChild = spawn('go', ['run', '.'], { cwd: appRoot, stdio: 'pipe' });
-      devProcesses.set(appId, goChild);
-      goChild.stdout?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
-      goChild.stderr?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
-      goChild.on('close', () => {
-        devProcesses.delete(appId);
-        if (!event.sender.isDestroyed()) {
-          event.sender.send('apps:dev-status', { appId, status: 'stopped' });
-        }
-      });
-      event.sender.send('apps:dev-status', { appId, status: 'starting' });
-      return { success: true };
-    }
-
-    // ── Node project: ensure runtime + npm install + npm run dev ──────────────────────
-    const nodeCmd = await ensureNode(sendLog);
-    if (!nodeCmd) {
-      return { success: false, error: 'Node.js is not installed and automatic installation failed. Please install Node.js 18+ manually.' };
-    }
-
-    // Always run npm install to pick up any new dependencies added by the AI
-    sanitizePackageJson(viteRoot, sendLog);
-    sendLog('Installing dependencies…\n');
-    try {
-      await execFileAsync('npm', ['install'], { cwd: viteRoot, timeout: 180000 });
-      sendLog('Dependencies installed\n');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { success: false, error: `npm install failed: ${msg}` };
     }
 
     const child = spawn('npm', ['run', 'dev'], { cwd: viteRoot, stdio: 'pipe' });
@@ -907,7 +579,10 @@ export function registerAppHandlers(
 
     const meta: Record<string, unknown> = { name, description: `Imported from ${path.basename(srcDir)}`, createdAt: new Date().toISOString(), appType };
     if (appType === 'fullstack') {
-      meta.dbProvider = 'sqlite';
+      meta.dbProvider = 'postgresql';
+      const [dbPort, guiPort] = await allocateAppPorts(id);
+      meta.dbPort = dbPort;
+      meta.guiPort = guiPort;
     }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
@@ -939,6 +614,12 @@ export function registerAppHandlers(
 
     // Write updated metadata with new name and timestamp
     const newMeta: Record<string, unknown> = { ...srcMeta, name: newName, createdAt: new Date().toISOString() };
+    // Reallocate ports for fullstack apps to avoid collisions
+    if (newMeta.appType === 'fullstack') {
+      const [dbPort, guiPort] = await allocateAppPorts(id);
+      newMeta.dbPort = dbPort;
+      newMeta.guiPort = guiPort;
+    }
     fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(newMeta, null, 2));
 
     await gitInit(appDir, id);

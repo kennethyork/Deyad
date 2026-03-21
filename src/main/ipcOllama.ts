@@ -4,9 +4,6 @@
 
 import { ipcMain, net } from 'electron';
 
-/** Track active streaming requests so they can be cancelled. */
-const activeRequests = new Map<string, Electron.ClientRequest>();
-
 async function listOllamaModels(baseUrl: string): Promise<{ models: { name: string; modified_at: string; size: number; details?: Record<string, string> }[] }> {
   return new Promise((resolve, reject) => {
     const request = net.request(`${baseUrl}/api/tags`);
@@ -29,33 +26,15 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     const body: Record<string, unknown> = { model, messages, stream: true };
     if (options && Object.keys(options).length > 0) body.options = options;
     const request = net.request({ method: 'POST', url: `${baseUrl}/api/chat` });
-    activeRequests.set(requestId, request);
     let buffer = '';
     let resolved = false;
     const finish = () => {
       if (resolved) return;
       resolved = true;
-      activeRequests.delete(requestId);
       if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done', requestId);
       resolve();
     };
     request.on('response', (response) => {
-      // Check for HTTP errors (Ollama returns 4xx/5xx for bad requests)
-      if (response.statusCode && response.statusCode >= 400) {
-        let errBody = '';
-        response.on('data', (chunk: Buffer) => { errBody += chunk.toString(); });
-        response.on('end', () => {
-          if (!resolved) {
-            resolved = true;
-            activeRequests.delete(requestId);
-            let errMsg = `Ollama returned HTTP ${response.statusCode}`;
-            try { const parsed = JSON.parse(errBody); if (parsed.error) errMsg = parsed.error; } catch { /* use default */ }
-            if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, errMsg);
-            reject(new Error(errMsg));
-          }
-        });
-        return;
-      }
       response.on('data', (chunk: Buffer) => {
         buffer += chunk.toString();
         const lines = buffer.split('\n');
@@ -64,12 +43,6 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
           if (!line.trim()) continue;
           try {
             const parsed = JSON.parse(line);
-            // Handle Ollama error responses (e.g. model not found, context overflow)
-            if (parsed.error) {
-              if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, parsed.error);
-              finish();
-              return;
-            }
             if (parsed.message?.content && !event.sender.isDestroyed()) {
               event.sender.send('ollama:stream-token', requestId, parsed.message.content);
             }
@@ -82,7 +55,6 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     request.on('error', (err: Error) => {
       if (!resolved) {
         resolved = true;
-        activeRequests.delete(requestId);
         if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, err.message);
         reject(err);
       }
@@ -100,14 +72,6 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
 
   ipcMain.handle('ollama:chat-stream', async (event, { model, messages, requestId, options }: { model: string; messages: { role: string; content: string }[]; requestId: string; options?: Record<string, number> }) => {
     return streamOllama(getOllamaBaseUrl(), event, model, messages, requestId, options);
-  });
-
-  ipcMain.handle('ollama:cancel-stream', (_event, requestId: string) => {
-    const req = activeRequests.get(requestId);
-    if (req) {
-      req.abort();
-      activeRequests.delete(requestId);
-    }
   });
 
   /** Fill-in-the-middle completion for inline autocomplete. */

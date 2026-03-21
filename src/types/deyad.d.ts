@@ -33,12 +33,11 @@ interface OllamaModel {
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  images?: string[];
 }
 
-type DbProvider = 'sqlite';
+type DbProvider = 'postgresql';
 
-type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
+type AppType = 'frontend' | 'fullstack';
 
 interface AppProject {
   id: string;
@@ -47,6 +46,8 @@ interface AppProject {
   createdAt: string;
   appType: AppType;
   dbProvider?: DbProvider;
+  dbPort?: number;
+  guiPort?: number;
 }
 
 interface UiMessage {
@@ -64,6 +65,8 @@ interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
+  pgAdminEmail: string;
+  pgAdminPassword: string;
   theme: 'dark' | 'light';
   temperature: number;
   topP: number;
@@ -80,7 +83,7 @@ export interface PluginTemplate {
   name: string;
   description: string;
   icon: string;
-  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
+  appType: 'frontend' | 'fullstack';
   prompt: string;
 }
 
@@ -88,44 +91,13 @@ export interface PluginManifest {
   name: string;
   description?: string;
   templates?: PluginTemplate[];
-  agentTools?: PluginAgentTool[];
-  agents?: PluginAgent[];
-  themes?: PluginTheme[];
-}
-
-export interface PluginAgentTool {
-  name: string;
-  description: string;
-  parameters: Record<string, { type: string; description: string; required?: boolean }>;
-}
-
-export interface PluginAgent {
-  name: string;
-  description: string;
-  systemPrompt: string;
-  model?: string;
-}
-
-export interface PluginTheme {
-  name: string;
-  css: string;
-}
-
-export interface RegistryPlugin {
-  name: string;
-  description: string;
-  author: string;
-  version: string;
-  repo: string;
-  downloads?: number;
-  tags?: string[];
+  // future extension points: models, deployProviders, etc.
 }
 
 interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }): Promise<void>;
-  cancelStream(requestId: string): Promise<void>;
   fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
   embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
   onStreamToken(requestId: string, cb: (token: string) => void): () => void;
@@ -155,9 +127,13 @@ interface DeyadAPI {
   onAppDevLog(cb: (payload: { appId: string; data: string }) => void): () => void;
   onAppDevStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
-  // Database (SQLite)
-  dbTables(appId: string): Promise<string[]>;
-  dbQuery(appId: string, sql: string): Promise<Record<string, unknown>[]>;
+  // Docker / Database
+  checkDocker(): Promise<boolean>;
+  dbStart(appId: string): Promise<{ success: boolean; error?: string }>;
+  dbStop(appId: string): Promise<{ success: boolean; error?: string }>;
+  dbStatus(appId: string): Promise<{ status: 'running' | 'stopped' | 'none' }>;
+  portCheck(port: number): Promise<boolean>;
+  onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
   // Settings
   getSettings(): Promise<DeyadSettings>;
@@ -217,22 +193,10 @@ interface DeyadAPI {
   deployFullstack(appId: string, provider: 'railway' | 'flyio'): Promise<{ success: boolean; url?: string; error?: string }>;
   deployElectron(appId: string, platform?: 'linux' | 'win' | 'mac'): Promise<{ success: boolean; outputDir?: string; error?: string }>;
   deployVps(appId: string, opts: { host: string; user: string; path: string; port?: number; domain?: string }): Promise<{ success: boolean; url?: string; error?: string }>;
-  deployOAuth(appId: string, provider: 'vercel' | 'netlify', token: string): Promise<{ success: boolean; url?: string; error?: string }>;
-  deployTokenGet(provider: 'vercel' | 'netlify'): Promise<string | null>;
-  deployTokenSet(provider: 'vercel' | 'netlify', token: string): Promise<boolean>;
-  deployTokenClear(provider: 'vercel' | 'netlify'): Promise<boolean>;
   onDeployLog(cb: (payload: { appId: string; data: string }) => void): () => void;
 
   // Plugins
   listPlugins(): Promise<PluginManifest[]>;
-  pluginInvokeTool(toolName: string, params: Record<string, unknown>): Promise<string>;
-  pluginListThemes(): Promise<PluginTheme[]>;
-  pluginListAgents(): Promise<PluginAgent[]>;
-
-  // Plugin Marketplace
-  pluginRegistryList(): Promise<RegistryPlugin[]>;
-  pluginInstall(repoUrl: string): Promise<{ success: boolean; error?: string }>;
-  pluginUninstall(pluginName: string): Promise<{ success: boolean; error?: string }>;
 
   // Database inspection
   dbDescribe(appId: string): Promise<{ tables: Array<{ name: string; columns: string[] }> }>;

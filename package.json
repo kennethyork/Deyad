@@ -1,11 +1,11 @@
 {
   "name": "deyad",
   "productName": "Deyad",
-  "version": "1.4.42",
+  "version": "1.4.31",
   "description": "Local AI app builder powered by Ollama models",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kennethyork/Deyad.git"
+    "url": "https://github.com/kennethhy/Deyad"
   },
   "main": ".vite/build/main.js",
   "private": true,

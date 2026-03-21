@@ -67,10 +67,10 @@ describe('isFullStackRequest', () => {
 });
 
 describe('getFullStackSystemPrompt', () => {
-  it('returns SQLite prompt', () => {
+  it('returns PostgreSQL prompt', () => {
     const prompt = getFullStackSystemPrompt();
-    expect(prompt).toContain('SQLite');
-    expect(prompt).not.toContain('PostgreSQL');
+    expect(prompt).toContain('PostgreSQL 16');
+    expect(prompt).toContain('port 5432');
     expect(prompt).not.toContain('MySQL');
   });
 });

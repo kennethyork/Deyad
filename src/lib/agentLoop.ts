@@ -11,379 +11,8 @@ import type { ToolResult } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
 
-/** Well-known built-in Node/browser modules that never need installing. */
-const BUILTIN_MODULES = new Set([
-  'react', 'react-dom', 'react/jsx-runtime', 'vite',
-  'path', 'fs', 'os', 'url', 'util', 'events', 'stream', 'http', 'https',
-  'crypto', 'child_process', 'net', 'tls', 'dns', 'assert', 'buffer',
-  'querystring', 'zlib', 'readline', 'worker_threads', 'cluster',
-  'node:path', 'node:fs', 'node:os', 'node:url', 'node:util',
-  'node:events', 'node:stream', 'node:http', 'node:https', 'node:crypto',
-  'node:child_process', 'node:net', 'node:tls', 'node:dns', 'node:assert',
-  'node:buffer', 'node:querystring', 'node:zlib', 'node:readline',
-  'node:worker_threads', 'node:cluster',
-]);
-
-/** Python stdlib modules that never need pip install. */
-const PYTHON_STDLIB = new Set([
-  'os', 'sys', 'json', 'math', 'datetime', 'time', 're', 'typing',
-  'collections', 'functools', 'itertools', 'pathlib', 'io', 'abc',
-  'dataclasses', 'enum', 'copy', 'pprint', 'string', 'textwrap',
-  'struct', 'hashlib', 'hmac', 'secrets', 'uuid', 'random',
-  'sqlite3', 'csv', 'configparser', 'argparse', 'logging',
-  'unittest', 'contextlib', 'threading', 'multiprocessing',
-  'subprocess', 'shlex', 'shutil', 'glob', 'fnmatch', 'tempfile',
-  'socket', 'http', 'urllib', 'email', 'html', 'xml',
-  'asyncio', 'concurrent', 'signal', 'traceback', 'inspect',
-  'importlib', 'pkgutil', 'types', 'weakref', 'operator',
-  'decimal', 'fractions', 'statistics', 'base64', 'binascii',
-  'dis', 'ast', 'token', 'tokenize', 'pickle', 'shelve',
-  'marshal', 'dbm', 'gzip', 'bz2', 'lzma', 'zipfile', 'tarfile',
-  'platform', 'sysconfig', 'ctypes', 'array', 'queue',
-  'heapq', 'bisect', 'graphlib', 'pdb', 'profile', 'timeit',
-  'warnings', 'atexit', 'site', 'code', 'codeop',
-]);
-
-/** Go stdlib packages that never need go get. */
-const GO_STDLIB_PREFIXES = [
-  'fmt', 'os', 'io', 'net', 'http', 'log', 'strings', 'strconv',
-  'encoding', 'crypto', 'sync', 'context', 'time', 'math', 'sort',
-  'errors', 'flag', 'path', 'regexp', 'testing', 'reflect', 'runtime',
-  'bytes', 'bufio', 'archive', 'compress', 'database', 'debug',
-  'embed', 'expvar', 'go', 'hash', 'html', 'image', 'index',
-  'internal', 'maps', 'mime', 'os', 'plugin', 'slices', 'syscall',
-  'text', 'unicode', 'unsafe',
-];
-
-/**
- * Extract npm package names from import/require statements in source code.
- * Returns only third-party package names (not relative imports or builtins).
- */
-function extractImportedPackages(code: string): Set<string> {
-  const packages = new Set<string>();
-  // Match: import ... from 'pkg'  |  import 'pkg'  |  require('pkg')
-  const patterns = [
-    /\bimport\s+[\s\S]*?from\s+['"]([^'"]+)['"]/g,
-    /\bimport\s+['"]([^'"]+)['"]/g,
-    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(code)) !== null) {
-      const spec = m[1];
-      // Skip relative imports and builtins
-      if (spec.startsWith('.') || spec.startsWith('/')) continue;
-      if (BUILTIN_MODULES.has(spec)) continue;
-      // Extract package name: @scope/pkg or pkg (ignore subpath)
-      const pkgName = spec.startsWith('@')
-        ? spec.split('/').slice(0, 2).join('/')
-        : spec.split('/')[0];
-      if (pkgName && !BUILTIN_MODULES.has(pkgName)) packages.add(pkgName);
-    }
-  }
-  return packages;
-}
-
-/**
- * Extract third-party Python package names from import statements.
- */
-function extractPythonImports(code: string): Set<string> {
-  const packages = new Set<string>();
-  // Match: import pkg  |  from pkg import ...  |  from pkg.sub import ...
-  const patterns = [
-    /^\s*import\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm,
-    /^\s*from\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm,
-  ];
-  for (const pattern of patterns) {
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(code)) !== null) {
-      const pkg = m[1];
-      if (!PYTHON_STDLIB.has(pkg)) packages.add(pkg);
-    }
-  }
-  return packages;
-}
-
-/**
- * Extract third-party Go module paths from import statements.
- */
-function extractGoImports(code: string): Set<string> {
-  const packages = new Set<string>();
-  // Match quoted import paths: "github.com/foo/bar"
-  const pattern = /"([a-zA-Z0-9][^"]*\.\w+\/[^"]+)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = pattern.exec(code)) !== null) {
-    const importPath = m[1];
-    // Skip stdlib (no dots in first segment = stdlib)
-    const firstSeg = importPath.split('/')[0];
-    if (GO_STDLIB_PREFIXES.includes(firstSeg)) continue;
-    // Extract module path (first 3 segments for domain/owner/repo)
-    const parts = importPath.split('/');
-    const modPath = parts.length >= 3 ? parts.slice(0, 3).join('/') : importPath;
-    packages.add(modPath);
-  }
-  return packages;
-}
-
-/**
- * Read package.json from the project and return all dependency names.
- */
-async function getInstalledPackages(appId: string): Promise<Set<string>> {
-  const installed = new Set<string>();
-  try {
-    const files = await window.deyad.readFiles(appId);
-    // Check root package.json and frontend/package.json
-    for (const pkgPath of ['package.json', 'frontend/package.json']) {
-      const raw = files[pkgPath];
-      if (!raw) continue;
-      const pkg = JSON.parse(raw);
-      for (const key of ['dependencies', 'devDependencies', 'peerDependencies']) {
-        if (pkg[key]) {
-          for (const name of Object.keys(pkg[key])) installed.add(name);
-        }
-      }
-    }
-  } catch { /* ignore parse errors */ }
-  return installed;
-}
-
-/**
- * Read requirements.txt from the project and return installed Python package names.
- */
-async function getPythonInstalledPackages(appId: string): Promise<Set<string>> {
-  const installed = new Set<string>();
-  try {
-    const files = await window.deyad.readFiles(appId);
-    const raw = files['requirements.txt'];
-    if (!raw) return installed;
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      // Strip version specifiers: package>=1.0 → package
-      const pkgName = trimmed.split(/[>=<~!\[;]/)[0].trim().toLowerCase();
-      if (pkgName) installed.add(pkgName);
-    }
-  } catch { /* ignore */ }
-  return installed;
-}
-
-/**
- * Read go.mod from the project and return required Go module paths.
- */
-async function getGoInstalledModules(appId: string): Promise<Set<string>> {
-  const installed = new Set<string>();
-  try {
-    const files = await window.deyad.readFiles(appId);
-    const raw = files['go.mod'];
-    if (!raw) return installed;
-    // Match: require github.com/foo/bar v1.0.0  or inside require block
-    const pattern = /^\s*(?:require\s+)?(\S+\.\S+\/\S+)\s+v/gm;
-    let m: RegExpExecArray | null;
-    while ((m = pattern.exec(raw)) !== null) {
-      installed.add(m[1]);
-    }
-  } catch { /* ignore */ }
-  return installed;
-}
-
-/**
- * Detect which language the project uses based on its files.
- */
-function detectProjectLanguage(files: Record<string, string>): 'node' | 'python' | 'go' {
-  if (files['go.mod'] || files['main.go']) return 'go';
-  if (files['requirements.txt'] || files['main.py'] || files['app.py']) return 'python';
-  return 'node';
-}
-
-/**
- * Auto-detect imports in changed files and install missing dependencies.
- * Supports Node (npm), Python (pip), and Go (go get).
- * Returns the list of packages installed (empty if none needed).
- */
-async function autoInstallDeps(
-  appId: string,
-  changedFiles: Record<string, string>,
-  sendLog: (msg: string) => void,
-): Promise<string[]> {
-  // Detect project language from ALL project files
-  const allFiles = await window.deyad.readFiles(appId);
-  const lang = detectProjectLanguage(allFiles);
-
-  if (lang === 'python') {
-    return autoInstallPythonDeps(appId, changedFiles, allFiles, sendLog);
-  }
-  if (lang === 'go') {
-    return autoInstallGoDeps(appId, changedFiles, allFiles, sendLog);
-  }
-  return autoInstallNodeDeps(appId, changedFiles, sendLog);
-}
-
-/** Auto-install missing npm packages for Node projects. */
-async function autoInstallNodeDeps(
-  appId: string,
-  changedFiles: Record<string, string>,
-  sendLog: (msg: string) => void,
-): Promise<string[]> {
-  const allImports = new Set<string>();
-  for (const [filePath, content] of Object.entries(changedFiles)) {
-    if (!/\.(tsx?|jsx?|mjs|cjs)$/.test(filePath)) continue;
-    for (const pkg of extractImportedPackages(content)) {
-      allImports.add(pkg);
-    }
-  }
-  if (allImports.size === 0) return [];
-
-  const installed = await getInstalledPackages(appId);
-  const missing = [...allImports].filter(pkg => {
-    if (installed.has(pkg)) return false;
-    // Never auto-install @types/ for packages that ship their own types
-    if (pkg.startsWith('@types/')) {
-      const basePkg = pkg.slice(7); // '@types/react-router-dom' → 'react-router-dom'
-      if (SELF_TYPED_PACKAGES.has(basePkg)) return false;
-    }
-    return true;
-  });
-  if (missing.length === 0) return [];
-
-  sendLog(`Auto-installing missing npm packages: ${missing.join(', ')}\n`);
-  try {
-    const result = await executeTool(
-      { name: 'run_command', params: { command: `npm install ${missing.join(' ')}` } },
-      appId,
-    );
-    if (result.success) {
-      sendLog(`npm packages installed successfully.\n`);
-    } else {
-      sendLog(`Warning: npm install had issues: ${result.output.slice(0, 200)}\n`);
-    }
-  } catch (err) {
-    sendLog(`Warning: npm auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
-  }
-  return missing;
-}
-
-/** Auto-install missing pip packages for Python projects. */
-async function autoInstallPythonDeps(
-  appId: string,
-  changedFiles: Record<string, string>,
-  allFiles: Record<string, string>,
-  sendLog: (msg: string) => void,
-): Promise<string[]> {
-  // Scan changed .py files for imports
-  const allImports = new Set<string>();
-  for (const [filePath, content] of Object.entries(changedFiles)) {
-    if (!filePath.endsWith('.py')) continue;
-    for (const pkg of extractPythonImports(content)) {
-      allImports.add(pkg.toLowerCase());
-    }
-  }
-  if (allImports.size === 0) return [];
-
-  const installed = await getPythonInstalledPackages(appId);
-  const missing = [...allImports].filter(pkg => !installed.has(pkg));
-  if (missing.length === 0) return [];
-
-  // Some Python packages have different pip names than import names
-  const PIP_NAME_MAP: Record<string, string> = {
-    'cv2': 'opencv-python', 'PIL': 'Pillow', 'pil': 'Pillow',
-    'sklearn': 'scikit-learn', 'yaml': 'PyYAML', 'bs4': 'beautifulsoup4',
-    'dotenv': 'python-dotenv', 'gi': 'PyGObject', 'serial': 'pyserial',
-    'attr': 'attrs', 'dateutil': 'python-dateutil',
-  };
-  const pipNames = missing.map(pkg => PIP_NAME_MAP[pkg] || pkg);
-
-  // Add to requirements.txt
-  const existingReqs = allFiles['requirements.txt'] || '';
-  const newLines = pipNames.filter(p => !existingReqs.toLowerCase().includes(p.toLowerCase()));
-  if (newLines.length > 0) {
-    const updated = existingReqs.trimEnd() + '\n' + newLines.join('\n') + '\n';
-    sendLog(`Adding to requirements.txt: ${newLines.join(', ')}\n`);
-    try {
-      await executeTool(
-        { name: 'write_files', params: { files: `### FILE: requirements.txt\n${updated}` } },
-        appId,
-      );
-    } catch { /* ignore */ }
-  }
-
-  // Install via pip
-  sendLog(`Auto-installing missing Python packages: ${pipNames.join(', ')}\n`);
-  try {
-    const result = await executeTool(
-      { name: 'run_command', params: { command: `pip install ${pipNames.join(' ')}` } },
-      appId,
-    );
-    if (result.success) {
-      sendLog(`Python packages installed successfully.\n`);
-    } else {
-      sendLog(`Warning: pip install had issues: ${result.output.slice(0, 200)}\n`);
-    }
-  } catch (err) {
-    sendLog(`Warning: pip auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
-  }
-  return missing;
-}
-
-/** Auto-install missing Go modules. */
-async function autoInstallGoDeps(
-  appId: string,
-  changedFiles: Record<string, string>,
-  _allFiles: Record<string, string>,
-  sendLog: (msg: string) => void,
-): Promise<string[]> {
-  // Scan changed .go files for imports
-  const allImports = new Set<string>();
-  for (const [filePath, content] of Object.entries(changedFiles)) {
-    if (!filePath.endsWith('.go')) continue;
-    for (const pkg of extractGoImports(content)) {
-      allImports.add(pkg);
-    }
-  }
-  if (allImports.size === 0) return [];
-
-  const installed = await getGoInstalledModules(appId);
-  const missing = [...allImports].filter(pkg => !installed.has(pkg));
-  if (missing.length === 0) return [];
-
-  // Use go get for each missing module, then go mod tidy
-  sendLog(`Auto-installing missing Go modules: ${missing.join(', ')}\n`);
-  try {
-    for (const mod of missing) {
-      await executeTool(
-        { name: 'run_command', params: { command: `go get ${mod}` } },
-        appId,
-      );
-    }
-    await executeTool(
-      { name: 'run_command', params: { command: 'go mod tidy' } },
-      appId,
-    );
-    sendLog(`Go modules installed successfully.\n`);
-  } catch (err) {
-    sendLog(`Warning: go get failed: ${err instanceof Error ? err.message : String(err)}\n`);
-  }
-  return missing;
-}
-
 /** Maximum autonomous iterations before forcing a stop. */
 const MAX_ITERATIONS = 30;
-
-/**
- * Packages that bundle their own TypeScript types — never install @types/ for these.
- * Also includes @types/ packages that have been removed from DefinitelyTyped.
- */
-const SELF_TYPED_PACKAGES = new Set([
-  'react-router-dom', 'react-router', 'react-query', '@tanstack/react-query',
-  'zustand', 'jotai', 'valtio', 'immer', 'zod', 'yup',
-  'framer-motion', 'motion', '@emotion/react', '@emotion/styled',
-  '@mui/material', '@mui/icons-material', '@chakra-ui/react',
-  'next', 'prisma', '@prisma/client', 'drizzle-orm',
-  'hono', 'elysia', 'fastify', 'trpc', '@trpc/server', '@trpc/client',
-  'three', '@react-three/fiber', '@react-three/drei',
-  'lucide-react', 'date-fns', 'dayjs', 'axios', 'ky', 'got',
-  'tailwind-merge', 'clsx', 'class-variance-authority',
-  'vitest', 'playwright', '@playwright/test',
-]);
 
 /** Approximate character budget for the full conversation (≈ 32k tokens at ~3.5 chars/token). */
 const MAX_CONVERSATION_CHARS = 112_000;
@@ -454,8 +83,8 @@ export interface AgentCallbacks {
 
 export interface AgentOptions {
   appId: string;
-  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
-  dbProvider?: 'sqlite';
+  appType: 'frontend' | 'fullstack';
+  dbProvider?: 'postgresql';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;
   userMessage: string;
@@ -474,7 +103,7 @@ export interface AgentOptions {
 
 function getAgentSystemPrompt(appType: string, _dbProvider?: string): string {
   const stackInfo = appType === 'fullstack'
-    ? 'This is a full-stack project (React + Vite + TypeScript frontend, Express + Prisma backend, SQLite database).'
+    ? 'This is a full-stack project (React + Vite + TypeScript frontend, Express + Prisma backend, PostgreSQL database).'
     : 'This is a frontend project (React + Vite + TypeScript).';
 
   return `You are Deyad Agent, an autonomous AI developer powered by Ollama.
@@ -498,8 +127,6 @@ RULES:
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
-- When you import a new third-party package, the system will auto-detect and install it. You do NOT need to run npm install, pip install, or go get manually for imports.
-- NEVER add @types/react-router-dom, @types/react-router, @types/zustand, @types/framer-motion, or @types/ for any package that bundles its own TypeScript types. Most modern packages (react-router-dom v6+, zustand, zod, @tanstack/react-query, etc.) include their own types.
 - Keep your prose explanations concise — focus on actions.
 - Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response.
@@ -614,7 +241,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
       }
 
       // Inject DB schema if available
-      if (appType === 'fullstack') {
+      if (dbStatus === 'running' && appType === 'fullstack') {
         try {
           const schema = await window.deyad.dbDescribe(appId);
           if (schema.tables.length > 0) {
@@ -661,18 +288,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
         const toolCalls = parseToolCalls(turnResponse);
 
         if (toolCalls.length === 0 || isDone(turnResponse)) {
-          // If the model returned an empty or very short response with no tool calls
-          // on the first iteration, it likely didn't understand the tool format.
-          // Retry once with a nudge to use tools.
+          // If the visible content is too short, append an auto-generated summary
           const visibleContent = stripToolMarkup(fullOutput).trim();
-          if (iteration === 1 && toolCalls.length === 0 && !isDone(turnResponse) && allChangedFiles.size === 0 && visibleContent.length > 0) {
-            // The model responded with prose but no tool calls — nudge it
-            messages.push({ role: 'assistant', content: turnResponse });
-            messages.push({ role: 'user', content: 'You must use the XML tool call format to make changes. Do not write code in prose — use <tool_call><name>write_files</name>...</tool_call> to create or modify files. Please try again using the tools.' });
-            fullOutput += '\n\n---\n\n';
-            callbacks.onContent(fullOutput);
-            continue;
-          }
           if (visibleContent.length < 40 && allChangedFiles.size > 0) {
             const fileList = [...allChangedFiles].map(f => `- ${f}`).join('\n');
             const summary = `\n\n**Changes made:**\n${fileList}`;
@@ -699,12 +316,11 @@ export function runAgentLoop(options: AgentOptions): () => void {
             filesChanged = true;
             const fileMap: Record<string, string> = {};
             if (call.params.path && call.params.content !== undefined) {
-              const trimmedPath = call.params.path.trim();
-              fileMap[trimmedPath] = call.params.content;
-              allChangedFiles.add(trimmedPath);
+              fileMap[call.params.path] = call.params.content;
+              allChangedFiles.add(call.params.path);
             }
             for (let i = 0; i < 50; i++) {
-              const p = call.params[`file_${i}_path`]?.trim();
+              const p = call.params[`file_${i}_path`];
               const c = call.params[`file_${i}_content`];
               if (!p) break;
               fileMap[p] = c ?? '';
@@ -718,26 +334,25 @@ export function runAgentLoop(options: AgentOptions): () => void {
           // edit_file also modifies files
           if (call.name === 'edit_file' && result.success) {
             filesChanged = true;
-            const editPath = call.params.path?.trim();
-            if (editPath) {
-              allChangedFiles.add(editPath);
+            if (call.params.path) {
+              allChangedFiles.add(call.params.path);
               // Read the updated file so the UI can show the diff
               try {
                 const freshFiles = await window.deyad.readFiles(appId);
-                const updatedContent = freshFiles[editPath];
+                const updatedContent = freshFiles[call.params.path];
                 if (updatedContent !== undefined) {
-                  await callbacks.onFilesWritten({ [editPath]: updatedContent });
+                  await callbacks.onFilesWritten({ [call.params.path]: updatedContent });
                 }
               } catch (err) { console.debug('ignore edit_file notify:', err); }
             }
           }
 
-          // multi_edit modifies files (check for any successful edits, not just overall success)
-          if (call.name === 'multi_edit' && result.output.includes(': OK')) {
+          // multi_edit modifies files
+          if (call.name === 'multi_edit' && result.success) {
             filesChanged = true;
             const editedPaths: string[] = [];
-            for (let i = 0; i < 20; i++) {
-              const p = call.params[`edit_${i}_path`]?.trim();
+            for (let i = 0; i < 50; i++) {
+              const p = call.params[`edit_${i}_path`] || call.params[`file_${i}_path`];
               if (!p) break;
               allChangedFiles.add(p);
               editedPaths.push(p);
@@ -761,33 +376,6 @@ export function runAgentLoop(options: AgentOptions): () => void {
           if (call.name === 'run_command' && call.params.command) {
             allCommands.push(call.params.command);
           }
-        }
-
-        // Auto-install missing npm dependencies after file writes
-        if (filesChanged && !aborted) {
-          try {
-            const freshFilesForDeps = await window.deyad.readFiles(appId);
-            // Collect content of all changed files for import scanning
-            const changedFileContents: Record<string, string> = {};
-            for (const f of allChangedFiles) {
-              if (freshFilesForDeps[f] !== undefined) changedFileContents[f] = freshFilesForDeps[f];
-            }
-            const installed = await autoInstallDeps(appId, changedFileContents, (msg) => {
-              fullOutput += msg;
-              callbacks.onContent(fullOutput);
-            });
-            if (installed.length > 0) {
-              // Re-read files since install may have updated package.json / requirements.txt / go.mod
-              const updatedFiles = await window.deyad.readFiles(appId);
-              const refreshFiles: Record<string, string> = {};
-              for (const f of ['package.json', 'requirements.txt', 'go.mod', 'go.sum']) {
-                if (updatedFiles[f]) refreshFiles[f] = updatedFiles[f];
-              }
-              if (Object.keys(refreshFiles).length > 0) {
-                await callbacks.onFilesWritten(refreshFiles);
-              }
-            }
-          } catch (err) { console.debug('ignore auto-install:', err); }
         }
 
         // Re-read project files after writes so the next iteration sees updated code

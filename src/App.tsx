@@ -19,7 +19,6 @@ import GitPanel from './components/GitPanel';
 import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import CommandPalette from './components/CommandPalette';
-import PluginMarketplace from './components/PluginMarketplace';
 import type { Command } from './components/CommandPalette';
 import { ToastProvider, useToast } from './components/ToastContainer';
 import { taskQueue } from './lib/taskQueue';
@@ -29,8 +28,12 @@ export interface AppProject {
   name: string;
   description: string;
   createdAt: string;
-  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
-  dbProvider?: 'sqlite';
+  appType: 'frontend' | 'fullstack';
+  dbProvider?: 'postgresql';
+  /** Host port for the database (unique per app). */
+  dbPort?: number;
+  /** Host port for the admin GUI — pgAdmin (unique per app). */
+  guiPort?: number;
 }
 
 type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git' | 'search';
@@ -39,6 +42,7 @@ type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'pa
 interface PerAppState {
   appFiles: Record<string, string>;
   selectedFile: string | null;
+  dbStatus: 'none' | 'running' | 'stopped';
   rightTab: RightTab;
   canRevert: boolean;
   pendingDiffFiles: Record<string, string> | null;
@@ -48,6 +52,7 @@ interface PerAppState {
 const defaultPerAppState: PerAppState = {
   appFiles: {},
   selectedFile: null,
+  dbStatus: 'none',
   rightTab: 'editor',
   canRevert: false,
   pendingDiffFiles: null,
@@ -79,7 +84,6 @@ function AppInner() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showEnvEditor, setShowEnvEditor] = useState(false);
   const [showPackageManager, setShowPackageManager] = useState(false);
-  const [showPluginMarketplace, setShowPluginMarketplace] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
@@ -192,7 +196,18 @@ function AppInner() {
   }, [selectedApp]);
 
   // Subscribe to DB status events (any app)
-  // (SQLite is file-based — no status events needed)
+  useEffect(() => {
+    const unsub = window.deyad.onDbStatus(({ appId, status }) => {
+      setPerApp(prev => {
+        if (!prev[appId]) return prev;
+        return {
+          ...prev,
+          [appId]: { ...prev[appId], dbStatus: status as 'running' | 'stopped' },
+        };
+      });
+    });
+    return unsub;
+  }, []);
 
   const loadApps = async () => {
     const list = await window.deyad.listApps();
@@ -207,12 +222,18 @@ function AppInner() {
       const files = await window.deyad.readFiles(app.id);
       const hasSnap = await window.deyad.hasSnapshot(app.id);
 
+      let dbSt: 'none' | 'running' | 'stopped' = 'none';
+      if (app.appType === 'fullstack') {
+        const result = await window.deyad.dbStatus(app.id);
+        dbSt = result.status as 'none' | 'running' | 'stopped';
+      }
+
       // Update files and status but preserve other per-app state (selectedFile, rightTab, etc.)
       setPerApp(prev => {
         const existing = prev[app.id] ?? defaultPerAppState;
         return {
           ...prev,
-          [app.id]: { ...existing, appFiles: files, canRevert: hasSnap },
+          [app.id]: { ...existing, appFiles: files, canRevert: hasSnap, dbStatus: dbSt },
         };
       });
     } catch (err) {
@@ -347,34 +368,27 @@ function AppInner() {
   };
 
 
-  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go', templatePrompt?: string) => {
-    const app = await window.deyad.createApp(name, description, appType, 'sqlite');
+  const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', templatePrompt?: string) => {
+    const app = await window.deyad.createApp(name, description, appType, 'postgresql');
     setShowNewAppModal(false);
     await loadApps();
 
     if (appType === 'fullstack') {
-      // Write scaffold files
+      // Write scaffold files with randomly-generated DB credentials
       const { generateFullStackScaffold } = await import('./lib/scaffoldGenerator');
       const { generatePassword } = await import('./lib/crypto');
+      const settings = await window.deyad.getSettings();
       const scaffold = generateFullStackScaffold({
         appName: name,
         description,
         dbName: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_db',
         dbUser: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_user',
         dbPassword: generatePassword(24),
+        dbPort: app.dbPort,
+        guiPort: app.guiPort,
+        pgAdminEmail: settings.pgAdminEmail,
+        pgAdminPassword: settings.pgAdminPassword,
       });
-      await window.deyad.writeFiles(app.id, scaffold);
-    } else if (appType === 'nextjs') {
-      const { generateNextJsScaffold } = await import('./lib/scaffoldGenerator');
-      const scaffold = generateNextJsScaffold({ appName: name, description });
-      await window.deyad.writeFiles(app.id, scaffold);
-    } else if (appType === 'python') {
-      const { generatePythonScaffold } = await import('./lib/scaffoldGenerator');
-      const scaffold = generatePythonScaffold({ appName: name, description });
-      await window.deyad.writeFiles(app.id, scaffold);
-    } else if (appType === 'go') {
-      const { generateGoScaffold } = await import('./lib/scaffoldGenerator');
-      const scaffold = generateGoScaffold({ appName: name, description });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
       // Write a minimal runnable Vite scaffold so the app can be previewed right away
@@ -444,6 +458,30 @@ function AppInner() {
   };
 
   const dbToggling = useRef<Set<string>>(new Set());
+  const handleDbToggle = useCallback(async (appId: string) => {
+    if (dbToggling.current.has(appId)) return;
+    dbToggling.current.add(appId);
+    try {
+      const s = perAppRef.current[appId] ?? defaultPerAppState;
+      if (s.dbStatus === 'running') {
+        updatePerApp(appId, { dbStatus: 'stopped' });
+        const result = await window.deyad.dbStop(appId);
+        if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
+        else addToast('info', 'Database stopped');
+      } else {
+        updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
+        const result = await window.deyad.dbStart(appId);
+        if (result.success) {
+          updatePerApp(appId, { dbStatus: 'running' });
+          addToast('success', 'Database started');
+        } else {
+          addToast('error', `Failed to start database: ${result.error}`);
+        }
+      }
+    } finally {
+      dbToggling.current.delete(appId);
+    }
+  }, [updatePerApp]);
 
   const handleRevert = useCallback(async (appId: string) => {
     const result = await window.deyad.revertFiles(appId);
@@ -476,7 +514,6 @@ function AppInner() {
     { id: 'app.new', name: 'New App', icon: '➕', shortcut: 'Ctrl+N', run: () => setShowNewAppModal(true) },
     { id: 'app.import', name: 'Import Project', icon: '📂', run: () => setShowImportModal(true) },
     { id: 'settings', name: 'Settings', icon: '⚙️', run: () => setShowSettings(true) },
-    { id: 'plugins', name: 'Plugin Marketplace', icon: '🧩', run: () => setShowPluginMarketplace(true) },
     ...(selectedApp ? [
       { id: 'deploy', name: 'Deploy App', icon: '🚀', run: () => setShowDeployModal(true) },
       { id: 'history', name: 'Version History', icon: '🕐', run: () => setShowVersionHistory(true) },
@@ -514,7 +551,6 @@ function AppInner() {
           onDeployApp={() => setShowDeployModal(true)}
           onImportApp={() => setShowImportModal(true)}
           onOpenSettings={() => setShowSettings(true)}
-          onOpenPlugins={() => setShowPluginMarketplace(true)}
           onOpenTaskQueue={() => setShowTaskQueue(true)}
           onOpenVersionHistory={() => setShowVersionHistory(true)}
           activeTasks={activeTasks}
@@ -560,7 +596,9 @@ function AppInner() {
                   app={appObj}
                   appFiles={appState.appFiles}
                   selectedFile={appState.selectedFile}
+                  dbStatus={appState.dbStatus}
                   onFilesUpdated={(newFiles) => handleFilesUpdated(appId, newFiles)}
+                  onDbToggle={() => handleDbToggle(appId)}
                   onRevert={() => handleRevert(appId)}
                   canRevert={appState.canRevert}
                   initialPrompt={isSelected ? pendingPrompt : null}
@@ -679,7 +717,7 @@ function AppInner() {
                 onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file, rightTab: 'editor' })}
               />
             ) : cur.rightTab === 'database' ? (
-              <DatabasePanel app={selectedApp} />
+              <DatabasePanel app={selectedApp} dbStatus={cur.dbStatus} onDbToggle={() => handleDbToggle(selectedApp.id)} />
             ) : null}
             {/* Keep PreviewPanel mounted so it maintains HMR/WebSocket connection */}
             <div style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
@@ -749,17 +787,13 @@ function AppInner() {
         />
       )}
 
-      {showPluginMarketplace && (
-        <PluginMarketplace onClose={() => setShowPluginMarketplace(false)} />
-      )}
-
       {showTaskQueue && selectedApp && (
         <TaskQueuePanel
           appId={selectedApp.id}
           appName={selectedApp.name}
           appType={selectedApp.appType}
           dbProvider={selectedApp.dbProvider}
-          dbStatus={'none'}
+          dbStatus={cur.dbStatus}
           model={defaultModel}
           onClose={() => setShowTaskQueue(false)}
           onRefreshFiles={async () => {

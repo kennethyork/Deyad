@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AppProject } from '../App';
 
 interface TableInfo {
@@ -6,64 +6,68 @@ interface TableInfo {
   columns: string[];
 }
 
-type ViewMode = 'tables' | 'schema';
+type ViewMode = 'gui' | 'schema';
 
 interface Props {
   app: AppProject;
+  dbStatus: 'none' | 'running' | 'stopped';
+  onDbToggle: () => void;
 }
 
-export default function DatabasePanel({ app }: Props) {
-  const [schemaInfo, setSchemaInfo] = useState<TableInfo[]>([]);
-  const [tableList, setTableList] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+const DEFAULT_GUI_PORT = 5050;
+
+export default function DatabasePanel({ app, dbStatus, onDbToggle }: Props) {
+  const [tables, setTables] = useState<TableInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>('tables');
-  const [dbMissing, setDbMissing] = useState(false);
+  const [view, setView] = useState<ViewMode>('gui');
+  const [portReady, setPortReady] = useState(false);
+  const [pgEmail, setPgEmail] = useState('admin@admin.com');
+  const [pgPassword, setPgPassword] = useState('admin');
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load table list and schema info when app changes
+  const guiPort = app.guiPort ?? DEFAULT_GUI_PORT;
+  const guiUrl = `http://localhost:${guiPort}`;
+
+  // Poll until the GUI port actually accepts connections before rendering the iframe
+  useEffect(() => {
+    if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
+    if (dbStatus !== 'running') { setPortReady(false); return; }
+    let cancelled = false;
+    const check = () => {
+      window.deyad.portCheck(guiPort)
+        .then((open) => {
+          if (cancelled) return;
+          if (open) setPortReady(true);
+          else pollRef.current = setTimeout(check, 1500);
+        })
+        .catch(() => {
+          if (!cancelled) pollRef.current = setTimeout(check, 1500);
+        });
+    };
+    check();
+    return () => { cancelled = true; if (pollRef.current) clearTimeout(pollRef.current); };
+  }, [dbStatus, guiPort]);
+
+  useEffect(() => {
+    window.deyad.getSettings().then((s) => {
+      setPgEmail(s.pgAdminEmail ?? 'admin@admin.com');
+      setPgPassword(s.pgAdminPassword ?? 'admin');
+    }).catch((err) => console.warn('Failed to load settings:', err));
+  }, []);
+
   useEffect(() => {
     if (app.appType !== 'fullstack') return;
     setLoading(true);
-    setError(null);
-    setDbMissing(false);
-
-    Promise.all([
-      window.deyad.dbTables(app.id),
-      window.deyad.dbDescribe(app.id),
-    ])
-      .then(([tables, schema]) => {
-        setTableList(tables);
-        setSchemaInfo(schema.tables);
-        if (tables.length === 0 && schema.tables.length === 0) {
-          setDbMissing(true);
-        }
-        // Auto-select first table
-        if (tables.length > 0 && !selectedTable) {
-          setSelectedTable(tables[0]);
-        }
-      })
+    window.deyad.dbDescribe(app.id)
+      .then((res) => setTables(res.tables))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));
   }, [app.id, app.appType]);
 
-  // Load rows when a table is selected
-  useEffect(() => {
-    if (!selectedTable) { setRows([]); return; }
-    setLoading(true);
-    const safeName = selectedTable.replace(/[^a-zA-Z0-9_]/g, '');
-    window.deyad.dbQuery(app.id, `SELECT * FROM "${safeName}" LIMIT 200`)
-      .then((data) => setRows(data))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
-      .finally(() => setLoading(false));
-  }, [selectedTable, app.id]);
-
   if (app.appType !== 'fullstack') {
     return <div className="db-panel">Database info is available only for full-stack apps.</div>;
   }
-
-  const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
   return (
     <div className="db-panel">
@@ -71,10 +75,10 @@ export default function DatabasePanel({ app }: Props) {
       <div className="db-toolbar">
         <div className="db-toolbar-tabs">
           <button
-            className={`db-toolbar-tab ${view === 'tables' ? 'active' : ''}`}
-            onClick={() => setView('tables')}
+            className={`db-toolbar-tab ${view === 'gui' ? 'active' : ''}`}
+            onClick={() => setView('gui')}
           >
-            Tables
+            pgAdmin
           </button>
           <button
             className={`db-toolbar-tab ${view === 'schema' ? 'active' : ''}`}
@@ -84,68 +88,48 @@ export default function DatabasePanel({ app }: Props) {
           </button>
         </div>
         <div className="db-toolbar-status">
-          <span className="db-status-dot running" />
-          SQLite
+          <span className={`db-status-dot ${dbStatus}`} />
+          {dbStatus === 'running' ? 'Running' : dbStatus === 'stopped' ? 'Stopped' : 'No DB'}
+          {dbStatus !== 'none' && (
+            <button className={`btn-db ${dbStatus}`} onClick={onDbToggle}>
+              {dbStatus === 'running' ? '⏹ Stop' : '▶ Start'}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Tables view */}
-      {view === 'tables' && (
-        <div className="db-tables-view">
-          {dbMissing ? (
+      {/* GUI view */}
+      {view === 'gui' && (
+        <div className="db-gui-wrapper">
+          {dbStatus !== 'running' ? (
             <div className="db-gui-placeholder">
-              <div className="db-gui-placeholder-icon">📂</div>
-              <h3>Database not created yet</h3>
-              <p>Run <code>npx prisma db push</code> in the terminal to create the SQLite database.</p>
+              <div className="db-gui-placeholder-icon">🐘</div>
+              <h3>PostgreSQL + pgAdmin</h3>
+              <p>Start the database to access pgAdmin.</p>
+              <button className="btn-db-start-large" onClick={onDbToggle}>
+                ▶ Start Database
+              </button>
             </div>
-          ) : loading && tableList.length === 0 ? (
-            <p className="db-schema-loading">Loading tables…</p>
-          ) : error ? (
-            <p className="db-schema-error">Error: {error}</p>
+          ) : !portReady ? (
+            <div className="db-gui-placeholder">
+              <div className="db-gui-placeholder-icon">⏳</div>
+              <h3>Starting pgAdmin…</h3>
+              <p>Waiting for pgAdmin to be ready on port {guiPort}.</p>
+            </div>
           ) : (
-            <div className="db-browse-layout">
-              <div className="db-table-list">
-                {tableList.map((t) => (
-                  <button
-                    key={t}
-                    className={`db-table-list-item ${selectedTable === t ? 'active' : ''}`}
-                    onClick={() => setSelectedTable(t)}
-                  >
-                    {t}
-                  </button>
-                ))}
+            <>
+              <div className="db-gui-credentials">
+                <span>Login: <strong>{pgEmail}</strong> / <strong>{pgPassword}</strong></span>
               </div>
-              <div className="db-table-data">
-                {selectedTable && (
-                  <>
-                    <div className="db-table-header">
-                      <strong>{selectedTable}</strong>
-                      <span className="db-row-count">{rows.length} row{rows.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    {rows.length === 0 ? (
-                      <p className="db-schema-empty">No rows in this table.</p>
-                    ) : (
-                      <div className="db-data-scroll">
-                        <table className="db-data-table">
-                          <thead>
-                            <tr>{columns.map((c) => <th key={c}>{c}</th>)}</tr>
-                          </thead>
-                          <tbody>
-                            {rows.map((row, i) => (
-                              <tr key={i}>
-                                {columns.map((c) => (
-                                  <td key={c}>{row[c] == null ? <em>null</em> : String(row[c])}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+              <webview
+                key={`pgadmin-${dbStatus}`}
+                src={guiUrl}
+                className="db-gui-iframe"
+                partition="persist:pgadmin"
+                // @ts-expect-error -- webview attributes not in React typings
+                allowpopups="true"
+              />
+            </>
           )}
         </div>
       )}
@@ -155,8 +139,8 @@ export default function DatabasePanel({ app }: Props) {
         <div className="db-schema-view">
           {loading && <p className="db-schema-loading">Loading schema…</p>}
           {error && <p className="db-schema-error">Error: {error}</p>}
-          {!loading && !error && schemaInfo.length === 0 && <p className="db-schema-empty">No tables found in schema.</p>}
-          {schemaInfo.map((t) => (
+          {!loading && !error && tables.length === 0 && <p className="db-schema-empty">No tables found in schema.</p>}
+          {tables.map((t) => (
             <div key={t.name} className="db-table">
               <div className="db-table-name">{t.name}</div>
               <ul className="db-table-cols">

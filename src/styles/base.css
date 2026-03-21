@@ -20,8 +20,6 @@
   --warning:       #f59e0b;
   --text-dim:      #475569;
   --bg-hover:      rgba(255,255,255,0.04);
-  --bg-code:       #0d1526;
-  --bg-code-inline: rgba(0,0,0,0.3);
   --text-tertiary:  #94a3b8;
   --sidebar-width: 220px;
   --editor-width:  340px;
@@ -49,8 +47,6 @@
   --warning:       #d97706;
   --text-dim:      #94a3b8;
   --bg-hover:      rgba(0,0,0,0.04);
-  --bg-code:       #e2e8f0;
-  --bg-code-inline: rgba(0,0,0,0.07);
   --text-tertiary:  #64748b;
 }
 
@@ -314,13 +310,13 @@ body {
 }
 
 .terminal-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #ccc);
 }
 
 .terminal-tab.active {
-  background: var(--bg-code);
-  color: var(--text-primary);
+  background: #000;
+  color: var(--text-primary, #fff);
 }
 
 .terminal-tab-label {

@@ -15,8 +15,8 @@ export interface TaskQueueItem {
   id: string;
   appId: string;
   appName: string;
-  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
-  dbProvider?: 'sqlite';
+  appType: 'frontend' | 'fullstack';
+  dbProvider?: 'postgresql';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;
   prompt: string;
@@ -108,8 +108,8 @@ class TaskQueue {
   enqueue(opts: {
     appId: string;
     appName: string;
-    appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
-    dbProvider?: 'sqlite';
+    appType: 'frontend' | 'fullstack';
+    dbProvider?: 'postgresql';
     dbStatus: 'none' | 'running' | 'stopped';
     model: string;
     prompt: string;

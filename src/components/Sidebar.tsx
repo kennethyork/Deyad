@@ -16,13 +16,12 @@ interface Props {
   onDeployApp: () => void;
   onImportApp: () => void;
   onOpenSettings: () => void;
-  onOpenPlugins: () => void;
   onOpenTaskQueue: () => void;
   onOpenVersionHistory: () => void;
   activeTasks: number;
 }
 
-export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onDuplicateApp, onExportApp, onDeployApp, onImportApp, onOpenSettings, onOpenPlugins, onOpenTaskQueue, onOpenVersionHistory, activeTasks }: Props) {
+export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDeleteApp, onRenameApp, onDuplicateApp, onExportApp, onDeployApp, onImportApp, onOpenSettings, onOpenTaskQueue, onOpenVersionHistory, activeTasks }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -155,9 +154,6 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
         </button>
         <button className="sidebar-settings-btn" onClick={onOpenSettings} title="Settings">
           Settings
-        </button>
-        <button className="sidebar-plugins-btn" onClick={onOpenPlugins} title="Plugin Marketplace">
-          Plugins
         </button>
       </div>
     </aside>
