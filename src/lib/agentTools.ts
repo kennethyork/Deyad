@@ -225,6 +225,64 @@ export async function executeTool(
         return { tool: call.name, success: true, output: `Edited ${filePath} (replaced 1 occurrence).` };
       }
 
+      case 'delete_file': {
+        const filePath = call.params.path;
+        if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
+        try {
+          await window.deyad.deleteFiles(appId, [filePath]);
+          return { tool: call.name, success: true, output: `Deleted ${filePath}` };
+        } catch (err) {
+          return { tool: call.name, success: false, output: `Failed to delete ${filePath}: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+
+      case 'fetch_url': {
+        const url = call.params.url;
+        if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        // Only allow http/https
+        if (!/^https?:\/\//i.test(url)) {
+          return { tool: call.name, success: false, output: 'Only http:// and https:// URLs are allowed.' };
+        }
+        try {
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'Deyad-Agent/1.0' },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!resp.ok) {
+            return { tool: call.name, success: false, output: `HTTP ${resp.status} ${resp.statusText}` };
+          }
+          let body = await resp.text();
+          // Strip HTML tags for cleaner reading if it looks like HTML
+          if (body.includes('<html') || body.includes('<!DOCTYPE')) {
+            body = body
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+          }
+          // Truncate to avoid blowing up context
+          if (body.length > 8000) body = body.slice(0, 8000) + '\n... (truncated)';
+          return { tool: call.name, success: true, output: body };
+        } catch (err) {
+          return { tool: call.name, success: false, output: `Fetch failed: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+
+      case 'install_package': {
+        const pkg = call.params.package;
+        if (!pkg) return { tool: call.name, success: false, output: 'Missing "package" parameter.' };
+        const isDev = call.params.dev === 'true';
+        const manager = call.params.manager || 'npm'; // npm | pip | go
+        if (manager === 'npm') {
+          const result = await window.deyad.npmInstall(appId, pkg, isDev);
+          return { tool: call.name, success: result.success, output: result.success ? `Installed ${pkg}${isDev ? ' (dev)' : ''} via npm` : `Failed: ${result.error}` };
+        }
+        // pip / go fallback via run_command
+        const cmd = manager === 'pip' ? `pip install ${pkg}` : manager === 'go' ? `go get ${pkg}` : `npm install ${pkg}`;
+        return executeCommand(appId, cmd);
+      }
+
       case 'multi_edit': {
         // Parse indexed edit operations: edit_0_path, edit_0_old_string, edit_0_new_string, ...
         const edits: Array<{ path: string; oldStr: string; newStr: string }> = [];
@@ -431,6 +489,18 @@ Available tools:
 
 18. **git_log** — Show recent commit history.
    No parameters.
+
+19. **delete_file** — Delete a single file from the project.
+   <param name="path">relative/path/to/file</param>
+
+20. **fetch_url** — Fetch the contents of a URL (webpage, API docs, JSON endpoint).
+   <param name="url">https://example.com/api/docs</param>
+   Returns the text content. HTML is stripped to plain text automatically.
+
+21. **install_package** — Install a package using npm, pip, or go.
+   <param name="package">express</param>
+   <param name="manager">npm</param>  (npm | pip | go, defaults to npm)
+   <param name="dev">false</param>  (optional, npm only — install as devDependency)
 
 After your tool calls, you will receive results in <tool_result> blocks.
 You can make multiple tool calls in a single response.

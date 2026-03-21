@@ -72,7 +72,7 @@ You describe your app in chat
 ### Autonomous AI Agent
 
 - **Multi-step agent loop** — reads code, writes files, runs commands, fixes errors, iterates up to 30 times
-- **18 agent tools**: `list_files`, `read_file`, `write_files`, `edit_file`, `multi_edit`, `run_command`, `search_files`, `db_schema`, `git_status`, `git_commit`, `git_push`, `git_pull`, `git_remote_get`, `git_remote_set`, `git_branch`, `git_branch_create`, `git_branch_switch`, `git_log`
+- **21 agent tools**: `list_files`, `read_file`, `write_files`, `edit_file`, `multi_edit`, `run_command`, `search_files`, `db_schema`, `delete_file`, `fetch_url`, `install_package`, `git_status`, `git_commit`, `git_push`, `git_pull`, `git_remote_get`, `git_remote_set`, `git_branch`, `git_branch_create`, `git_branch_switch`, `git_log`
 - **Error auto-detection** — watches Vite dev server logs, auto-sends up to 3 fix attempts
 - **Planning mode** — agent generates a plan for your approval before executing
 - **Context-aware** — injects live database schema, file summaries, and conversation history
