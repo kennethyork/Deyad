@@ -24,6 +24,37 @@ const BUILTIN_MODULES = new Set([
   'node:worker_threads', 'node:cluster',
 ]);
 
+/** Python stdlib modules that never need pip install. */
+const PYTHON_STDLIB = new Set([
+  'os', 'sys', 'json', 'math', 'datetime', 'time', 're', 'typing',
+  'collections', 'functools', 'itertools', 'pathlib', 'io', 'abc',
+  'dataclasses', 'enum', 'copy', 'pprint', 'string', 'textwrap',
+  'struct', 'hashlib', 'hmac', 'secrets', 'uuid', 'random',
+  'sqlite3', 'csv', 'configparser', 'argparse', 'logging',
+  'unittest', 'contextlib', 'threading', 'multiprocessing',
+  'subprocess', 'shlex', 'shutil', 'glob', 'fnmatch', 'tempfile',
+  'socket', 'http', 'urllib', 'email', 'html', 'xml',
+  'asyncio', 'concurrent', 'signal', 'traceback', 'inspect',
+  'importlib', 'pkgutil', 'types', 'weakref', 'operator',
+  'decimal', 'fractions', 'statistics', 'base64', 'binascii',
+  'dis', 'ast', 'token', 'tokenize', 'pickle', 'shelve',
+  'marshal', 'dbm', 'gzip', 'bz2', 'lzma', 'zipfile', 'tarfile',
+  'platform', 'sysconfig', 'ctypes', 'array', 'queue',
+  'heapq', 'bisect', 'graphlib', 'pdb', 'profile', 'timeit',
+  'warnings', 'atexit', 'site', 'code', 'codeop',
+]);
+
+/** Go stdlib packages that never need go get. */
+const GO_STDLIB_PREFIXES = [
+  'fmt', 'os', 'io', 'net', 'http', 'log', 'strings', 'strconv',
+  'encoding', 'crypto', 'sync', 'context', 'time', 'math', 'sort',
+  'errors', 'flag', 'path', 'regexp', 'testing', 'reflect', 'runtime',
+  'bytes', 'bufio', 'archive', 'compress', 'database', 'debug',
+  'embed', 'expvar', 'go', 'hash', 'html', 'image', 'index',
+  'internal', 'maps', 'mime', 'os', 'plugin', 'slices', 'syscall',
+  'text', 'unicode', 'unsafe',
+];
+
 /**
  * Extract npm package names from import/require statements in source code.
  * Returns only third-party package names (not relative imports or builtins).
@@ -54,6 +85,47 @@ function extractImportedPackages(code: string): Set<string> {
 }
 
 /**
+ * Extract third-party Python package names from import statements.
+ */
+function extractPythonImports(code: string): Set<string> {
+  const packages = new Set<string>();
+  // Match: import pkg  |  from pkg import ...  |  from pkg.sub import ...
+  const patterns = [
+    /^\s*import\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm,
+    /^\s*from\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm,
+  ];
+  for (const pattern of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(code)) !== null) {
+      const pkg = m[1];
+      if (!PYTHON_STDLIB.has(pkg)) packages.add(pkg);
+    }
+  }
+  return packages;
+}
+
+/**
+ * Extract third-party Go module paths from import statements.
+ */
+function extractGoImports(code: string): Set<string> {
+  const packages = new Set<string>();
+  // Match quoted import paths: "github.com/foo/bar"
+  const pattern = /"([a-zA-Z0-9][^"]*\.\w+\/[^"]+)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(code)) !== null) {
+    const importPath = m[1];
+    // Skip stdlib (no dots in first segment = stdlib)
+    const firstSeg = importPath.split('/')[0];
+    if (GO_STDLIB_PREFIXES.includes(firstSeg)) continue;
+    // Extract module path (first 3 segments for domain/owner/repo)
+    const parts = importPath.split('/');
+    const modPath = parts.length >= 3 ? parts.slice(0, 3).join('/') : importPath;
+    packages.add(modPath);
+  }
+  return packages;
+}
+
+/**
  * Read package.json from the project and return all dependency names.
  */
 async function getInstalledPackages(appId: string): Promise<Set<string>> {
@@ -76,7 +148,56 @@ async function getInstalledPackages(appId: string): Promise<Set<string>> {
 }
 
 /**
- * Auto-detect imports in changed files and install missing npm packages.
+ * Read requirements.txt from the project and return installed Python package names.
+ */
+async function getPythonInstalledPackages(appId: string): Promise<Set<string>> {
+  const installed = new Set<string>();
+  try {
+    const files = await window.deyad.readFiles(appId);
+    const raw = files['requirements.txt'];
+    if (!raw) return installed;
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      // Strip version specifiers: package>=1.0 → package
+      const pkgName = trimmed.split(/[>=<~!\[;]/)[0].trim().toLowerCase();
+      if (pkgName) installed.add(pkgName);
+    }
+  } catch { /* ignore */ }
+  return installed;
+}
+
+/**
+ * Read go.mod from the project and return required Go module paths.
+ */
+async function getGoInstalledModules(appId: string): Promise<Set<string>> {
+  const installed = new Set<string>();
+  try {
+    const files = await window.deyad.readFiles(appId);
+    const raw = files['go.mod'];
+    if (!raw) return installed;
+    // Match: require github.com/foo/bar v1.0.0  or inside require block
+    const pattern = /^\s*(?:require\s+)?(\S+\.\S+\/\S+)\s+v/gm;
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(raw)) !== null) {
+      installed.add(m[1]);
+    }
+  } catch { /* ignore */ }
+  return installed;
+}
+
+/**
+ * Detect which language the project uses based on its files.
+ */
+function detectProjectLanguage(files: Record<string, string>): 'node' | 'python' | 'go' {
+  if (files['go.mod'] || files['main.go']) return 'go';
+  if (files['requirements.txt'] || files['main.py'] || files['app.py']) return 'python';
+  return 'node';
+}
+
+/**
+ * Auto-detect imports in changed files and install missing dependencies.
+ * Supports Node (npm), Python (pip), and Go (go get).
  * Returns the list of packages installed (empty if none needed).
  */
 async function autoInstallDeps(
@@ -84,7 +205,25 @@ async function autoInstallDeps(
   changedFiles: Record<string, string>,
   sendLog: (msg: string) => void,
 ): Promise<string[]> {
-  // Gather all imported packages from changed files
+  // Detect project language from ALL project files
+  const allFiles = await window.deyad.readFiles(appId);
+  const lang = detectProjectLanguage(allFiles);
+
+  if (lang === 'python') {
+    return autoInstallPythonDeps(appId, changedFiles, allFiles, sendLog);
+  }
+  if (lang === 'go') {
+    return autoInstallGoDeps(appId, changedFiles, allFiles, sendLog);
+  }
+  return autoInstallNodeDeps(appId, changedFiles, sendLog);
+}
+
+/** Auto-install missing npm packages for Node projects. */
+async function autoInstallNodeDeps(
+  appId: string,
+  changedFiles: Record<string, string>,
+  sendLog: (msg: string) => void,
+): Promise<string[]> {
   const allImports = new Set<string>();
   for (const [filePath, content] of Object.entries(changedFiles)) {
     if (!/\.(tsx?|jsx?|mjs|cjs)$/.test(filePath)) continue;
@@ -94,25 +233,126 @@ async function autoInstallDeps(
   }
   if (allImports.size === 0) return [];
 
-  // Compare against what's already in package.json
   const installed = await getInstalledPackages(appId);
   const missing = [...allImports].filter(pkg => !installed.has(pkg));
   if (missing.length === 0) return [];
 
-  // Install missing packages
-  sendLog(`Auto-installing missing dependencies: ${missing.join(', ')}\n`);
+  sendLog(`Auto-installing missing npm packages: ${missing.join(', ')}\n`);
   try {
     const result = await executeTool(
       { name: 'run_command', params: { command: `npm install ${missing.join(' ')}` } },
       appId,
     );
     if (result.success) {
-      sendLog(`Dependencies installed successfully.\n`);
+      sendLog(`npm packages installed successfully.\n`);
     } else {
       sendLog(`Warning: npm install had issues: ${result.output.slice(0, 200)}\n`);
     }
   } catch (err) {
-    sendLog(`Warning: auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
+    sendLog(`Warning: npm auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+  return missing;
+}
+
+/** Auto-install missing pip packages for Python projects. */
+async function autoInstallPythonDeps(
+  appId: string,
+  changedFiles: Record<string, string>,
+  allFiles: Record<string, string>,
+  sendLog: (msg: string) => void,
+): Promise<string[]> {
+  // Scan changed .py files for imports
+  const allImports = new Set<string>();
+  for (const [filePath, content] of Object.entries(changedFiles)) {
+    if (!filePath.endsWith('.py')) continue;
+    for (const pkg of extractPythonImports(content)) {
+      allImports.add(pkg.toLowerCase());
+    }
+  }
+  if (allImports.size === 0) return [];
+
+  const installed = await getPythonInstalledPackages(appId);
+  const missing = [...allImports].filter(pkg => !installed.has(pkg));
+  if (missing.length === 0) return [];
+
+  // Some Python packages have different pip names than import names
+  const PIP_NAME_MAP: Record<string, string> = {
+    'cv2': 'opencv-python', 'PIL': 'Pillow', 'pil': 'Pillow',
+    'sklearn': 'scikit-learn', 'yaml': 'PyYAML', 'bs4': 'beautifulsoup4',
+    'dotenv': 'python-dotenv', 'gi': 'PyGObject', 'serial': 'pyserial',
+    'attr': 'attrs', 'dateutil': 'python-dateutil',
+  };
+  const pipNames = missing.map(pkg => PIP_NAME_MAP[pkg] || pkg);
+
+  // Add to requirements.txt
+  const existingReqs = allFiles['requirements.txt'] || '';
+  const newLines = pipNames.filter(p => !existingReqs.toLowerCase().includes(p.toLowerCase()));
+  if (newLines.length > 0) {
+    const updated = existingReqs.trimEnd() + '\n' + newLines.join('\n') + '\n';
+    sendLog(`Adding to requirements.txt: ${newLines.join(', ')}\n`);
+    try {
+      await executeTool(
+        { name: 'write_files', params: { files: `### FILE: requirements.txt\n${updated}` } },
+        appId,
+      );
+    } catch { /* ignore */ }
+  }
+
+  // Install via pip
+  sendLog(`Auto-installing missing Python packages: ${pipNames.join(', ')}\n`);
+  try {
+    const result = await executeTool(
+      { name: 'run_command', params: { command: `pip install ${pipNames.join(' ')}` } },
+      appId,
+    );
+    if (result.success) {
+      sendLog(`Python packages installed successfully.\n`);
+    } else {
+      sendLog(`Warning: pip install had issues: ${result.output.slice(0, 200)}\n`);
+    }
+  } catch (err) {
+    sendLog(`Warning: pip auto-install failed: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+  return missing;
+}
+
+/** Auto-install missing Go modules. */
+async function autoInstallGoDeps(
+  appId: string,
+  changedFiles: Record<string, string>,
+  _allFiles: Record<string, string>,
+  sendLog: (msg: string) => void,
+): Promise<string[]> {
+  // Scan changed .go files for imports
+  const allImports = new Set<string>();
+  for (const [filePath, content] of Object.entries(changedFiles)) {
+    if (!filePath.endsWith('.go')) continue;
+    for (const pkg of extractGoImports(content)) {
+      allImports.add(pkg);
+    }
+  }
+  if (allImports.size === 0) return [];
+
+  const installed = await getGoInstalledModules(appId);
+  const missing = [...allImports].filter(pkg => !installed.has(pkg));
+  if (missing.length === 0) return [];
+
+  // Use go get for each missing module, then go mod tidy
+  sendLog(`Auto-installing missing Go modules: ${missing.join(', ')}\n`);
+  try {
+    for (const mod of missing) {
+      await executeTool(
+        { name: 'run_command', params: { command: `go get ${mod}` } },
+        appId,
+      );
+    }
+    await executeTool(
+      { name: 'run_command', params: { command: 'go mod tidy' } },
+      appId,
+    );
+    sendLog(`Go modules installed successfully.\n`);
+  } catch (err) {
+    sendLog(`Warning: go get failed: ${err instanceof Error ? err.message : String(err)}\n`);
   }
   return missing;
 }
@@ -233,7 +473,7 @@ RULES:
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
 - After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
-- When you import a new third-party package, the system will auto-detect and install it. You do NOT need to run npm install manually for imports.
+- When you import a new third-party package, the system will auto-detect and install it. You do NOT need to run npm install, pip install, or go get manually for imports.
 - Keep your prose explanations concise — focus on actions.
 - Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response.
@@ -511,10 +751,14 @@ export function runAgentLoop(options: AgentOptions): () => void {
               callbacks.onContent(fullOutput);
             });
             if (installed.length > 0) {
-              // Re-read files since npm install may have updated package.json
+              // Re-read files since install may have updated package.json / requirements.txt / go.mod
               const updatedFiles = await window.deyad.readFiles(appId);
-              if (updatedFiles['package.json']) {
-                await callbacks.onFilesWritten({ 'package.json': updatedFiles['package.json'] });
+              const refreshFiles: Record<string, string> = {};
+              for (const f of ['package.json', 'requirements.txt', 'go.mod', 'go.sum']) {
+                if (updatedFiles[f]) refreshFiles[f] = updatedFiles[f];
+              }
+              if (Object.keys(refreshFiles).length > 0) {
+                await callbacks.onFilesWritten(refreshFiles);
               }
             }
           } catch (err) { console.debug('ignore auto-install:', err); }

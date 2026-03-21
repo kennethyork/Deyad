@@ -340,6 +340,22 @@ export function registerAppHandlers(
     const backendDir = path.join(appRoot, 'backend');
     const isFullstack = fs.existsSync(backendDir) && fs.existsSync(path.join(appRoot, 'docker-compose.yml'));
 
+    // Detect project language from deyad.json or file markers
+    let projectLang = 'node';
+    try {
+      const metaPath = path.join(appRoot, 'deyad.json');
+      if (fs.existsSync(metaPath)) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        if (meta.appType === 'python') projectLang = 'python';
+        else if (meta.appType === 'go') projectLang = 'go';
+      }
+    } catch { /* ignore */ }
+    // Fallback: detect from files
+    if (projectLang === 'node') {
+      if (fs.existsSync(path.join(appRoot, 'go.mod'))) projectLang = 'go';
+      else if (fs.existsSync(path.join(appRoot, 'requirements.txt')) || fs.existsSync(path.join(appRoot, 'main.py'))) projectLang = 'python';
+    }
+
     if (isFullstack) {
       sendLog('Starting database containers…\n');
       try {
@@ -381,6 +397,69 @@ export function registerAppHandlers(
       backendChild.on('close', () => { devProcesses.delete(`${appId}:backend`); });
     }
 
+    // ── Python project: pip install + uvicorn ────────────────────────
+    if (projectLang === 'python') {
+      sendLog('Installing Python dependencies…\n');
+      try {
+        // Create venv if missing
+        if (!fs.existsSync(path.join(appRoot, '.venv'))) {
+          await execFileAsync('python3', ['-m', 'venv', '.venv'], { cwd: appRoot, timeout: 60000 });
+        }
+        const pip = path.join(appRoot, '.venv', 'bin', 'pip');
+        if (fs.existsSync(path.join(appRoot, 'requirements.txt'))) {
+          await execFileAsync(pip, ['install', '-r', 'requirements.txt'], { cwd: appRoot, timeout: 180000 });
+        }
+        sendLog('Python dependencies installed\n');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendLog(`Warning: pip install failed: ${msg}\n`);
+      }
+
+      sendLog('Starting Python server…\n');
+      const uvicorn = path.join(appRoot, '.venv', 'bin', 'uvicorn');
+      const pythonChild = spawn(uvicorn, ['main:app', '--reload', '--port', '8000'], {
+        cwd: appRoot, stdio: 'pipe',
+      });
+      devProcesses.set(appId, pythonChild);
+      pythonChild.stdout?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+      pythonChild.stderr?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+      pythonChild.on('close', () => {
+        devProcesses.delete(appId);
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('apps:dev-status', { appId, status: 'stopped' });
+        }
+      });
+      event.sender.send('apps:dev-status', { appId, status: 'starting' });
+      return { success: true };
+    }
+
+    // ── Go project: go mod tidy + go run ─────────────────────────────
+    if (projectLang === 'go') {
+      sendLog('Installing Go dependencies…\n');
+      try {
+        await execFileAsync('go', ['mod', 'tidy'], { cwd: appRoot, timeout: 120000 });
+        sendLog('Go dependencies installed\n');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sendLog(`Warning: go mod tidy failed: ${msg}\n`);
+      }
+
+      sendLog('Starting Go server…\n');
+      const goChild = spawn('go', ['run', '.'], { cwd: appRoot, stdio: 'pipe' });
+      devProcesses.set(appId, goChild);
+      goChild.stdout?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+      goChild.stderr?.on('data', (chunk: Buffer) => sendLog(chunk.toString()));
+      goChild.on('close', () => {
+        devProcesses.delete(appId);
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('apps:dev-status', { appId, status: 'stopped' });
+        }
+      });
+      event.sender.send('apps:dev-status', { appId, status: 'starting' });
+      return { success: true };
+    }
+
+    // ── Node project: npm install + npm run dev ──────────────────────
     // Always run npm install to pick up any new dependencies added by the AI
     sendLog('Installing dependencies…\n');
     try {
