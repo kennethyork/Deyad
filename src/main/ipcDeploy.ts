@@ -1,14 +1,12 @@
 /**
  * Deploy IPC handlers for Netlify, Vercel, Surge, Railway, Fly.io, and Electron desktop.
- * Includes OAuth token-based deploy for Vercel and Netlify (no CLI needed).
  */
 
-import { BrowserWindow, ipcMain, app } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { execFile, spawn } from 'node:child_process';
-import https from 'node:https';
 
 const execFileAsync = promisify(execFile);
 
@@ -59,11 +57,6 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       appType = meta.appType || appType;
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
     } catch (err) { console.debug('use defaults:', err); }
-
-    // Python and Go apps should use container-based deploy (Railway/Fly.io), not static hosting
-    if (appType === 'python' || appType === 'go') {
-      return { success: false, error: `${appType} apps should be deployed via Railway or Fly.io (container deploy). Use the fullstack deploy option.` };
-    }
 
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
 
@@ -122,11 +115,9 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
     let appName = 'deyad-app';
-    let appType = 'fullstack';
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-      appType = meta.appType || appType;
     } catch (err) { console.debug('use default:', err); }
 
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -136,16 +127,7 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       let url = '';
 
       if (provider === 'railway') {
-        sendLog(`Deploying ${appType} app to Railway...\n`);
-
-        // Ensure Dockerfile exists for Python/Go apps
-        if ((appType === 'python' || appType === 'go') && !fs.existsSync(path.join(dir, 'Dockerfile'))) {
-          const dockerfile = appType === 'python'
-            ? `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]\n`
-            : `FROM golang:1.22-alpine AS build\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o server .\n\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=build /app/server .\nEXPOSE 8080\nCMD ["./server"]\n`;
-          fs.writeFileSync(path.join(dir, 'Dockerfile'), dockerfile);
-          sendLog('Generated Dockerfile.\n');
-        }
+        sendLog('Deploying fullstack app to Railway...\n');
 
         const hasRailway = fs.existsSync(path.join(dir, '.railway'));
         if (!hasRailway) {
@@ -166,20 +148,28 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
           url = '(check Railway dashboard for URL)';
         }
       } else if (provider === 'flyio') {
-        sendLog(`Deploying ${appType} app to Fly.io...\n`);
+        sendLog('Deploying fullstack app to Fly.io...\n');
 
         const hasFlyToml = fs.existsSync(path.join(dir, 'fly.toml'));
         if (!hasFlyToml) {
           sendLog('Launching new Fly.io app...\n');
           if (!fs.existsSync(path.join(dir, 'Dockerfile'))) {
-            let dockerfile: string;
-            if (appType === 'python') {
-              dockerfile = `FROM python:3.11-slim\nWORKDIR /app\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY . .\nEXPOSE 8000\nCMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]\n`;
-            } else if (appType === 'go') {
-              dockerfile = `FROM golang:1.22-alpine AS build\nWORKDIR /app\nCOPY go.mod go.sum ./\nRUN go mod download\nCOPY . .\nRUN CGO_ENABLED=0 go build -o server .\n\nFROM alpine:3.19\nWORKDIR /app\nCOPY --from=build /app/server .\nEXPOSE 8080\nCMD ["./server"]\n`;
-            } else {
-              dockerfile = `FROM node:20-alpine AS build\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\nCOPY . .\nRUN cd frontend && npm ci && npx vite build\n\nFROM node:20-alpine\nWORKDIR /app\nCOPY --from=build /app/backend ./backend\nCOPY --from=build /app/frontend/dist ./frontend/dist\nCOPY --from=build /app/package*.json ./\nRUN cd backend && npm ci --production\nEXPOSE 3001\nCMD ["node", "backend/src/index.js"]\n`;
-            }
+            const dockerfile = `FROM node:20-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN cd frontend && npm ci && npx vite build
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=build /app/backend ./backend
+COPY --from=build /app/frontend/dist ./frontend/dist
+COPY --from=build /app/package*.json ./
+RUN cd backend && npm ci --production
+EXPOSE 3001
+CMD ["node", "backend/src/index.js"]
+`;
             fs.writeFileSync(path.join(dir, 'Dockerfile'), dockerfile);
             sendLog('Generated Dockerfile.\n');
           }
@@ -233,25 +223,13 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
 
     try {
       // 1. Build
-      let distDir: string;
-      if (appType === 'python') {
-        // Python: no build step, rsync the whole project
-        sendLog('Preparing Python project for upload…\n');
-        distDir = dir;
-      } else if (appType === 'go') {
-        // Go: build binary
-        sendLog('Building Go binary…\n');
-        await spawnWithLogs('go', ['build', '-o', 'server', '.'], { cwd: dir, timeout: 120_000 }, sendLog);
-        sendLog('Build complete.\n');
-        distDir = dir;
-      } else {
-        const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
-        sendLog('Building project…\n');
-        await spawnWithLogs('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 }, sendLog);
-        sendLog('Build complete.\n');
-        distDir = path.join(webDir, 'dist');
-        if (!fs.existsSync(distDir)) return { success: false, error: 'Build output (dist/) not found' };
-      }
+      const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
+      sendLog('Building project…\n');
+      await spawnWithLogs('npx', ['vite', 'build'], { cwd: webDir, timeout: 120_000 }, sendLog);
+      sendLog('Build complete.\n');
+
+      const distDir = path.join(webDir, 'dist');
+      if (!fs.existsSync(distDir)) return { success: false, error: 'Build output (dist/) not found' };
 
       // 2. rsync to VPS
       const remoteDest = `${opts.user}@${opts.host}:${opts.path}`;
@@ -267,81 +245,22 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
       const code = await spawnWithLogs('rsync', rsyncArgs, { cwd: dir, timeout: 300_000 }, sendLog);
       if (code !== 0) return { success: false, error: `rsync exited with code ${code}` };
 
-      // 3. Start service on VPS for Python/Go
-      if (appType === 'python' || appType === 'go') {
-        sendLog('\nSetting up systemd service on VPS…\n');
-        const serviceName = `deyad-${appId.slice(0, 12)}`;
-        const execStart = appType === 'python'
-          ? `/usr/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000`
-          : `${opts.path}/server`;
-        const servicePort = appType === 'python' ? 8000 : 8080;
-        const serviceUnit = [
-          '[Unit]',
-          `Description=${serviceName}`,
-          'After=network.target',
-          '',
-          '[Service]',
-          `WorkingDirectory=${opts.path}`,
-          `ExecStart=${execStart}`,
-          'Restart=always',
-          'Environment=PATH=/usr/local/bin:/usr/bin:/bin',
-          '',
-          '[Install]',
-          'WantedBy=multi-user.target',
-        ].join('\n');
-
-        const setupCmd = [
-          `echo '${serviceUnit}' | sudo tee /etc/systemd/system/${serviceName}.service`,
-          'sudo systemctl daemon-reload',
-          `sudo systemctl enable --now ${serviceName}`,
-        ].join(' && ');
-
-        const svcCode = await spawnWithLogs(
-          'ssh',
-          ['-p', sshPort, '-o', 'StrictHostKeyChecking=accept-new', `${opts.user}@${opts.host}`, setupCmd],
-          { cwd: dir, timeout: 30_000 },
-          sendLog,
-        );
-        if (svcCode !== 0) {
-          sendLog('\n⚠ Service setup failed — files were uploaded but the service was not configured.\n');
-          sendLog('Make sure the SSH user has sudo access and Python3/Go is installed on the server.\n');
-        } else {
-          sendLog('Service started!\n');
-        }
-      }
-
-      // 4. Set up nginx + SSL if domain provided
+      // 3. Set up nginx + SSL if domain provided
       if (opts.domain) {
         sendLog(`\nConfiguring nginx for ${opts.domain}…\n`);
         const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=accept-new ${opts.user}@${opts.host}`;
 
-        const isApiApp = appType === 'python' || appType === 'go';
-        const apiPort = appType === 'python' ? 8000 : 8080;
-        const nginxConf = isApiApp
-          ? [
-              `server {`,
-              `    listen 80;`,
-              `    server_name ${opts.domain};`,
-              `    location / {`,
-              `        proxy_pass http://127.0.0.1:${apiPort};`,
-              `        proxy_set_header Host \$host;`,
-              `        proxy_set_header X-Real-IP \$remote_addr;`,
-              `        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;`,
-              `        proxy_set_header X-Forwarded-Proto \$scheme;`,
-              `    }`,
-              `}`,
-            ].join('\n')
-          : [
-              `server {`,
-              `    listen 80;`,
-              `    server_name ${opts.domain};`,
-              `    root ${opts.path};`,
-              `    index index.html;`,
-              `    location / {`,
-              `        try_files \$uri \$uri/ /index.html;`,
-              `    }`,
-              `}`,
-            ].join('\n');
+        const nginxConf = [
+          `server {`,
+          `    listen 80;`,
+          `    server_name ${opts.domain};`,
+          `    root ${opts.path};`,
+          `    index index.html;`,
+          `    location / {`,
+          `        try_files \\$uri \\$uri/ /index.html;`,
+          `    }`,
+          `}`,
+        ].join('\n');
 
         // Write nginx config
         const confPath = `/etc/nginx/sites-available/${opts.domain}`;
@@ -405,11 +324,6 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     const sendLog = (msg: string) => win?.webContents.send('apps:deploy-log', { appId, data: msg });
 
     try {
-      // Python/Go apps cannot be packaged as Electron desktop apps
-      if (appType === 'python' || appType === 'go') {
-        return { success: false, error: `${appType} apps cannot be packaged as Electron desktop apps. Use Railway, Fly.io, or VPS deploy instead.` };
-      }
-
       // 1. Build the Vite frontend
       const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
       sendLog('Building frontend…\n');
@@ -568,226 +482,4 @@ contextBridge.exposeInMainWorld('ollama', {
       return { success: false, error: msg };
     }
   });
-
-  // ── OAuth token storage ──────────────────────────────────────────────
-  const tokensPath = path.join(app.getPath('userData'), 'deploy-tokens.json');
-
-  function readTokens(): Record<string, string> {
-    try {
-      return JSON.parse(fs.readFileSync(tokensPath, 'utf-8'));
-    } catch {
-      return {};
-    }
-  }
-
-  function writeTokens(tokens: Record<string, string>): void {
-    fs.writeFileSync(tokensPath, JSON.stringify(tokens, null, 2), { mode: 0o600 });
-  }
-
-  ipcMain.handle('apps:deploy-token-get', (_e, provider: string) => {
-    const tokens = readTokens();
-    return tokens[provider] ?? null;
-  });
-
-  ipcMain.handle('apps:deploy-token-set', (_e, provider: string, token: string) => {
-    const tokens = readTokens();
-    tokens[provider] = token;
-    writeTokens(tokens);
-    return { success: true };
-  });
-
-  ipcMain.handle('apps:deploy-token-clear', (_e, provider: string) => {
-    const tokens = readTokens();
-    delete tokens[provider];
-    writeTokens(tokens);
-    return { success: true };
-  });
-
-  // ── OAuth deploy via REST API (no CLI needed) ────────────────────────
-  ipcMain.handle('apps:deploy-oauth', async (_e, appId: string, provider: string, token: string) => {
-    const win = BrowserWindow.getAllWindows()[0];
-    const sendLog = (msg: string) => win?.webContents.send('deploy-log', msg);
-
-    try {
-      const dir = appDir(appId);
-      const distDir = path.join(dir, 'dist');
-      if (!fs.existsSync(distDir)) {
-        sendLog('Building project before deploy…\n');
-        await spawnWithLogs('npm', ['run', 'build'], { cwd: dir, timeout: 120_000 }, sendLog);
-      }
-
-      if (!fs.existsSync(distDir)) {
-        return { success: false, error: 'Build did not produce a dist/ folder.' };
-      }
-
-      if (provider === 'vercel') {
-        return await deployVercelRest(distDir, token, appId, sendLog);
-      } else if (provider === 'netlify') {
-        return await deployNetlifyRest(distDir, token, appId, sendLog);
-      } else {
-        return { success: false, error: `Unknown OAuth provider: ${provider}` };
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      sendLog(`\nDeploy failed: ${msg}\n`);
-      return { success: false, error: msg };
-    }
-  });
-
-  // ── Vercel REST API deploy ───────────────────────────────────────────
-  async function deployVercelRest(
-    distDir: string,
-    token: string,
-    appId: string,
-    sendLog: (msg: string) => void,
-  ): Promise<{ success: boolean; url?: string; error?: string }> {
-    sendLog('Deploying to Vercel via REST API…\n');
-
-    const files: { file: string; data: string }[] = [];
-    function collectFiles(dir: string, prefix: string) {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) {
-          collectFiles(path.join(dir, entry.name), rel);
-        } else {
-          const content = fs.readFileSync(path.join(dir, entry.name));
-          files.push({ file: rel, data: content.toString('base64') });
-        }
-      }
-    }
-    collectFiles(distDir, '');
-    sendLog(`Uploading ${files.length} files…\n`);
-
-    const body = JSON.stringify({
-      name: appId,
-      files: files.map(f => ({ file: f.file, data: f.data, encoding: 'base64' })),
-      projectSettings: { framework: null },
-    });
-
-    const result = await httpsRequest({
-      hostname: 'api.vercel.com',
-      path: '/v13/deployments',
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, body);
-
-    const data = JSON.parse(result);
-    if (data.url) {
-      const url = `https://${data.url}`;
-      sendLog(`\nDeployed! ${url}\n`);
-      return { success: true, url };
-    }
-    return { success: false, error: data.error?.message ?? 'Unknown Vercel error' };
-  }
-
-  // ── Netlify REST API deploy ──────────────────────────────────────────
-  async function deployNetlifyRest(
-    distDir: string,
-    token: string,
-    appId: string,
-    sendLog: (msg: string) => void,
-  ): Promise<{ success: boolean; url?: string; error?: string }> {
-    sendLog('Deploying to Netlify via REST API…\n');
-
-    // Collect file digests
-    const crypto = await import('node:crypto');
-    const fileMap: Record<string, string> = {};
-    const fileContents: Record<string, Buffer> = {};
-
-    function collectFiles(dir: string, prefix: string) {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) {
-          collectFiles(path.join(dir, entry.name), rel);
-        } else {
-          const content = fs.readFileSync(path.join(dir, entry.name));
-          const sha1 = crypto.createHash('sha1').update(content).digest('hex');
-          fileMap[`/${rel}`] = sha1;
-          fileContents[sha1] = content;
-        }
-      }
-    }
-    collectFiles(distDir, '');
-    sendLog(`Hashing ${Object.keys(fileMap).length} files…\n`);
-
-    // Create deploy with file list
-    const createBody = JSON.stringify({ title: appId, files: fileMap });
-    const createResult = await httpsRequest({
-      hostname: 'api.netlify.com',
-      path: '/api/v1/sites',
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(createBody),
-      },
-    }, createBody);
-
-    const site = JSON.parse(createResult);
-    if (!site.id) {
-      return { success: false, error: site.message ?? 'Failed to create Netlify site' };
-    }
-
-    const siteId = site.id;
-    sendLog(`Site created: ${site.ssl_url ?? site.url}\n`);
-
-    // Create deploy
-    const deployBody = JSON.stringify({ files: fileMap });
-    const deployResult = await httpsRequest({
-      hostname: 'api.netlify.com',
-      path: `/api/v1/sites/${siteId}/deploys`,
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(deployBody),
-      },
-    }, deployBody);
-
-    const deploy = JSON.parse(deployResult);
-    const deployId = deploy.id;
-    const required: string[] = deploy.required ?? [];
-
-    // Upload required files
-    sendLog(`Uploading ${required.length} files…\n`);
-    for (const sha of required) {
-      const content = fileContents[sha];
-      if (!content) continue;
-      await httpsRequest({
-        hostname: 'api.netlify.com',
-        path: `/api/v1/deploys/${deployId}/files/${sha}`,
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/octet-stream',
-          'Content-Length': content.length,
-        },
-      }, content);
-    }
-
-    const url = deploy.ssl_url ?? deploy.url ?? site.ssl_url ?? site.url;
-    sendLog(`\nDeployed! ${url}\n`);
-    return { success: true, url };
-  }
-
-  // ── HTTPS helper ─────────────────────────────────────────────────────
-  function httpsRequest(
-    options: https.RequestOptions,
-    body?: string | Buffer,
-  ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const req = https.request(options, (res) => {
-        const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
-        res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
-      });
-      req.on('error', reject);
-      if (body) req.write(body);
-      req.end();
-    });
-  }
 }

@@ -6,8 +6,8 @@ interface Props {
   /** Current app context for quick-enqueue. */
   appId: string;
   appName: string;
-  appType: 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
-  dbProvider?: 'sqlite';
+  appType: 'frontend' | 'fullstack';
+  dbProvider?: 'postgresql';
   dbStatus: 'none' | 'running' | 'stopped';
   model: string;
   onClose: () => void;

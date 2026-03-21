@@ -7,8 +7,9 @@
  * generateFullStackScaffold — a project with:
  *   - React + Vite  (frontend, port 5173)
  *   - Express       (backend API, port 3001)
- *   - SQLite        (file-based database via Prisma)
+ *   - PostgreSQL 16 (via Docker Compose)
  *   - Prisma ORM    (schema + client)
+ *   - docker-compose.yml
  *   - README with startup instructions
  */
 
@@ -176,7 +177,7 @@ input:focus { border-color: #6366f1; }
   };
 }
 
-export type DbProvider = 'sqlite';
+export type DbProvider = 'postgresql';
 
 export interface ScaffoldOptions {
   appName: string;
@@ -185,6 +186,14 @@ export interface ScaffoldOptions {
   dbUser: string;
   /** If omitted a cryptographically random password is generated at scaffold time. */
   dbPassword: string;
+  /** Host port for the DB (mapped to container 5432). Auto-assigned if omitted. */
+  dbPort?: number;
+  /** Host port for the admin GUI (pgAdmin, mapped to container 80). Auto-assigned if omitted. */
+  guiPort?: number;
+  /** pgAdmin login email. Defaults to admin@admin.com. */
+  pgAdminEmail?: string;
+  /** pgAdmin login password. Defaults to admin. */
+  pgAdminPassword?: string;
 }
 
 /**
@@ -215,8 +224,64 @@ function sanitize(s: string): string {
 
 export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string, string> {
   const { appName, description } = opts;
+  const dbName = sanitize(opts.dbName || 'deyad_db');
+  const dbUser = sanitize(opts.dbUser || 'deyad_user');
+  const dbPassword = opts.dbPassword;
+  const hostDbPort = opts.dbPort ?? 5433;
+  const hostGuiPort = opts.guiPort ?? 5050;
+  const pgAdminEmail = opts.pgAdminEmail || 'admin@admin.com';
+  const pgAdminPassword = opts.pgAdminPassword || 'admin';
+
+  const dockerCompose = `version: '3.9'
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: ${sanitize(appName)}_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${dbName}
+      POSTGRES_USER: ${dbUser}
+      POSTGRES_PASSWORD: ${dbPassword}
+    ports:
+      - '${hostDbPort}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${dbUser} -d ${dbName}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ${sanitize(appName)}_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${pgAdminEmail}
+      PGADMIN_DEFAULT_PASSWORD: ${pgAdminPassword}
+      PGADMIN_CONFIG_WTF_CSRF_ENABLED: 'False'
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: 'False'
+      PGADMIN_CONFIG_WTF_CSRF_CHECK_DEFAULT: 'False'
+    ports:
+      - '${hostGuiPort}:80'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+`;
+
+  const dbPort = String(hostDbPort);
+  const dbProtocol = 'postgresql';
+  const prismaProvider = 'postgresql';
+  const dbLabel = 'PostgreSQL 16';
 
   return {
+    // ── Docker Compose ──────────────────────────────────────────────────
+    'docker-compose.yml': dockerCompose,
 
     // ── Backend: Express + Prisma ───────────────────────────────────────
     'backend/package.json': JSON.stringify(
@@ -273,11 +338,11 @@ export function generateFullStackScaffold(opts: ScaffoldOptions): Record<string,
       2,
     ),
 
-    'backend/.env': `DATABASE_URL="file:./dev.db"
+    'backend/.env': `DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
 PORT=3001
 `,
 
-    'backend/.env.example': `DATABASE_URL="file:./dev.db"
+    'backend/.env.example': `DATABASE_URL="${dbProtocol}://USER:PASSWORD@localhost:${dbPort}/${dbName}"
 PORT=3001
 `,
 
@@ -289,7 +354,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "${prismaProvider}"
   url      = env("DATABASE_URL")
 }
 
@@ -625,18 +690,28 @@ ${description}
 |----------|-----------------------------|
 | Frontend | React 18 + Vite + TypeScript |
 | Backend  | Node.js + Express + TypeScript |
-| Database | SQLite (file-based)          |
+| Database | ${dbLabel} (Docker)             |
 | ORM      | Prisma                       |
 
 ## Getting Started
 
-### 1. Set up the backend
+### 1. Start the PostgreSQL database
+
+> Requires [Docker](https://www.docker.com/) to be installed.
+
+\`\`\`bash
+docker compose up -d
+\`\`\`
+
+You can also click **Start DB** inside Deyad.
+
+### 2. Set up the backend
 
 \`\`\`bash
 cd backend
 npm install
-# Create the database and generate Prisma client
-npx prisma db push
+# Run Prisma migrations
+npx prisma db push     # or: npx prisma migrate dev
 npx prisma generate
 # Start dev server
 npm run dev
@@ -644,7 +719,7 @@ npm run dev
 
 Backend runs at **http://localhost:3001**
 
-### 2. Set up the frontend
+### 3. Set up the frontend
 
 \`\`\`bash
 cd frontend
@@ -654,10 +729,21 @@ npm run dev
 
 Frontend runs at **http://localhost:5173**
 
-## Database
+### 4. Open the database admin UI
 
-The database is a SQLite file at \`backend/prisma/dev.db\`. You can browse it in
-the **Database** tab inside Deyad, or open it with any SQLite client.
+pgAdmin is available at **http://localhost:${hostGuiPort}**
+
+Login with:
+- **Email:** ${pgAdminEmail}
+- **Password:** (your pgAdmin password from Settings)
+
+## Database connection
+
+Edit \`backend/.env\` to change the connection string:
+
+\`\`\`
+DATABASE_URL="${dbProtocol}://${dbUser}:${dbPassword}@localhost:${dbPort}/${dbName}"
+\`\`\`
 
 ## Prisma
 
@@ -671,438 +757,6 @@ npx prisma db push
 # Open Prisma Studio (GUI)
 npx prisma studio
 \`\`\`
-`,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Next.js scaffold
-// ═══════════════════════════════════════════════════════════════════════
-
-export function generateNextJsScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
-  const { appName, description } = opts;
-  const safeName = appName.toLowerCase().replace(/[^a-z0-9-_.]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-
-  return {
-    'package.json': JSON.stringify(
-      {
-        name: safeName,
-        version: '0.0.1',
-        description,
-        private: true,
-        scripts: {
-          dev: 'next dev',
-          build: 'next build',
-          start: 'next start',
-          lint: 'next lint',
-        },
-        dependencies: {
-          next: '^14.2.0',
-          react: '^18.3.1',
-          'react-dom': '^18.3.1',
-        },
-        devDependencies: {
-          '@types/node': '^20.14.0',
-          '@types/react': '^18.3.11',
-          '@types/react-dom': '^18.3.1',
-          typescript: '^5.4.5',
-        },
-      },
-      null,
-      2,
-    ),
-
-    'tsconfig.json': JSON.stringify(
-      {
-        compilerOptions: {
-          target: 'ES2017',
-          lib: ['dom', 'dom.iterable', 'esnext'],
-          allowJs: true,
-          skipLibCheck: true,
-          strict: true,
-          noEmit: true,
-          esModuleInterop: true,
-          module: 'esnext',
-          moduleResolution: 'bundler',
-          resolveJsonModule: true,
-          isolatedModules: true,
-          jsx: 'preserve',
-          incremental: true,
-          plugins: [{ name: 'next' }],
-          paths: { '@/*': ['./src/*'] },
-        },
-        include: ['next-env.d.ts', '**/*.ts', '**/*.tsx', '.next/types/**/*.ts'],
-        exclude: ['node_modules'],
-      },
-      null,
-      2,
-    ),
-
-    'next.config.mjs': `/** @type {import('next').NextConfig} */
-const nextConfig = {};
-export default nextConfig;
-`,
-
-    'src/app/layout.tsx': `import type { Metadata } from 'next';
-import './globals.css';
-
-export const metadata: Metadata = {
-  title: '${appName}',
-  description: '${description}',
-};
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
-  );
-}
-`,
-
-    'src/app/globals.css': `*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
-  min-height: 100vh;
-}
-`,
-
-    'src/app/page.tsx': `export default function Home() {
-  return (
-    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1rem', textAlign: 'center' }}>
-      <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>✨ ${appName}</h1>
-      <p style={{ color: '#94a3b8', marginTop: '0.5rem' }}>${description}</p>
-      <p style={{ color: '#64748b', marginTop: '2rem', fontSize: '0.875rem' }}>
-        Chat with the AI to build your app →
-      </p>
-    </main>
-  );
-}
-`,
-
-    'src/app/api/hello/route.ts': `import { NextResponse } from 'next/server';
-
-export async function GET() {
-  return NextResponse.json({ message: 'Hello from ${appName}!' });
-}
-`,
-
-    'README.md': `# ${appName}
-
-${description}
-
-## Stack
-
-| Layer    | Technology            |
-|----------|-----------------------|
-| Framework | Next.js 14 (App Router) |
-| Language  | TypeScript            |
-| UI        | React 18              |
-
-## Getting Started
-
-\\\`\\\`\\\`bash
-npm install
-npm run dev
-\\\`\\\`\\\`
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-`,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Python / FastAPI scaffold
-// ═══════════════════════════════════════════════════════════════════════
-
-export function generatePythonScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
-  const { appName, description } = opts;
-  const safeName = appName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
-
-  return {
-    'requirements.txt': `fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-sqlmodel>=0.0.19
-`,
-
-    'main.py': `"""${appName} — ${description}"""
-
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Field, Session, SQLModel, create_engine, select
-
-# ── Database ────────────────────────────────────────────────────────────
-DATABASE_URL = "sqlite:///./data.db"
-engine = create_engine(DATABASE_URL, echo=False)
-
-
-class Item(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str
-    done: bool = False
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    SQLModel.metadata.create_all(engine)
-    yield
-
-
-# ── App ─────────────────────────────────────────────────────────────────
-app = FastAPI(title="${appName}", description="${description}", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/")
-def root():
-    return {"message": "Hello from ${appName}!"}
-
-
-@app.get("/items")
-def list_items():
-    with Session(engine) as session:
-        return session.exec(select(Item)).all()
-
-
-@app.post("/items", status_code=201)
-def create_item(item: Item):
-    with Session(engine) as session:
-        session.add(item)
-        session.commit()
-        session.refresh(item)
-        return item
-
-
-@app.delete("/items/{item_id}")
-def delete_item(item_id: int):
-    with Session(engine) as session:
-        item = session.get(Item, item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail="Item not found")
-        session.delete(item)
-        session.commit()
-        return {"deleted": True}
-`,
-
-    '.gitignore': `__pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-.venv/
-data.db
-`,
-
-    'README.md': `# ${appName}
-
-${description}
-
-## Stack
-
-| Layer     | Technology          |
-|-----------|---------------------|
-| Framework | FastAPI             |
-| Language  | Python 3.11+        |
-| Database  | SQLite (via SQLModel)|
-| Server    | Uvicorn             |
-
-## Getting Started
-
-\\\`\\\`\\\`bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\\\Scripts\\\\activate
-pip install -r requirements.txt
-uvicorn main:app --reload
-\\\`\\\`\\\`
-
-API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
-`,
-
-    'Dockerfile': `FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-`,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// Go scaffold
-// ═══════════════════════════════════════════════════════════════════════
-
-export function generateGoScaffold(opts: FrontendScaffoldOptions): Record<string, string> {
-  const { appName, description } = opts;
-  const safeName = appName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-
-  return {
-    'go.mod': `module ${safeName}
-
-go 1.22
-
-require github.com/go-chi/chi/v5 v5.0.12
-`,
-
-    'main.go': `package main
-
-import (
-\t"database/sql"
-\t"encoding/json"
-\t"log"
-\t"net/http"
-\t"strconv"
-
-\t"github.com/go-chi/chi/v5"
-\t"github.com/go-chi/chi/v5/middleware"
-\t_ "modernc.org/sqlite"
-)
-
-// ${appName} — ${description}
-
-var db *sql.DB
-
-type Item struct {
-\tID   int64  \`json:"id"\`
-\tName string \`json:"name"\`
-\tDone bool   \`json:"done"\`
-}
-
-func main() {
-\tvar err error
-\tdb, err = sql.Open("sqlite", "./data.db")
-\tif err != nil {
-\t\tlog.Fatal(err)
-\t}
-\tdefer db.Close()
-
-\t_, err = db.Exec(\`CREATE TABLE IF NOT EXISTS items (
-\t\tid INTEGER PRIMARY KEY AUTOINCREMENT,
-\t\tname TEXT NOT NULL,
-\t\tdone BOOLEAN DEFAULT FALSE
-\t)\`)
-\tif err != nil {
-\t\tlog.Fatal(err)
-\t}
-
-\tr := chi.NewRouter()
-\tr.Use(middleware.Logger)
-\tr.Use(middleware.Recoverer)
-
-\tr.Get("/", func(w http.ResponseWriter, r *http.Request) {
-\t\tjson.NewEncoder(w).Encode(map[string]string{"message": "Hello from ${appName}!"})
-\t})
-
-\tr.Get("/items", listItems)
-\tr.Post("/items", createItem)
-\tr.Delete("/items/{id}", deleteItem)
-
-\tlog.Println("Listening on :8080")
-\tlog.Fatal(http.ListenAndServe(":8080", r))
-}
-
-func listItems(w http.ResponseWriter, r *http.Request) {
-\trows, err := db.Query("SELECT id, name, done FROM items")
-\tif err != nil {
-\t\thttp.Error(w, err.Error(), 500)
-\t\treturn
-\t}
-\tdefer rows.Close()
-
-\titems := []Item{}
-\tfor rows.Next() {
-\t\tvar it Item
-\t\tif err := rows.Scan(&it.ID, &it.Name, &it.Done); err != nil {
-\t\t\thttp.Error(w, err.Error(), 500)
-\t\t\treturn
-\t\t}
-\t\titems = append(items, it)
-\t}
-\tjson.NewEncoder(w).Encode(items)
-}
-
-func createItem(w http.ResponseWriter, r *http.Request) {
-\tvar it Item
-\tif err := json.NewDecoder(r.Body).Decode(&it); err != nil {
-\t\thttp.Error(w, "Invalid JSON", 400)
-\t\treturn
-\t}
-\tresult, err := db.Exec("INSERT INTO items (name, done) VALUES (?, ?)", it.Name, it.Done)
-\tif err != nil {
-\t\thttp.Error(w, err.Error(), 500)
-\t\treturn
-\t}
-\tid, _ := result.LastInsertId()
-\tit.ID = id
-\tw.WriteHeader(201)
-\tjson.NewEncoder(w).Encode(it)
-}
-
-func deleteItem(w http.ResponseWriter, r *http.Request) {
-\tidStr := chi.URLParam(r, "id")
-\tid, err := strconv.ParseInt(idStr, 10, 64)
-\tif err != nil {
-\t\thttp.Error(w, "Invalid ID", 400)
-\t\treturn
-\t}
-\t_, err = db.Exec("DELETE FROM items WHERE id = ?", id)
-\tif err != nil {
-\t\thttp.Error(w, err.Error(), 500)
-\t\treturn
-\t}
-\tjson.NewEncoder(w).Encode(map[string]bool{"deleted": true})
-}
-`,
-
-    '.gitignore': `data.db
-${safeName}
-`,
-
-    'README.md': `# ${appName}
-
-${description}
-
-## Stack
-
-| Layer     | Technology            |
-|-----------|-----------------------|
-| Language  | Go 1.22+              |
-| Router    | Chi v5                |
-| Database  | SQLite (modernc.org)  |
-
-## Getting Started
-
-\\\`\\\`\\\`bash
-go mod tidy
-go run .
-\\\`\\\`\\\`
-
-Server runs at [http://localhost:8080](http://localhost:8080)
-`,
-
-    'Dockerfile': `FROM golang:1.22-alpine AS build
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -o server .
-
-FROM alpine:3.19
-WORKDIR /app
-COPY --from=build /app/server .
-EXPOSE 8080
-CMD ["./server"]
 `,
   };
 }

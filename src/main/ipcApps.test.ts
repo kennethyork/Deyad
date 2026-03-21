@@ -39,6 +39,7 @@ vi.mock('./ipcGit', () => ({
 }));
 
 vi.mock('./ipcDocker', () => ({
+  stopCompose: vi.fn(),
 }));
 
 const handlers = new Map<string, Function>();

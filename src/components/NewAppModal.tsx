@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-type AppType = 'frontend' | 'fullstack' | 'nextjs' | 'python' | 'go';
+type AppType = 'frontend' | 'fullstack';
 
 interface Props {
   onClose: () => void;
@@ -52,6 +52,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [appType, setAppType] = useState<AppType>('frontend');
+  const [dockerAvailable, setDockerAvailable] = useState<boolean | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [pluginTemplates, setPluginTemplates] = useState<Template[]>([]);
 
@@ -66,6 +67,10 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
       });
       setPluginTemplates(pts);
     }).catch((err) => console.warn('listPlugins:', err));
+  }, []);
+
+  useEffect(() => {
+    window.deyad.checkDocker().then(setDockerAvailable);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -100,17 +105,14 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
                   <button
                     key={t.name}
                     type="button"
-                    className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''}`}
-                    onClick={() => selectTemplate(t)}
-                    title={t.description}
+                    className={`template-card ${selectedTemplate?.name === t.name ? 'selected' : ''} ${t.appType === 'fullstack' && dockerAvailable === false ? 'disabled' : ''}`}
+                    onClick={() => !(t.appType === 'fullstack' && dockerAvailable === false) && selectTemplate(t)}
+                    title={t.appType === 'fullstack' && dockerAvailable === false ? 'Docker required' : t.description}
                   >
                     <span className="template-icon">{t.icon}</span>
                     <span className="template-name">{t.name}</span>
                     <span className="template-desc">{t.description}</span>
                     {t.appType === 'fullstack' && <span className="template-badge">Full Stack</span>}
-                    {t.appType === 'nextjs' && <span className="template-badge">Next.js</span>}
-                    {t.appType === 'python' && <span className="template-badge">Python</span>}
-                    {t.appType === 'go' && <span className="template-badge">Go</span>}
                   </button>
                 ))}
               </div>
@@ -155,42 +157,16 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
 
               <button
                 type="button"
-                className={`type-card ${appType === 'fullstack' ? 'selected' : ''}`}
-                onClick={() => setAppType('fullstack')}
+                className={`type-card ${appType === 'fullstack' ? 'selected' : ''} ${dockerAvailable === false ? 'disabled' : ''}`}
+                onClick={() => dockerAvailable !== false && setAppType('fullstack')}
+                title={dockerAvailable === false ? 'Docker is required for full-stack apps' : ''}
               >
                 <span className="type-card-icon"></span>
                 <span className="type-card-title">Full Stack</span>
-                <span className="type-card-desc">React + Express + SQLite + Prisma</span>
-              </button>
-
-              <button
-                type="button"
-                className={`type-card ${appType === 'nextjs' ? 'selected' : ''}`}
-                onClick={() => setAppType('nextjs')}
-              >
-                <span className="type-card-icon">▲</span>
-                <span className="type-card-title">Next.js</span>
-                <span className="type-card-desc">Next.js 14 + App Router + TypeScript</span>
-              </button>
-
-              <button
-                type="button"
-                className={`type-card ${appType === 'python' ? 'selected' : ''}`}
-                onClick={() => setAppType('python')}
-              >
-                <span className="type-card-icon">🐍</span>
-                <span className="type-card-title">Python</span>
-                <span className="type-card-desc">FastAPI + SQLite + SQLModel</span>
-              </button>
-
-              <button
-                type="button"
-                className={`type-card ${appType === 'go' ? 'selected' : ''}`}
-                onClick={() => setAppType('go')}
-              >
-                <span className="type-card-icon">🔷</span>
-                <span className="type-card-title">Go</span>
-                <span className="type-card-desc">Go + Chi router + SQLite</span>
+                <span className="type-card-desc">React + Express + DB + Prisma</span>
+                {dockerAvailable === false && (
+                  <span className="type-card-warning">Docker required</span>
+                )}
               </button>
             </div>
           </div>
@@ -201,43 +177,14 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
             <div className="stack-info">
               <p className="stack-info-title">What gets scaffolded automatically:</p>
               <ul>
-                <li><strong>backend/</strong> — Express API + Prisma ORM + SQLite</li>
+                <li><strong>docker-compose.yml</strong> — PostgreSQL 16 database</li>
+                <li><strong>backend/</strong> — Express API + Prisma ORM</li>
                 <li><strong>frontend/</strong> — React + Vite app (proxies to backend)</li>
                 <li><strong>README.md</strong> — Setup &amp; run instructions</li>
               </ul>
-            </div>
-          )}
-
-          {appType === 'nextjs' && (
-            <div className="stack-info">
-              <p className="stack-info-title">What gets scaffolded automatically:</p>
-              <ul>
-                <li><strong>src/app/</strong> — Next.js App Router pages &amp; layouts</li>
-                <li><strong>src/app/api/</strong> — API routes (serverless)</li>
-                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
-              </ul>
-            </div>
-          )}
-
-          {appType === 'python' && (
-            <div className="stack-info">
-              <p className="stack-info-title">What gets scaffolded automatically:</p>
-              <ul>
-                <li><strong>main.py</strong> — FastAPI app with SQLite via SQLModel</li>
-                <li><strong>requirements.txt</strong> — Python dependencies</li>
-                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
-              </ul>
-            </div>
-          )}
-
-          {appType === 'go' && (
-            <div className="stack-info">
-              <p className="stack-info-title">What gets scaffolded automatically:</p>
-              <ul>
-                <li><strong>main.go</strong> — Go + Chi router with SQLite</li>
-                <li><strong>go.mod</strong> — Go module dependencies</li>
-                <li><strong>README.md</strong> — Setup &amp; run instructions</li>
-              </ul>
+              <p className="stack-info-db">
+                DB credentials will be randomly generated when you create the app. Check <code>backend/.env</code> after creation.
+              </p>
             </div>
           )}
 

@@ -168,7 +168,7 @@ describe('TaskQueue', () => {
       appId: 'test-app',
       appName: 'Test App',
       appType: 'fullstack',
-      dbProvider: 'sqlite',
+      dbProvider: 'postgresql',
       dbStatus: 'running',
       model: 'codellama',
       prompt: 'Add authentication',
@@ -176,7 +176,7 @@ describe('TaskQueue', () => {
     const task = taskQueue.getAll().find((t) => t.id === id)!;
     expect(task.appId).toBe('test-app');
     expect(task.appType).toBe('fullstack');
-    expect(task.dbProvider).toBe('sqlite');
+    expect(task.dbProvider).toBe('postgresql');
     expect(task.model).toBe('codellama');
     expect(task.output).toBe('');
     expect(task.steps).toEqual([]);

@@ -11,6 +11,8 @@ beforeEach(() => {
       autocompleteEnabled: true,
       completionModel: 'codellama',
       embedModel: 'nomic-embed-text',
+      pgAdminEmail: 'admin@admin.com',
+      pgAdminPassword: 'admin',
       theme: 'dark',
     }),
     setSettings: vi.fn().mockResolvedValue(undefined),
@@ -51,6 +53,16 @@ describe('SettingsModal', () => {
     await waitFor(() => {
       // Models should be loaded and available in dropdowns
       expect(window.deyad.listModels).toHaveBeenCalled();
+    });
+  });
+
+  it('resets pgAdmin credentials to defaults', async () => {
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    const resetBtn = screen.getByText('Reset to Defaults');
+    fireEvent.click(resetBtn);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('admin@admin.com')).toBeTruthy();
     });
   });
 });
