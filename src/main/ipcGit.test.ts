@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn() },
+}));
+
 import { gitInit, gitCommit } from './ipcGit';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';

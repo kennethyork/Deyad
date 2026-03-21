@@ -26,17 +26,20 @@ const handlers = new Map<string, Function>();
 
 import { ipcMain } from 'electron';
 
-beforeEach(() => {
+beforeEach(async () => {
   handlers.clear();
+  const { _setPtyForTest } = await import('./ipcTerminal');
+  _setPtyForTest({ spawn: mockSpawn });
   vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
     handlers.set(channel, handler);
     return undefined as any;
   });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  const { getTerminals } = await import('./ipcTerminal');
+  getTerminals().clear();
   vi.restoreAllMocks();
-  vi.resetModules();
 });
 
 describe('ipcTerminal handler registration', () => {
