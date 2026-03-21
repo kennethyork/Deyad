@@ -28,8 +28,6 @@ export interface DeyadSettings {
   completionModel: string;
   embedModel: string;
   hasCompletedWizard: boolean;
-  pgAdminEmail: string;
-  pgAdminPassword: string;
   theme: 'dark' | 'light';
   temperature: number;
   topP: number;
@@ -43,8 +41,6 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   completionModel: '',
   embedModel: '',
   hasCompletedWizard: false,
-  pgAdminEmail: 'admin@admin.com',
-  pgAdminPassword: 'admin',
   theme: 'dark',
   temperature: 0.7,
   topP: 0.9,

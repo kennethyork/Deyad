@@ -50,8 +50,6 @@ describe('ipcSettings handler registration', () => {
     completionModel: '',
     embedModel: '',
     hasCompletedWizard: false,
-    pgAdminEmail: 'admin@admin.com',
-    pgAdminPassword: 'admin',
     theme: 'dark',
   };
 

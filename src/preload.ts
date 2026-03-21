@@ -18,7 +18,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export type DbProvider = 'postgresql';
+export type DbProvider = 'sqlite';
 export type AppType = 'frontend' | 'fullstack';
 
 export interface AppProject {

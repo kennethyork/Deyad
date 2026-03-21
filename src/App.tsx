@@ -29,10 +29,8 @@ export interface AppProject {
   description: string;
   createdAt: string;
   appType: 'frontend' | 'fullstack';
-  dbProvider?: 'postgresql';
-  /** Host port for the database (unique per app). */
-  dbPort?: number;
-  /** Host port for the admin GUI — pgAdmin (unique per app). */
+  dbProvider?: 'sqlite';
+  /** Host port for Prisma Studio (the DB viewer GUI, unique per app). */
   guiPort?: number;
 }
 
@@ -369,25 +367,17 @@ function AppInner() {
 
 
   const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', templatePrompt?: string) => {
-    const app = await window.deyad.createApp(name, description, appType, 'postgresql');
+    const app = await window.deyad.createApp(name, description, appType, 'sqlite');
     setShowNewAppModal(false);
     await loadApps();
 
     if (appType === 'fullstack') {
-      // Write scaffold files with randomly-generated DB credentials
+      // Write scaffold files with SQLite configuration
       const { generateFullStackScaffold } = await import('./lib/scaffoldGenerator');
-      const { generatePassword } = await import('./lib/crypto');
-      const settings = await window.deyad.getSettings();
       const scaffold = generateFullStackScaffold({
         appName: name,
         description,
-        dbName: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_db',
-        dbUser: name.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_user',
-        dbPassword: generatePassword(24),
-        dbPort: app.dbPort,
         guiPort: app.guiPort,
-        pgAdminEmail: settings.pgAdminEmail,
-        pgAdminPassword: settings.pgAdminPassword,
       });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
