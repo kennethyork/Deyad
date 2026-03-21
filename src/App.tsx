@@ -459,12 +459,14 @@ function AppInner() {
         if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
         else addToast('info', 'Database stopped');
       } else {
-        updatePerApp(appId, { dbStatus: 'stopped' }); // optimistic
+        const prevStatus = s.dbStatus;
+        updatePerApp(appId, { dbStatus: 'stopped' });
         const result = await window.deyad.dbStart(appId);
         if (result.success) {
           updatePerApp(appId, { dbStatus: 'running' });
           addToast('success', 'Database started');
         } else {
+          updatePerApp(appId, { dbStatus: prevStatus });
           addToast('error', `Failed to start database: ${result.error}`);
         }
       }

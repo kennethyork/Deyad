@@ -10,9 +10,11 @@ vi.mock('electron', () => ({
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(() => ({
     on: vi.fn(),
+    removeListener: vi.fn(),
     kill: vi.fn(),
     exitCode: null,
     killed: false,
+    stderr: { on: vi.fn() },
   })),
 }));
 
@@ -114,10 +116,9 @@ model Post {
     expect(result).toEqual({ success: false, error: 'No backend directory found in app directory' });
   });
 
-  it('docker:db-start succeeds when backend directory exists', async () => {
+  it('docker:db-start returns error when no schema.prisma', async () => {
     const backendDir = path.join(tmpDir, 'backend');
     fs.mkdirSync(backendDir, { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, 'deyad.json'), JSON.stringify({ guiPort: 5555 }));
 
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);
@@ -125,7 +126,43 @@ model Post {
     const handler = handlers.get('docker:db-start')!;
     const event = { sender: { send: vi.fn(), isDestroyed: vi.fn(() => false) } };
     const result = await handler(event, 'app1');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('schema.prisma');
+  });
+
+  it('docker:db-start returns error when prisma not installed', async () => {
+    const backendDir = path.join(tmpDir, 'backend');
+    fs.mkdirSync(path.join(backendDir, 'prisma'), { recursive: true });
+    fs.writeFileSync(path.join(backendDir, 'prisma', 'schema.prisma'), 'model X { id Int @id }');
+
+    const { registerDockerHandlers } = await import('./ipcDocker');
+    registerDockerHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('docker:db-start')!;
+    const event = { sender: { send: vi.fn(), isDestroyed: vi.fn(() => false) } };
+    const result = await handler(event, 'app1');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('npm install');
+  });
+
+  it('docker:db-start succeeds when prerequisites are met', async () => {
+    vi.useFakeTimers();
+    const backendDir = path.join(tmpDir, 'backend');
+    fs.mkdirSync(path.join(backendDir, 'prisma'), { recursive: true });
+    fs.mkdirSync(path.join(backendDir, 'node_modules', 'prisma'), { recursive: true });
+    fs.writeFileSync(path.join(backendDir, 'prisma', 'schema.prisma'), 'model X { id Int @id }');
+    fs.writeFileSync(path.join(tmpDir, 'deyad.json'), JSON.stringify({ guiPort: 5555 }));
+
+    const { registerDockerHandlers } = await import('./ipcDocker');
+    registerDockerHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('docker:db-start')!;
+    const event = { sender: { send: vi.fn(), isDestroyed: vi.fn(() => false) } };
+    const promise = handler(event, 'app1');
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await promise;
     expect(result.success).toBe(true);
+    vi.useRealTimers();
   });
 
   it('docker:db-status returns none when no backend directory', async () => {

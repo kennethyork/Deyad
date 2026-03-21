@@ -69,6 +69,17 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       return { success: false, error: 'No backend directory found in app directory' };
     }
 
+    // Verify schema.prisma exists
+    const schemaPath = path.join(backendDir, 'prisma', 'schema.prisma');
+    if (!fs.existsSync(schemaPath)) {
+      return { success: false, error: 'No prisma/schema.prisma found — create a schema first' };
+    }
+
+    // Verify prisma is installed
+    if (!fs.existsSync(path.join(backendDir, 'node_modules', 'prisma'))) {
+      return { success: false, error: 'Prisma not installed — run npm install in the backend terminal first' };
+    }
+
     // Read guiPort from deyad.json
     let guiPort = 5555;
     try {
@@ -79,29 +90,64 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
     // Stop any existing instance
     killStudio(appId);
 
-    try {
-      const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-      const proc = spawn(npx, ['prisma', 'studio', '--port', String(guiPort), '--browser=none'], {
-        cwd: backendDir,
-        stdio: 'pipe',
-        env: { ...process.env },
-      });
+    const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+    const proc = spawn(npx, ['prisma', 'studio', '--port', String(guiPort), '--browser=none'], {
+      cwd: backendDir,
+      stdio: 'pipe',
+      env: { ...process.env },
+    });
 
-      studioProcesses.set(appId, proc);
+    studioProcesses.set(appId, proc);
 
-      proc.on('exit', () => {
+    // Capture stderr for error reporting
+    let stderrBuf = '';
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      if (stderrBuf.length < 4096) stderrBuf += chunk.toString();
+    });
+
+    // Wait up to 3 s to detect immediate crash / spawn error before returning success
+    const result = await new Promise<{ success: boolean; error?: string }>((resolve) => {
+      let settled = false;
+
+      const onSpawnError = (err: Error) => {
+        if (settled) return;
+        settled = true;
         studioProcesses.delete(appId);
-        if (!event.sender.isDestroyed()) {
-          event.sender.send('docker:db-status', { appId, status: 'stopped' });
-        }
-      });
+        resolve({ success: false, error: err.message });
+      };
 
-      event.sender.send('docker:db-status', { appId, status: 'running' });
-      return { success: true };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { success: false, error: msg };
-    }
+      const onEarlyExit = (code: number | null) => {
+        if (settled) return;
+        settled = true;
+        studioProcesses.delete(appId);
+        const msg = stderrBuf.trim() || `Prisma Studio exited immediately (code ${code})`;
+        resolve({ success: false, error: msg });
+      };
+
+      proc.on('error', onSpawnError);
+      proc.on('exit', onEarlyExit);
+
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        // Process survived 3 s — consider it started successfully.
+        // Swap early-exit listeners for the long-running exit handler.
+        proc.removeListener('exit', onEarlyExit);
+        proc.removeListener('error', onSpawnError);
+        proc.on('exit', () => {
+          studioProcesses.delete(appId);
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('docker:db-status', { appId, status: 'stopped' });
+          }
+        });
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('docker:db-status', { appId, status: 'running' });
+        }
+        resolve({ success: true });
+      }, 3000);
+    });
+
+    return result;
   });
 
   // ── Stop Prisma Studio ──────────────────────────────────────────────────
