@@ -248,6 +248,57 @@ async function ensurePython(sendLog: (msg: string) => void): Promise<string | nu
 }
 
 /**
+ * Ensure Node.js is installed. If not, install it via the OS package manager.
+ * Returns the path to the node binary, or null if installation failed.
+ */
+async function ensureNode(sendLog: (msg: string) => void): Promise<string | null> {
+  if (await commandExists('node')) {
+    try {
+      const { stdout } = await execFileAsync('node', ['--version'], { timeout: 10000 });
+      sendLog(`Found Node.js ${stdout.trim()}\n`);
+    } catch { /* ignore */ }
+    return 'node';
+  }
+
+  sendLog('Node.js not found \u2014 installing automatically\u2026\n');
+  const pm = detectPkgManager();
+  if (!pm) {
+    sendLog('Error: Could not detect package manager. Please install Node.js 18+ manually.\n');
+    return null;
+  }
+
+  try {
+    switch (pm) {
+      case 'apt':
+        await execFileAsync('sudo', ['apt', 'update'], { timeout: 60000 });
+        await execFileAsync('sudo', ['apt', 'install', '-y', 'nodejs', 'npm'], { timeout: 300000 });
+        break;
+      case 'dnf':
+        await execFileAsync('sudo', ['dnf', 'install', '-y', 'nodejs', 'npm'], { timeout: 300000 });
+        break;
+      case 'pacman':
+        await execFileAsync('sudo', ['pacman', '-S', '--noconfirm', 'nodejs', 'npm'], { timeout: 300000 });
+        break;
+      case 'brew':
+        await execFileAsync('brew', ['install', 'node'], { timeout: 300000 });
+        break;
+      case 'winget':
+        await execFileAsync('winget', ['install', '--id', 'OpenJS.NodeJS.LTS', '-e', '--accept-source-agreements', '--accept-package-agreements'], { timeout: 300000 });
+        break;
+    }
+    sendLog('Node.js installed successfully.\n');
+    if (await commandExists('node')) return 'node';
+    sendLog('Warning: Node.js was installed but the command is not in PATH. You may need to restart Deyad.\n');
+    return 'node';
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    sendLog(`Error installing Node.js: ${msg}\n`);
+    sendLog('Please install Node.js 18+ manually from https://nodejs.org\n');
+    return null;
+  }
+}
+
+/**
  * Ensure Go is installed. If not, install it via the OS package manager.
  * Returns the path to the go binary, or null if installation failed.
  */
@@ -354,12 +405,14 @@ export function registerAppHandlers(
     }
     fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
 
-    // Pre-install Python or Go runtime in the background if not already present
+    // Pre-install runtimes in the background so they're ready before first preview
     const silentLog = (msg: string) => console.log(`[runtime-setup] ${msg.trim()}`);
     if (resolvedAppType === 'python') {
       ensurePython(silentLog).catch((err) => console.debug('python pre-install:', err));
     } else if (resolvedAppType === 'go') {
       ensureGo(silentLog).catch((err) => console.debug('go pre-install:', err));
+    } else {
+      ensureNode(silentLog).catch((err) => console.debug('node pre-install:', err));
     }
 
     await gitInit(appDir, id);
@@ -615,7 +668,12 @@ export function registerAppHandlers(
       return { success: true };
     }
 
-    // ── Node project: npm install + npm run dev ──────────────────────
+    // ── Node project: ensure runtime + npm install + npm run dev ──────────────────────
+    const nodeCmd = await ensureNode(sendLog);
+    if (!nodeCmd) {
+      return { success: false, error: 'Node.js is not installed and automatic installation failed. Please install Node.js 18+ manually.' };
+    }
+
     // Always run npm install to pick up any new dependencies added by the AI
     sendLog('Installing dependencies…\n');
     try {
