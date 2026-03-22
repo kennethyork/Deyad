@@ -25,12 +25,14 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
     const unsubLog = window.deyad.onAppDevLog(({ appId, data }) => {
       if (appId !== app.id) return;
       setLogs((prev) => prev + data);
-      // Auto-detect "ready" from Vite output and extract the actual URL
-      const urlMatch = data.match(/https?:\/\/localhost:\d+/);
-      if (urlMatch) {
-        setPreviewUrl(urlMatch[0]);
-        setStatus('running');
-      } else if (data.includes('Local:')) {
+      // Only capture the URL from Vite's "Local:" output, not from backend logs
+      if (data.includes('Local:')) {
+        const urlMatch = data.match(/https?:\/\/localhost:\d+/);
+        if (urlMatch) {
+          setPreviewUrl(urlMatch[0]);
+          setStatus('running');
+        }
+      } else if (data.includes('VITE') && data.includes('ready')) {
         setStatus('running');
       }
     });
