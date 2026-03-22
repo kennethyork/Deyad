@@ -1,8 +1,8 @@
-<div align="center">
-
 # Deyad
 
-### The open-source, local-first AI app builder
+<div align="center">
+
+## The open-source, local-first AI app builder
 
 Describe what you want. Get a working app. No cloud. No API keys. No subscriptions.
 
@@ -65,7 +65,7 @@ On first launch the Welcome Wizard connects to Ollama and lets you pick a model.
 
 ## What It Does
 
-```
+```text
 You describe your app in chat
   → Agent reads your codebase
   → Plans the approach
