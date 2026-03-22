@@ -20,8 +20,8 @@ Local-first AI app builder powered by Ollama. Ships as a cross-platform Electron
                          │
         ┌────────────────┼────────────────┐
         ▼                ▼                ▼
-   File System      Ollama API      Docker / DB
-   (deyad-apps/)   (localhost:11434)  (PostgreSQL)
+   File System      Ollama API      SQLite / DB
+   (deyad-apps/)   (localhost:11434)  (Prisma)
 ```
 
 ## Process Model
@@ -45,14 +45,14 @@ src/
 │   ├── EditorPanel.tsx      # Monaco code editor
 │   ├── PreviewPanel.tsx     # Live app preview (webview)
 │   ├── TerminalPanel.tsx    # Embedded terminal (xterm.js)
-│   ├── DatabasePanel.tsx    # pgAdmin / DB management
+│   ├── DatabasePanel.tsx    # Prisma Studio / DB management
 │   ├── Sidebar.tsx          # App list & navigation
 │   ├── GitPanel.tsx         # Git operations
 │   ├── DeployModal.tsx      # VPS deploy via SSH + rsync
 │   └── …                   # Settings, Import, WelcomeWizard, etc.
 ├── main/                # IPC handler modules (8 files, each with .test.ts)
 │   ├── ipcApps.ts           # App CRUD, snapshots, file read/write
-│   ├── ipcDocker.ts         # Docker + PostgreSQL lifecycle
+│   ├── ipcDocker.ts         # SQLite + Prisma Studio lifecycle
 │   ├── ipcGit.ts            # Git operations (commit, push, pull, etc.)
 │   ├── ipcOllama.ts         # Ollama model listing + streaming chat
 │   ├── ipcSettings.ts       # Settings, npm, env vars, plugins

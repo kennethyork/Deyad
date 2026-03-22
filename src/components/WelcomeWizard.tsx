@@ -21,18 +21,25 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
 
   const checkOllama = async () => {
     setChecking(true);
-    try {
-      const res = await window.deyad.listModels();
-      setModels(res.models ?? []);
-      setOllamaOk(true);
-      if (res.models?.length) {
-        setSelectedModel(res.models[0].name);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await window.deyad.listModels();
+        setModels(res.models ?? []);
+        setOllamaOk(true);
+        if (res.models?.length) {
+          setSelectedModel(res.models[0].name);
+        }
+        setChecking(false);
+        return;
+      } catch (err) {
+        console.debug('Handled error:', err);
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
       }
-    } catch (err) {
-      console.debug('Handled error:', err);
-      setOllamaOk(false);
-      setModels([]);
     }
+    setOllamaOk(false);
+    setModels([]);
     setChecking(false);
   };
 

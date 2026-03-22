@@ -12,8 +12,8 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 | **Runs locally** | ✅ | ✅ | ❌ cloud | ❌ cloud | ✅ | ✅ | ❌ cloud | ❌ cloud |
 | **Data privacy** | ✅ code never leaves machine | Partial (cloud API keys) | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
 | **Own your AI** | ✅ Ollama (any model) | Partial (BYO API key) | ❌ locked to their API | ❌ locked | Partial (API keys) | Partial (API keys) | ❌ | ❌ |
-| **Full-stack scaffold** | ✅ React+Express+Prisma+PG | ✅ Supabase | ✅ | ✅ | ❌ editor only | ❌ editor only | ✅ | ❌ frontend only |
-| **Database management** | ✅ PG + pgAdmin GUI | ✅ Supabase | ❌ | ✅ Supabase | ❌ | ❌ | ✅ PostgreSQL | ❌ |
+| **Full-stack scaffold** | ✅ React+Express+Prisma+SQLite | ✅ Supabase | ✅ | ✅ | ❌ editor only | ❌ editor only | ✅ | ❌ frontend only |
+| **Database management** | ✅ SQLite + Prisma Studio | ✅ Supabase | ❌ | ✅ Supabase | ❌ | ❌ | ✅ PostgreSQL | ❌ |
 | **Live preview** | ✅ embedded Vite | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
 | **Agent loop (auto-fix)** | ✅ 30-iter with error recovery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **Code editor** | ✅ Monaco (VS Code engine) | ✅ visual editor | Basic | Basic | ✅ VS Code fork | ✅ VS Code fork | ✅ Monaco | ❌ |

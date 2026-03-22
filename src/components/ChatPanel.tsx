@@ -163,30 +163,37 @@ export default function ChatPanel({
     }
   }, [initialPrompt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadModels = async () => {
-    try {
-      const { models: list } = await window.deyad.listModels();
-      const names = list.map((m) => m.name);
-      setModels(names);
-      // Try to use saved default model
-      const settings = await window.deyad.getSettings();
-      if (settings.defaultModel && names.includes(settings.defaultModel)) {
-        setSelectedModel(settings.defaultModel);
-      } else if (names.length > 0) {
-        setSelectedModel(names[0]);
+  const loadModels = async (retries = 3) => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const { models: list } = await window.deyad.listModels();
+        const names = list.map((m) => m.name);
+        setModels(names);
+        // Try to use saved default model
+        const settings = await window.deyad.getSettings();
+        if (settings.defaultModel && names.includes(settings.defaultModel)) {
+          setSelectedModel(settings.defaultModel);
+        } else if (names.length > 0) {
+          setSelectedModel(names[0]);
+        }
+        if (settings.embedModel) {
+          embedModelRef.current = settings.embedModel;
+        }
+        modelOptionsRef.current = {
+          temperature: settings.temperature ?? 0.7,
+          top_p: settings.topP ?? 0.9,
+          repeat_penalty: settings.repeatPenalty ?? 1.1,
+        };
+        setError(null);
+        return;
+      } catch (err) {
+        console.debug('Handled error:', err);
+        if (attempt < retries - 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
       }
-      if (settings.embedModel) {
-        embedModelRef.current = settings.embedModel;
-      }
-      modelOptionsRef.current = {
-        temperature: settings.temperature ?? 0.7,
-        top_p: settings.topP ?? 0.9,
-        repeat_penalty: settings.repeatPenalty ?? 1.1,
-      };
-    } catch (err) {
-      console.debug('Handled error:', err);
-      setError('Could not connect to Ollama. Make sure it is running.');
     }
+    setError('Could not connect to Ollama. Make sure it is running.');
   };
 
   const saveMessages = useCallback(
@@ -270,7 +277,7 @@ export default function ChatPanel({
             .join('\n');
           ollamaMessages.push({
             role: 'system' as const,
-            content: `The database is running (PostgreSQL). Current schema:\n${schemaText}\n\nUse this schema when generating backend code, API routes, or Prisma queries.`,
+            content: `The database is running (SQLite via Prisma). Current schema:\n${schemaText}\n\nUse this schema when generating backend code, API routes, or Prisma queries.`,
           });
         }
       } catch (err) {
@@ -694,7 +701,7 @@ User's instructions: ${text}`;
                   <span className="stack-badge">Express</span>
                   <span className="stack-badge">Prisma</span>
                   <span className={`stack-badge stack-badge-db`}>
-                    PostgreSQL
+                    SQLite
                   </span>
                 </>
               )}
