@@ -16,6 +16,7 @@ vi.mock('node:child_process', () => ({
     killed: false,
     stderr: { on: vi.fn() },
   })),
+  execSync: vi.fn(() => ''),
 }));
 
 vi.mock('node:net', () => ({

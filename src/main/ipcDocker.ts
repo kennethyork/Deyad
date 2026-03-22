@@ -10,7 +10,7 @@ import { ipcMain } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import nodeNet from 'node:net';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, execSync, type ChildProcess } from 'node:child_process';
 
 // ── Prisma Studio process registry ───────────────────────────────────────────
 
@@ -21,6 +21,28 @@ function killStudio(appId: string): void {
   if (proc) {
     try { proc.kill(); } catch (err) { console.debug('kill studio:', err); }
     studioProcesses.delete(appId);
+  }
+}
+
+/** Kill any process listening on the given port (best-effort, Linux/macOS). */
+function killProcessOnPort(port: number): void {
+  if (process.platform === 'win32') {
+    try {
+      const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf-8', timeout: 3000 });
+      const pids = new Set(out.split(/\r?\n/).map(l => l.trim().split(/\s+/).pop()).filter(Boolean));
+      for (const pid of pids) {
+        try { execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 }); } catch { /* already dead */ }
+      }
+    } catch { /* no listeners */ }
+  } else {
+    try {
+      const out = execSync(`lsof -ti :${port}`, { encoding: 'utf-8', timeout: 3000 }).trim();
+      if (out) {
+        for (const pid of out.split(/\s+/)) {
+          try { process.kill(Number(pid), 'SIGKILL'); } catch { /* already dead */ }
+        }
+      }
+    } catch { /* no listeners */ }
   }
 }
 
@@ -87,8 +109,9 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       if (meta.guiPort) guiPort = meta.guiPort;
     } catch (err) { console.debug('Could not read guiPort from deyad.json:', err); }
 
-    // Stop any existing instance
+    // Stop any existing instance and free the port
     killStudio(appId);
+    killProcessOnPort(guiPort);
 
     const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
     const proc = spawn(npx, ['prisma', 'studio', '--port', String(guiPort), '--browser=none'], {
@@ -153,7 +176,16 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
   // ── Stop Prisma Studio ──────────────────────────────────────────────────
   ipcMain.handle('docker:db-stop', async (event, appId: string) => {
     try {
+      // Read guiPort so we can also kill stale processes on it
+      const dir = appDir(appId);
+      let guiPort = 5555;
+      try {
+        const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+        if (meta.guiPort) guiPort = meta.guiPort;
+      } catch { /* use default */ }
+
       killStudio(appId);
+      killProcessOnPort(guiPort);
       event.sender.send('docker:db-status', { appId, status: 'stopped' });
       return { success: true };
     } catch (err: unknown) {
