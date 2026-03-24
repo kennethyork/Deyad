@@ -537,6 +537,14 @@ User's instructions: ${text}`;
     agentAbortRef.current = abort;
   };
 
+  const handleStopAgent = () => {
+    agentAbortRef.current?.();
+    streamCleanupRef.current?.();
+    setStreaming(false);
+    setError('Agent stopped by user');
+    setAgentSteps((prev) => [...prev, { type: 'result', text: '⏹️ Agent stopped by user' }]);
+  };
+
   const sendRef = useRef<(text?: string) => void>();
 
   const handleSend = () => {
@@ -752,6 +760,7 @@ User's instructions: ${text}`;
         imageAttachment={imageAttachment}
         setImageAttachment={setImageAttachment}
         onSend={handleSend}
+        onStop={handleStopAgent}
         onImagePaste={handleImagePaste}
       />
     </div>

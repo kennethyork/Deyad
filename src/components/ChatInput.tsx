@@ -8,6 +8,7 @@ interface Props {
   imageAttachment: string | null;
   setImageAttachment: (v: string | null) => void;
   onSend: () => void;
+  onStop?: () => void;
   onImagePaste: (e: React.ClipboardEvent) => void;
 }
 
@@ -19,6 +20,7 @@ export default memo(function ChatInput({
   imageAttachment,
   setImageAttachment,
   onSend,
+  onStop,
   onImagePaste,
 }: Props) {
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -88,9 +90,15 @@ export default memo(function ChatInput({
           placeholder={streaming ? 'AI is responding…' : imageAttachment ? 'Describe what to build from this image…' : 'Describe what you want to build…'}
           disabled={streaming}
         />
-        <button className="btn-send" onClick={onSend} disabled={streaming || !input.trim()}>
-          {agentMode ? '⚡' : '↑'}
-        </button>
+        {streaming ? (
+          <button className="btn-stop" onClick={onStop} title="Stop agent" type="button">
+            ■
+          </button>
+        ) : (
+          <button className="btn-send" onClick={onSend} disabled={!input.trim()}>
+            {agentMode ? '⚡' : '↑'}
+          </button>
+        )}
       </div>
     </div>
   );
