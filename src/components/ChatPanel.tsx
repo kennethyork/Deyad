@@ -80,7 +80,7 @@ export default function ChatPanel({
 
   // Listen to dev server logs for error auto-detection
   useEffect(() => {
-    const unsub = window.dyad.onAppDevLog(({ appId, data }) => {
+    const unsub = window.deyad.onAppDevLog(({ appId, data }) => {
       if (appId !== app.id) return;
       const errors = detectErrors(data);
       if (errors.length > 0) {
@@ -110,7 +110,7 @@ export default function ChatPanel({
     autoFixTimerRef.current = setTimeout(async () => {
       autoFixAttemptsRef.current++;
       // Re-read files from disk to avoid stale closure data
-      const freshFiles = await window.dyad.readFiles(app.id);
+      const freshFiles = await window.deyad.readFiles(app.id);
       const prompt = buildErrorFixPrompt(detectedErrors, freshFiles);
       setDetectedErrors([]);
       sendAgentMessage(prompt);
@@ -142,7 +142,7 @@ export default function ChatPanel({
   useEffect(() => {
     (async () => {
       try {
-        const saved = await window.dyad.loadMessages(app.id);
+        const saved = await window.deyad.loadMessages(app.id);
         setMessages(saved || []);
       } catch (err) {
         console.debug('Handled error:', err);
@@ -166,11 +166,11 @@ export default function ChatPanel({
   const loadModels = async (retries = 3) => {
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        const { models: list } = await window.dyad.listModels();
+        const { models: list } = await window.deyad.listModels();
         const names = list.map((m) => m.name);
         setModels(names);
         // Try to use saved default model
-        const settings = await window.dyad.getSettings();
+        const settings = await window.deyad.getSettings();
         if (settings.defaultModel && names.includes(settings.defaultModel)) {
           setSelectedModel(settings.defaultModel);
         } else if (names.length > 0) {
@@ -198,7 +198,7 @@ export default function ChatPanel({
 
   const saveMessages = useCallback(
     (msgs: UiMessage[]) => {
-      window.dyad.saveMessages(app.id, msgs).catch((err) => console.warn('Failed to save messages:', err));
+      window.deyad.saveMessages(app.id, msgs).catch((err) => console.warn('Failed to save messages:', err));
     },
     [app.id],
   );
@@ -270,7 +270,7 @@ export default function ChatPanel({
     // If the database is running, fetch and inject the live schema
     if (dbStatus === 'running' && app.appType === 'fullstack') {
       try {
-        const schema = await window.dyad.dbDescribe(app.id);
+        const schema = await window.deyad.dbDescribe(app.id);
         if (schema.tables.length > 0) {
           const schemaText = schema.tables
             .map((t) => `  ${t.name}: ${t.columns.join(', ')}`)
@@ -335,7 +335,7 @@ User's instructions: ${text}`;
 
     // Set up stream listeners
     const requestId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const unsubToken = window.dyad.onStreamToken(requestId, (token: string) => {
+    const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
       streamBuf.current += token;
       if (!rafRef.current) {
         rafRef.current = requestAnimationFrame(() => {
@@ -401,9 +401,9 @@ User's instructions: ${text}`;
       setStreaming(false);
     };
 
-    const unsubDone = window.dyad.onStreamDone(requestId, onDone);
+    const unsubDone = window.deyad.onStreamDone(requestId, onDone);
 
-    const unsubError = window.dyad.onStreamError(requestId, (err: string) => {
+    const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
       cleanup();
       setError(`Ollama error: ${err}`);
       setStreaming(false);
@@ -411,7 +411,7 @@ User's instructions: ${text}`;
 
     streamCleanupRef.current = cleanup;
 
-    window.dyad.chatStream(selectedModel, ollamaMessages, requestId, modelOptionsRef.current).catch((err) => {
+    window.deyad.chatStream(selectedModel, ollamaMessages, requestId, modelOptionsRef.current).catch((err) => {
       cleanup();
       setError(`Failed to connect to Ollama: ${err instanceof Error ? err.message : String(err)}`);
       setStreaming(false);

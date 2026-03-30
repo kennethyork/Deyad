@@ -18,8 +18,8 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const refresh = useCallback(async () => {
     try {
       const [remote, branchInfo] = await Promise.all([
-        window.dyad.gitRemoteGet(appId),
-        window.dyad.gitBranch(appId),
+        window.deyad.gitRemoteGet(appId),
+        window.deyad.gitBranch(appId),
       ]);
       setRemoteUrl(remote || '');
       setInputUrl(remote || '');
@@ -38,7 +38,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const handleSetRemote = async () => {
     if (!inputUrl.trim()) return;
     setLoading('remote');
-    const res = await window.dyad.gitRemoteSet(appId, inputUrl.trim());
+    const res = await window.deyad.gitRemoteSet(appId, inputUrl.trim());
     if (res.success) {
       setRemoteUrl(inputUrl.trim());
       showMsg('success', 'Remote origin saved');
@@ -53,11 +53,11 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
     setLoading('commit');
     try {
       // Use the IPC directly — git add + commit
-      const termId = await window.dyad.createTerminal(appId);
-      await window.dyad.terminalWrite(termId, `git add . && git commit -m "${commitMsg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`);
+      const termId = await window.deyad.createTerminal(appId);
+      await window.deyad.terminalWrite(termId, `git add . && git commit -m "${commitMsg.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\n`);
       // Wait a moment for it to complete
       await new Promise(r => setTimeout(r, 2000));
-      await window.dyad.terminalKill(termId);
+      await window.deyad.terminalKill(termId);
       setCommitMsg('');
       showMsg('success', 'Committed');
       refresh();
@@ -70,7 +70,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const handlePush = async () => {
     if (!remoteUrl) { showMsg('error', 'Set a remote URL first'); return; }
     setLoading('push');
-    const res = await window.dyad.gitPush(appId);
+    const res = await window.deyad.gitPush(appId);
     if (res.success) {
       showMsg('success', 'Pushed to remote');
     } else {
@@ -82,7 +82,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const handlePull = async () => {
     if (!remoteUrl) { showMsg('error', 'Set a remote URL first'); return; }
     setLoading('pull');
-    const res = await window.dyad.gitPull(appId);
+    const res = await window.deyad.gitPull(appId);
     if (res.success) {
       showMsg('success', 'Pulled from remote');
       onFilesChanged?.();
@@ -95,7 +95,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const handleCreateBranch = async () => {
     if (!newBranch.trim()) return;
     setLoading('branch');
-    const res = await window.dyad.gitBranchCreate(appId, newBranch.trim());
+    const res = await window.deyad.gitBranchCreate(appId, newBranch.trim());
     if (res.success) {
       showMsg('success', `Created branch ${newBranch.trim()}`);
       setNewBranch('');
@@ -110,7 +110,7 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
   const handleSwitchBranch = async (name: string) => {
     if (name === currentBranch) return;
     setLoading('branch');
-    const res = await window.dyad.gitBranchSwitch(appId, name);
+    const res = await window.deyad.gitBranchSwitch(appId, name);
     if (res.success) {
       showMsg('success', `Switched to ${name}`);
       refresh();

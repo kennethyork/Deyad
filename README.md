@@ -1,4 +1,4 @@
-# Dyad
+# Deyad
 
 <div align="center">
 
@@ -13,13 +13,13 @@ Describe what you want. Get a working app. No cloud. No API keys. No subscriptio
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-[Download](https://github.com/kennethyork/Dyad/releases/latest) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
+[Download](https://github.com/kennethyork/Deyad/releases/latest) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
 
 </div>
 
 ---
 
-Dyad is a desktop app that turns natural language into working software. It runs [Ollama](https://ollama.ai) on your machine for AI, scaffolds production stacks (React + Express + SQLite + Prisma), and gives you a full IDE — editor, terminal, live preview, database admin, version control, and deployment — all in one window.
+Deyad is a desktop app that turns natural language into working software. It runs [Ollama](https://ollama.ai) on your machine for AI, scaffolds production stacks (React + Express + SQLite + Prisma), and gives you a full IDE — editor, terminal, live preview, database admin, version control, and deployment — all in one window.
 
 Your code never leaves your machine. There are no tokens to buy, no accounts to create, and no internet required.
 
@@ -29,20 +29,20 @@ Your code never leaves your machine. There are no tokens to buy, no accounts to 
 
 ### Download a binary
 
-Grab the latest release for your platform from [GitHub Releases](https://github.com/kennethyork/Dyad/releases/latest):
+Grab the latest release for your platform from [GitHub Releases](https://github.com/kennethyork/Deyad/releases/latest):
 
 | Platform | File |
 | --- | --- |
-| Ubuntu / Debian | `Dyad-amd64.deb` |
-| Fedora / RHEL | `Dyad-x86_64.rpm` |
-| Any Linux | `Dyad-x86_64.AppImage` |
-| Windows | `Dyad-x64.exe` |
+| Ubuntu / Debian | `Deyad-amd64.deb` |
+| Fedora / RHEL | `Deyad-x86_64.rpm` |
+| Any Linux | `Deyad-x86_64.AppImage` |
+| Windows | `Deyad-x64.exe` |
 
 ### Or run from source
 
 ```bash
-git clone https://github.com/kennethyork/Dyad.git
-cd Dyad && npm install && npm start
+git clone https://github.com/kennethyork/Deyad.git
+cd Deyad && npm install && npm start
 ```
 
 ### Prerequisites
@@ -174,7 +174,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 
 ## How It Compares
 
-| | **Dyad** | Bolt.new | Lovable | Cursor | Base44 | v0 |
+| | **Deyad** | Bolt.new | Lovable | Cursor | Base44 | v0 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Local AI (no cloud) | ✅ | — | — | — | — | — |
 | Free forever | ✅ | — | — | — | — | — |
@@ -192,7 +192,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | Mobile preview | ✅ | — | — | — | — | — |
 | Plugin system | ✅ | — | — | ✅ | — | — |
 
-> Every other AI app builder sends your code to a cloud API. Dyad runs inference entirely on your hardware via Ollama. Zero cloud dependency. Zero cost. Zero data leakage.
+> Every other AI app builder sends your code to a cloud API. Deyad runs inference entirely on your hardware via Ollama. Zero cloud dependency. Zero cost. Zero data leakage.
 
 [Full comparison →](COMPARISON.md)
 
@@ -234,8 +234,8 @@ sudo apt install -y git
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
 
-# Dyad — install the .deb
-sudo dpkg -i Dyad-amd64.deb
+# Deyad — install the .deb
+sudo dpkg -i Deyad-amd64.deb
 ```
 
 </details>
@@ -255,8 +255,8 @@ sudo dnf install -y git
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
 
-# Dyad — install the .rpm
-sudo rpm -i Dyad-x86_64.rpm
+# Deyad — install the .rpm
+sudo rpm -i Deyad-x86_64.rpm
 ```
 
 </details>
@@ -272,8 +272,8 @@ sudo pacman -S nodejs npm git
 curl -fsSL https://ollama.com/install.sh | sh
 ollama pull llama3.2
 
-# Dyad — run the AppImage
-chmod +x Dyad-x86_64.AppImage && ./Dyad-x86_64.AppImage
+# Deyad — run the AppImage
+chmod +x Deyad-x86_64.AppImage && ./Deyad-x86_64.AppImage
 ```
 
 </details>
@@ -287,7 +287,7 @@ winget install Git.Git
 winget install Ollama.Ollama
 ollama pull llama3.2
 
-# Download and run Dyad-x64.exe from GitHub Releases
+# Download and run Deyad-x64.exe from GitHub Releases
 ```
 
 </details>

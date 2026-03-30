@@ -13,7 +13,7 @@ const mockApp: AppProject = {
 };
 
 beforeEach(() => {
-  (window as any).dyad = {
+  (window as any).deyad = {
     onAppDevLog: vi.fn().mockReturnValue(() => {}),
     onAppDevStatus: vi.fn().mockReturnValue(() => {}),
     appDevStart: vi.fn().mockResolvedValue({ success: true }),
@@ -35,7 +35,7 @@ describe('PreviewPanel', () => {
     render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
     fireEvent.click(screen.getAllByText('Run App')[0]);
     await waitFor(() => {
-      expect(window.dyad.appDevStart).toHaveBeenCalledWith('app1');
+      expect(window.deyad.appDevStart).toHaveBeenCalledWith('app1');
     });
   });
 
@@ -48,7 +48,7 @@ describe('PreviewPanel', () => {
 
   it('subscribes to dev log and status events on mount', () => {
     render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
-    expect(window.dyad.onAppDevLog).toHaveBeenCalled();
-    expect(window.dyad.onAppDevStatus).toHaveBeenCalled();
+    expect(window.deyad.onAppDevLog).toHaveBeenCalled();
+    expect(window.deyad.onAppDevStatus).toHaveBeenCalled();
   });
 });

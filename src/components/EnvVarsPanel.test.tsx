@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EnvVarsPanel from './EnvVarsPanel';
 
 beforeEach(() => {
-  (window as any).dyad = {
+  (window as any).deyad = {
     envRead: vi.fn().mockResolvedValue({
       '.env': { DATABASE_URL: 'postgres://localhost', API_KEY: 'secret123' },
     }),
@@ -29,12 +29,12 @@ describe('EnvVarsPanel', () => {
   it('calls envRead on mount', async () => {
     render(<EnvVarsPanel appId="app1" />);
     await waitFor(() => {
-      expect(window.dyad.envRead).toHaveBeenCalledWith('app1');
+      expect(window.deyad.envRead).toHaveBeenCalledWith('app1');
     });
   });
 
   it('shows file tabs for multiple env files', async () => {
-    (window as any).dyad.envRead = vi.fn().mockResolvedValue({
+    (window as any).deyad.envRead = vi.fn().mockResolvedValue({
       '.env': { KEY1: 'val1' },
       '.env.local': { KEY2: 'val2' },
     });
@@ -59,15 +59,15 @@ describe('EnvVarsPanel', () => {
     fireEvent.click(screen.getByText('Add'));
 
     await waitFor(() => {
-      expect(window.dyad.envWrite).toHaveBeenCalled();
+      expect(window.deyad.envWrite).toHaveBeenCalled();
     });
   });
 
   it('shows empty state gracefully', async () => {
-    (window as any).dyad.envRead = vi.fn().mockResolvedValue({});
+    (window as any).deyad.envRead = vi.fn().mockResolvedValue({});
     const { container } = render(<EnvVarsPanel appId="app1" />);
     await waitFor(() => {
-      expect(window.dyad.envRead).toHaveBeenCalled();
+      expect(window.deyad.envRead).toHaveBeenCalled();
     });
     // Should render without crashing
     expect(container.innerHTML).toBeTruthy();

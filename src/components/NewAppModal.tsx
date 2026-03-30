@@ -57,7 +57,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
 
   // load plugin templates on mount
   useEffect(() => {
-    window.dyad.listPlugins().then((plugins) => {
+    window.deyad.listPlugins().then((plugins) => {
       const pts: Template[] = [];
       plugins.forEach((p) => {
         if (p.templates) {

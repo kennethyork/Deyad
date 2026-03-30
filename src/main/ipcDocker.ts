@@ -102,12 +102,12 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       return { success: false, error: 'Prisma not installed — run npm install in the backend terminal first' };
     }
 
-    // Read guiPort from dyad.json
+    // Read guiPort from deyad.json
     let guiPort = 5555;
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       if (meta.guiPort) guiPort = meta.guiPort;
-    } catch (err) { console.debug('Could not read guiPort from dyad.json:', err); }
+    } catch (err) { console.debug('Could not read guiPort from deyad.json:', err); }
 
     // Stop any existing instance and free the port
     killStudio(appId);
@@ -180,7 +180,7 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       const dir = appDir(appId);
       let guiPort = 5555;
       try {
-        const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
+        const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
         if (meta.guiPort) guiPort = meta.guiPort;
       } catch { /* use default */ }
 

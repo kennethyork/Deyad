@@ -26,7 +26,7 @@ export default function SearchPanel({ appId, onSelectFile }: Props) {
     }
     setSearching(true);
     try {
-      const res = await window.dyad.searchFiles(appId, q.trim());
+      const res = await window.deyad.searchFiles(appId, q.trim());
       setResults(res);
       setSearched(true);
     } catch (err) {

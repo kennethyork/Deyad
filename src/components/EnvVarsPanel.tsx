@@ -14,7 +14,7 @@ export default function EnvVarsPanel({ appId }: Props) {
 
   const loadEnv = useCallback(async () => {
     try {
-      const result = await window.dyad.envRead(appId);
+      const result = await window.deyad.envRead(appId);
       setEnvFiles(result);
       const files = Object.keys(result);
       if (files.length > 0 && !result[activeFile]) {
@@ -29,7 +29,7 @@ export default function EnvVarsPanel({ appId }: Props) {
 
   const handleSave = useCallback(async (vars: Record<string, string>) => {
     setSaving(true);
-    const result = await window.dyad.envWrite(appId, activeFile, vars);
+    const result = await window.deyad.envWrite(appId, activeFile, vars);
     if (result.success) {
       setStatus('✓ Saved');
       loadEnv();

@@ -1,6 +1,6 @@
 {
-  "name": "dyad",
-  "productName": "Dyad",
+  "name": "deyad",
+  "productName": "Deyad",
   "version": "1.4.34",
   "description": "Local AI app builder powered by Ollama models",
   "repository": {
@@ -32,8 +32,8 @@
     "electron"
   ],
   "author": {
-    "name": "Dyad",
-    "email": "maintainer@dyad.app"
+    "name": "Deyad",
+    "email": "maintainer@deyad.app"
   },
   "license": "MIT",
   "devDependencies": {

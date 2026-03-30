@@ -20,14 +20,14 @@ vi.mock('./codebaseIndexer', () => ({
   embedChunks: vi.fn(async () => {}),
 }));
 
-// ── Fake window.dyad ───────────────────────────────────────────────────────
+// ── Fake window.deyad ───────────────────────────────────────────────────────
 
 let streamTokenCb: ((token: string) => void) | null = null;
 let streamDoneCb: (() => void) | null = null;
 let streamErrorCb: ((err: string) => void) | null = null;
 
 const fakeWindow = {
-  dyad: {
+  deyad: {
     chatStream: vi.fn(async () => {}),
     readFiles: vi.fn(async () => ({})),
     dbDescribe: vi.fn(async () => ({ tables: [] })),
@@ -39,19 +39,19 @@ const fakeWindow = {
 
 Object.defineProperty(globalThis, 'window', { value: fakeWindow, writable: true });
 
-// Re-establish all window.dyad mock implementations (called after resetAllMocks)
+// Re-establish all window.deyad mock implementations (called after resetAllMocks)
 function resetWindowMocks() {
-  fakeWindow.dyad.chatStream.mockImplementation(async () => {});
-  fakeWindow.dyad.readFiles.mockImplementation(async () => ({}));
-  fakeWindow.dyad.dbDescribe.mockImplementation(async () => ({ tables: [] }));
-  fakeWindow.dyad.onStreamToken.mockImplementation((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; });
-  fakeWindow.dyad.onStreamDone.mockImplementation((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
-  fakeWindow.dyad.onStreamError.mockImplementation((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
+  fakeWindow.deyad.chatStream.mockImplementation(async () => {});
+  fakeWindow.deyad.readFiles.mockImplementation(async () => ({}));
+  fakeWindow.deyad.dbDescribe.mockImplementation(async () => ({ tables: [] }));
+  fakeWindow.deyad.onStreamToken.mockImplementation((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; });
+  fakeWindow.deyad.onStreamDone.mockImplementation((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
+  fakeWindow.deyad.onStreamError.mockImplementation((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
 }
 
 // Simulate a streaming turn: emit tokens then call done
 function simulateStream(response: string) {
-  fakeWindow.dyad.chatStream.mockImplementationOnce(async () => {
+  fakeWindow.deyad.chatStream.mockImplementationOnce(async () => {
     await Promise.resolve();
     streamTokenCb?.(response);
     streamDoneCb?.();
@@ -59,7 +59,7 @@ function simulateStream(response: string) {
 }
 
 function simulateStreamError(errorMsg: string) {
-  fakeWindow.dyad.chatStream.mockImplementationOnce(async () => {
+  fakeWindow.deyad.chatStream.mockImplementationOnce(async () => {
     await Promise.resolve();
     streamErrorCb?.(errorMsg);
   });

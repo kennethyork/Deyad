@@ -7,7 +7,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
-import type { DyadSettings } from '../lib/mainUtils';
+import type { DeyadSettings } from '../lib/mainUtils';
 import { getViteRoot } from './ipcApps';
 
 const execFileAsync = promisify(execFile);
@@ -59,14 +59,14 @@ app.whenReady().then(() => {
 
 export function registerSettingsHandlers(
   appDir: (id: string) => string,
-  getSettings: () => DyadSettings,
-  setSettings: (s: DyadSettings) => void,
+  getSettings: () => DeyadSettings,
+  setSettings: (s: DeyadSettings) => void,
 ): void {
   // ── Settings ──────────────────────────────────────────────────────────────
 
   ipcMain.handle('settings:get', () => getSettings());
 
-  ipcMain.handle('settings:set', (_event, settings: Partial<DyadSettings>) => {
+  ipcMain.handle('settings:set', (_event, settings: Partial<DeyadSettings>) => {
     const updated = { ...getSettings(), ...settings };
     setSettings(updated);
     return updated;

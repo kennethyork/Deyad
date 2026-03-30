@@ -5,7 +5,7 @@ import TerminalPanel from './TerminalPanel';
 
 describe('TerminalPanel', () => {
   beforeEach(() => {
-    (window as any).dyad = {
+    (window as any).deyad = {
       createTerminal: vi.fn().mockResolvedValue('term1'),
       terminalWrite: vi.fn(),
       terminalResize: vi.fn(),
@@ -25,6 +25,6 @@ describe('TerminalPanel', () => {
     expect(container.querySelector('.terminal-tab-add')).toBeTruthy();
     // Initial tab should be created
     await Promise.resolve();
-    expect(window.dyad.createTerminal).toHaveBeenCalledWith('foo');
+    expect(window.deyad.createTerminal).toHaveBeenCalledWith('foo');
   });
 });

@@ -5,7 +5,7 @@ import NewAppModal from './NewAppModal';
 
 describe('NewAppModal', () => {
   beforeEach(() => {
-    (window as any).dyad = {
+    (window as any).deyad = {
       checkDocker: vi.fn().mockResolvedValue(true),
       listPlugins: vi.fn().mockResolvedValue([
         {

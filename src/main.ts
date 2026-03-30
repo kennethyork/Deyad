@@ -20,7 +20,7 @@ import {
   saveSettings as saveSettingsUtil,
   DEFAULT_SETTINGS,
 } from './lib/mainUtils';
-import type { DyadSettings } from './lib/mainUtils';
+import type { DeyadSettings } from './lib/mainUtils';
 
 // IPC handler modules (extracted from this file)
 import { registerGitHandlers } from './main/ipcGit';
@@ -42,9 +42,9 @@ try {
 
 if (started) { app.quit(); }
 
-const APPS_DIR = path.join(app.getPath('userData'), 'dyad-apps');
-const SETTINGS_PATH = path.join(app.getPath('userData'), 'dyad-settings.json');
-const SNAPSHOTS_DIR = path.join(app.getPath('userData'), 'dyad-snapshots');
+const APPS_DIR = path.join(app.getPath('userData'), 'deyad-apps');
+const SETTINGS_PATH = path.join(app.getPath('userData'), 'deyad-settings.json');
+const SNAPSHOTS_DIR = path.join(app.getPath('userData'), 'deyad-snapshots');
 
 /** Returns the verified absolute directory for an app. */
 function appDir(appId: string): string {
@@ -53,11 +53,11 @@ function appDir(appId: string): string {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-function loadSettings(): DyadSettings {
+function loadSettings(): DeyadSettings {
   return loadSettingsUtil(SETTINGS_PATH);
 }
 
-function saveSettings(settings: DyadSettings): void {
+function saveSettings(settings: DeyadSettings): void {
   saveSettingsUtil(SETTINGS_PATH, settings);
 }
 
@@ -83,7 +83,7 @@ registerAppHandlers(appDir, APPS_DIR, SNAPSHOTS_DIR);
 registerSettingsHandlers(
   appDir,
   () => currentSettings,
-  (s: DyadSettings) => { currentSettings = s; saveSettings(s); },
+  (s: DeyadSettings) => { currentSettings = s; saveSettings(s); },
 );
 registerGitHandlers(appDir);
 registerCapacitorHandlers(appDir);
@@ -102,25 +102,25 @@ function buildAppMenu(): void {
       submenu: [
         {
           label: 'GitHub Repository',
-          click: () => shell.openExternal('https://github.com/theKennethy/Dyad'),
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad'),
         },
         {
           label: 'Report an Issue',
-          click: () => shell.openExternal('https://github.com/theKennethy/Dyad/issues'),
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/issues'),
         },
         {
           label: 'Releases',
-          click: () => shell.openExternal('https://github.com/theKennethy/Dyad/releases'),
+          click: () => shell.openExternal('https://github.com/theKennethy/Deyad/releases'),
         },
         { type: 'separator' },
         {
-          label: 'About Dyad',
+          label: 'About Deyad',
           click: () => {
             dialog.showMessageBox({
               type: 'info',
-              title: 'About Dyad',
-              message: 'Dyad',
-              detail: 'Local AI app builder powered by Ollama models.\n\nhttps://github.com/theKennethy/Dyad',
+              title: 'About Deyad',
+              message: 'Deyad',
+              detail: 'Local AI app builder powered by Ollama models.\n\nhttps://github.com/theKennethy/Deyad',
             });
           },
         },

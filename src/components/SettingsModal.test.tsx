@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SettingsModal from './SettingsModal';
 
 beforeEach(() => {
-  (window as any).dyad = {
+  (window as any).deyad = {
     getSettings: vi.fn().mockResolvedValue({
       ollamaHost: 'http://localhost:11434',
       defaultModel: 'llama3',
@@ -43,14 +43,14 @@ describe('SettingsModal', () => {
     render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
     await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
     fireEvent.click(screen.getByText('Save Settings'));
-    await waitFor(() => expect(window.dyad.setSettings).toHaveBeenCalled());
+    await waitFor(() => expect(window.deyad.setSettings).toHaveBeenCalled());
   });
 
   it('shows model list from Ollama', async () => {
     render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
     await waitFor(() => {
       // Models should be loaded and available in dropdowns
-      expect(window.dyad.listModels).toHaveBeenCalled();
+      expect(window.deyad.listModels).toHaveBeenCalled();
     });
   });
 

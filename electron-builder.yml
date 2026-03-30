@@ -1,5 +1,5 @@
-appId: com.dyad.app
-productName: Dyad
+appId: com.deyad.app
+productName: Deyad
 directories:
   output: dist
   buildResources: build

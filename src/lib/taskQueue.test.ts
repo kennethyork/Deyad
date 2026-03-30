@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Provide minimal localStorage and window.dyad stubs for the node environment
+// Provide minimal localStorage and window.deyad stubs for the node environment
 const store: Record<string, string> = {};
 if (typeof globalThis.localStorage === 'undefined') {
   Object.defineProperty(globalThis, 'localStorage', {
@@ -25,17 +25,17 @@ import { runAgentLoop } from './agentLoop';
 
 const mockRunAgentLoop = vi.mocked(runAgentLoop);
 
-// Setup window.dyad mock
-function setupDyadMock() {
+// Setup window.deyad mock
+function setupDeyadMock() {
   (globalThis as any).window = (globalThis as any).window || {};
-  (globalThis as any).window.dyad = {
+  (globalThis as any).window.deyad = {
     readFiles: vi.fn().mockResolvedValue({ 'src/App.tsx': 'export default function App() {}' }),
   };
 }
 
 describe('TaskQueue', () => {
   beforeEach(() => {
-    setupDyadMock();
+    setupDeyadMock();
     vi.clearAllMocks();
     // Clear localStorage
     localStorage.clear();

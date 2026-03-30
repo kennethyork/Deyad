@@ -6,7 +6,7 @@ import ChatPanel from './ChatPanel';
 const dummyApp = { id:'a',name:'Test',description:'',createdAt:new Date().toISOString(),appType:'frontend' as const };
 
 beforeEach(()=>{
-  (window as any).dyad={
+  (window as any).deyad={
     getSettings: vi.fn().mockResolvedValue({ollamaHost:'',defaultModel:''}),
     listModels: vi.fn().mockResolvedValue({models:[{name:'m1',modified_at:'',size:0}]}),
     chatStream: vi.fn().mockResolvedValue(undefined),

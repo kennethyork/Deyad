@@ -28,15 +28,15 @@ export default function TerminalPanel({ appId }: Props) {
 
   // global listeners for pty data/exit (shared across all tabs)
   useEffect(() => {
-    const unsubData = window.dyad.onTerminalData(({ id, data }) => {
+    const unsubData = window.deyad.onTerminalData(({ id, data }) => {
       const tab = tabsRef.current.find(t => t.termId === id);
       if (tab) tab.term.write(data);
     });
-    const unsubExit = window.dyad.onTerminalExit(({ id, exitCode }) => {
+    const unsubExit = window.deyad.onTerminalExit(({ id, exitCode }) => {
       const tab = tabsRef.current.find(t => t.termId === id);
       if (tab) tab.term.write(`\r\n\x1b[90mprocess exited (${exitCode})\x1b[0m\r\n`);
     });
-    const removeClear = window.dyad.onTerminalClear(() => {
+    const removeClear = window.deyad.onTerminalClear(() => {
       const tab = tabsRef.current.find(t => t.id === activeIdRef.current);
       if (tab) tab.term.clear();
     });
@@ -65,22 +65,22 @@ export default function TerminalPanel({ appId }: Props) {
     fit.fit();
 
     // start pty
-    const termId = await window.dyad.createTerminal(appId);
+    const termId = await window.deyad.createTerminal(appId);
 
     // forward keystrokes to pty
-    term.onData((d) => window.dyad.terminalWrite(termId, d));
+    term.onData((d) => window.deyad.terminalWrite(termId, d));
 
     // paste shortcut
     term.attachCustomKeyEventHandler((e) => {
       if (e.ctrlKey && e.key === 'v') {
-        navigator.clipboard.readText().then(text => window.dyad.terminalWrite(termId, text));
+        navigator.clipboard.readText().then(text => window.deyad.terminalWrite(termId, text));
         return false;
       }
       return true;
     });
 
     // initial resize
-    window.dyad.terminalResize(termId, term.cols, term.rows);
+    window.deyad.terminalResize(termId, term.cols, term.rows);
 
     tabCounter++;
     const tab: TermTab = {
@@ -117,7 +117,7 @@ export default function TerminalPanel({ appId }: Props) {
         wrapper.style.display = 'block';
         tab.fit.fit();
         tab.term.focus();
-        window.dyad.terminalResize(tab.termId, tab.term.cols, tab.term.rows);
+        window.deyad.terminalResize(tab.termId, tab.term.cols, tab.term.rows);
       } else {
         wrapper.style.display = 'none';
       }
@@ -131,7 +131,7 @@ export default function TerminalPanel({ appId }: Props) {
       const tab = tabsRef.current.find(t => t.id === activeIdRef.current);
       if (tab) {
         tab.fit.fit();
-        window.dyad.terminalResize(tab.termId, tab.term.cols, tab.term.rows);
+        window.deyad.terminalResize(tab.termId, tab.term.cols, tab.term.rows);
       }
     });
     obs.observe(containerRef.current);
@@ -144,7 +144,7 @@ export default function TerminalPanel({ appId }: Props) {
     if (!el) return;
     const handler = (e: MouseEvent) => {
       e.preventDefault();
-      window.dyad.showContextMenu('terminal');
+      window.deyad.showContextMenu('terminal');
     };
     el.addEventListener('contextmenu', handler, { capture: true });
     return () => el.removeEventListener('contextmenu', handler);
@@ -154,7 +154,7 @@ export default function TerminalPanel({ appId }: Props) {
   useEffect(() => {
     return () => {
       for (const tab of tabsRef.current) {
-        window.dyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
+        window.deyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
         tab.term.dispose();
       }
     };
@@ -165,7 +165,7 @@ export default function TerminalPanel({ appId }: Props) {
     const tab = tabsRef.current.find(t => t.id === tabId);
     if (!tab) return;
 
-    window.dyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
+    window.deyad.terminalKill(tab.termId).catch((err) => console.warn('terminalKill:', err));
     tab.term.dispose();
 
     // remove the DOM wrapper

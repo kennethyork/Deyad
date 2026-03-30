@@ -1,6 +1,6 @@
 // Preload — exposes safe IPC bridges to the renderer (contextIsolation: true)
 import { contextBridge, ipcRenderer } from 'electron';
-import type { PluginManifest } from './types/dyad';
+import type { PluginManifest } from './types/deyad';
 
 export interface OllamaModel {
   name: string;
@@ -37,7 +37,7 @@ export interface UiMessage {
   filesGenerated?: string[];
 }
 
-contextBridge.exposeInMainWorld('dyad', {
+contextBridge.exposeInMainWorld('deyad', {
   // ── Ollama ──────────────────────────────────────────────────────────────
   listModels: (): Promise<{ models: OllamaModel[] }> =>
     ipcRenderer.invoke('ollama:list-models'),
