@@ -57,7 +57,7 @@ interface UiMessage {
   model?: string;
 }
 
-interface DeyadSettings {
+interface DyadSettings {
   ollamaHost: string;
   defaultModel: string;
   autocompleteEnabled: boolean;
@@ -91,7 +91,7 @@ export interface PluginManifest {
   // future extension points: models, deployProviders, etc.
 }
 
-interface DeyadAPI {
+interface DyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
   chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }): Promise<void>;
@@ -133,8 +133,8 @@ interface DeyadAPI {
   onDbStatus(cb: (payload: { appId: string; status: string }) => void): () => void;
 
   // Settings
-  getSettings(): Promise<DeyadSettings>;
-  setSettings(settings: Partial<DeyadSettings>): Promise<DeyadSettings>;
+  getSettings(): Promise<DyadSettings>;
+  setSettings(settings: Partial<DyadSettings>): Promise<DyadSettings>;
 
   // Export
   exportApp(appId: string, format?: 'zip' | 'mobile'): Promise<{ success: boolean; error?: string; path?: string }>;
@@ -201,7 +201,7 @@ interface DeyadAPI {
 
 declare global {
   interface Window {
-    deyad: DeyadAPI;
+    dyad: DyadAPI;
   }
 }
 

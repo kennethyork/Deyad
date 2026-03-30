@@ -21,7 +21,7 @@ const sampleFiles: Record<string, string> = {
 };
 
 beforeEach(() => {
-  (window as any).deyad = {
+  (window as any).dyad = {
     openAppFolder: vi.fn(),
     chatAutocomplete: vi.fn().mockResolvedValue(''),
   };

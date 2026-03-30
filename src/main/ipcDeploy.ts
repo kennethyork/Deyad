@@ -51,9 +51,9 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
     let appType = 'frontend';
-    let appName = 'deyad-app';
+    let appName = 'dyad-app';
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       appType = meta.appType || appType;
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
     } catch (err) { console.debug('use defaults:', err); }
@@ -95,7 +95,7 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
         if (fs.existsSync(indexPath) && !fs.existsSync(spaPath)) {
           fs.copyFileSync(indexPath, spaPath);
         }
-        const domain = `deyad-${appId.slice(0, 12)}.surge.sh`;
+        const domain = `dyad-${appId.slice(0, 12)}.surge.sh`;
         const { stdout } = await execFileAsync('npx', ['surge', distDir, domain], { cwd: webDir, timeout: 120_000 });
         url = `https://${domain}`;
         sendLog(stdout);
@@ -114,9 +114,9 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     const dir = appDir(appId);
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
-    let appName = 'deyad-app';
+    let appName = 'dyad-app';
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
     } catch (err) { console.debug('use default:', err); }
 
@@ -213,7 +213,7 @@ CMD ["node", "backend/src/index.js"]
 
     let appType = 'frontend';
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       appType = meta.appType || appType;
     } catch (err) { console.debug('use default:', err); }
 
@@ -310,11 +310,11 @@ CMD ["node", "backend/src/index.js"]
     const dir = appDir(appId);
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
-    let appName = 'deyad-app';
-    let displayName = 'Deyad App';
+    let appName = 'dyad-app';
+    let displayName = 'Dyad App';
     let appType = 'frontend';
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       displayName = meta.name || displayName;
       appName = displayName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
       appType = meta.appType || appType;
@@ -436,11 +436,11 @@ contextBridge.exposeInMainWorld('ollama', {
       const pkgJson = {
         name: appName,
         version: '1.0.0',
-        description: `Desktop app: ${displayName} — built with Deyad`,
+        description: `Desktop app: ${displayName} — built with Dyad`,
         main: 'main.js',
         scripts: { build: 'electron-builder build' },
         build: {
-          appId: `com.deyad.${appName.replace(/-/g, '')}`,
+          appId: `com.dyad.${appName.replace(/-/g, '')}`,
           productName: displayName,
           directories: { output: 'out' },
           files: ['main.js', 'preload.js', 'app/**/*'],

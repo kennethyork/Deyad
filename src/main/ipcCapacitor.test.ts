@@ -22,7 +22,7 @@ beforeEach(() => {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-cap-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dyad-cap-test-'));
 });
 
 afterEach(() => {
@@ -53,7 +53,7 @@ describe('ipcCapacitor handler registration', () => {
 
   it('capacitor-init reports already initialized when capacitor.config.ts exists', async () => {
     // Create required files
-    fs.writeFileSync(path.join(tmpDir, 'deyad.json'), JSON.stringify({ name: 'TestApp', appType: 'frontend' }));
+    fs.writeFileSync(path.join(tmpDir, 'dyad.json'), JSON.stringify({ name: 'TestApp', appType: 'frontend' }));
     fs.writeFileSync(path.join(tmpDir, 'capacitor.config.ts'), 'export default {};');
 
     const { registerCapacitorHandlers } = await import('./ipcCapacitor');

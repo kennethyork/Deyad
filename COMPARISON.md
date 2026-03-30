@@ -1,12 +1,12 @@
-# Deyad vs. Competitors
+# Dyad vs. Competitors
 
-A detailed comparison of Deyad against the leading AI app builders (as of March 2026).
+A detailed comparison of Dyad against the leading AI app builders (as of March 2026).
 
 ---
 
 ## Feature Matrix
 
-| Feature | **Deyad** | **Dyad** | **Bolt.new** | **Lovable** | **Cursor** | **Windsurf** | **Replit** | **v0** |
+| Feature | **Dyad** | **Dyad (Cloud)** | **Bolt.new** | **Lovable** | **Cursor** | **Windsurf** | **Replit** | **v0** |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Pricing** | Free forever | Freemium ($20–$79/mo) | Freemium ($20+/mo) | Freemium ($20+/mo) | $20/mo | $15/mo | Freemium ($25+/mo) | Freemium ($20+/mo) |
 | **Runs locally** | ✅ | ✅ | ❌ cloud | ❌ cloud | ✅ | ✅ | ❌ cloud | ❌ cloud |
@@ -34,32 +34,32 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 
 ---
 
-## Where Deyad Wins
+## Where Dyad Wins
 
-1. **100% free, 100% local** — no subscriptions, no token limits, no cloud dependency. You own everything. Dyad is also local but charges $20–$79/mo for Pro features.
-2. **7 deploy targets** — nobody else offers VPS+SSL, desktop export, AND mobile (Capacitor) in one tool. Dyad only ships to GitHub + Vercel.
-3. **Full database GUI** — pgAdmin embedded. Dyad uses Supabase (cloud-hosted DB). Bolt/Cursor/Windsurf/v0 have nothing comparable.
-4. **True model freedom** — swap between Llama, Mistral, DeepSeek, Qwen, CodeGemma, etc. via Ollama with zero API cost. Dyad requires cloud API keys (OpenAI, Anthropic, etc.) which cost money per token.
-5. **Desktop + mobile export** — unique. No competitor — including Dyad — can produce an AppImage/exe/DMG or Capacitor mobile app.
-6. **Privacy** — your code and prompts never leave your machine. Dyad runs locally but still sends prompts to cloud APIs.
-7. **Offline-first** — works without internet after initial setup. Dyad requires internet for its API-key-based models.
-8. **Full PTY terminal** — multi-tab terminal with full shell access. Dyad has no terminal.
-9. **MIT license** — truly open source. Dyad is source-available with a non-competing restriction.
+1. **100% free, 100% local** — no subscriptions, no token limits, no cloud dependency. You own everything. Dyad (Cloud) is also local but charges $20–$79/mo for Pro features.
+2. **7 deploy targets** — nobody else offers VPS+SSL, desktop export, AND mobile (Capacitor) in one tool. Dyad (Cloud) only ships to GitHub + Vercel.
+3. **Full database GUI** — pgAdmin embedded. Dyad (Cloud) uses Supabase (cloud-hosted DB). Bolt/Cursor/Windsurf/v0 have nothing comparable.
+4. **True model freedom** — swap between Llama, Mistral, DeepSeek, Qwen, CodeGemma, etc. via Ollama with zero API cost. Dyad (Cloud) requires cloud API keys (OpenAI, Anthropic, etc.) which cost money per token.
+5. **Desktop + mobile export** — unique. No competitor — including Dyad (Cloud) — can produce an AppImage/exe/DMG or Capacitor mobile app.
+6. **Privacy** — your code and prompts never leave your machine. Dyad (Cloud) runs locally but still sends prompts to cloud APIs.
+7. **Offline-first** — works without internet after initial setup. Dyad (Cloud) requires internet for its API-key-based models.
+8. **Full PTY terminal** — multi-tab terminal with full shell access. Dyad (Cloud) has no terminal.
+9. **MIT license** — truly open source. Dyad (Cloud) is source-available with a non-competing restriction.
 
 ## Where Competitors Win
 
-1. **AI model quality** — Bolt/Lovable/Cursor/Dyad use Claude 3.5/4 and GPT-4o directly. Cloud models produce better code than most local models (unless you run 70B+ on a beefy GPU).
-2. **Zero setup** — Bolt/Lovable/v0 work in a browser tab. Deyad needs Electron + Ollama + Docker installed.
-3. **Collaboration** — Replit has real-time multiplayer editing. Deyad is single-user.
-4. **Ecosystem polish** — Cursor/Windsurf have years of VC funding, large teams, and extension marketplaces. Dyad has 20k GitHub stars and a large community.
-5. **Managed hosting** — Replit and Bolt bundle cloud hosting. Deyad deploys to external providers.
-6. **MCP extensibility** — Dyad supports MCP servers for tool extensibility. Deyad has a plugin system but not MCP.
-7. **Security scanning** — Dyad has built-in security review. Deyad relies on manual review.
-8. **Voice input** — Dyad supports speech-to-text prompting. Deyad is keyboard-only.
+1. **AI model quality** — Bolt/Lovable/Cursor/Dyad (Cloud) use Claude 3.5/4 and GPT-4o directly. Cloud models produce better code than most local models (unless you run 70B+ on a beefy GPU).
+2. **Zero setup** — Bolt/Lovable/v0 work in a browser tab. Dyad needs Electron + Ollama + Docker installed.
+3. **Collaboration** — Replit has real-time multiplayer editing. Dyad is single-user.
+4. **Ecosystem polish** — Cursor/Windsurf have years of VC funding, large teams, and extension marketplaces. Dyad (Cloud) has 20k GitHub stars and a large community.
+5. **Managed hosting** — Replit and Bolt bundle cloud hosting. Dyad deploys to external providers.
+6. **MCP extensibility** — Dyad (Cloud) supports MCP servers for tool extensibility. Dyad has a plugin system but not MCP.
+7. **Security scanning** — Dyad (Cloud) has built-in security review. Dyad relies on manual review.
+8. **Voice input** — Dyad (Cloud) supports speech-to-text prompting. Dyad is keyboard-only.
 
 ---
 
-## Who Should Use Deyad
+## Who Should Use Dyad
 
 - Developers who want **full control** over their AI tooling and data
 - Teams working on **proprietary or sensitive** projects that can't touch cloud APIs
@@ -70,11 +70,11 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 
 ---
 
-## Deyad vs. Dyad — Head-to-Head
+## Dyad vs. Dyad (Cloud) — Head-to-Head
 
-Dyad is the closest competitor to Deyad — both are local, open-source Electron app builders. Key differences:
+Dyad (Cloud) is the closest competitor to Dyad — both are local, open-source Electron app builders. Key differences:
 
-| | **Deyad** | **Dyad** |
+| | **Dyad** | **Dyad (Cloud)** |
 | --- | --- | --- |
 | Price | Free forever | Free tier + $20–$79/mo Pro |
 | AI models | Ollama (free, local, offline) | Cloud API keys (paid per token) |
@@ -94,8 +94,8 @@ Dyad is the closest competitor to Deyad — both are local, open-source Electron
 
 ## Summary
 
-Deyad trades cloud model quality for **sovereignty, privacy, and zero cost**. Every other tool in this space — including Dyad — requires you to send your prompts to someone else's API and pay for the privilege. Deyad doesn't.
+Dyad trades cloud model quality for **sovereignty, privacy, and zero cost**. Every other tool in this space — including Dyad (Cloud) — requires you to send your prompts to someone else's API and pay for the privilege. Dyad doesn't.
 
-Dyad is the most similar competitor, but it depends on cloud API keys, charges for Pro features, and has a restrictive license. Deyad is fully free, fully offline, and truly MIT open source.
+Dyad (Cloud) is the most similar competitor, but it depends on cloud API keys, charges for Pro features, and has a restrictive license. Dyad is fully free, fully offline, and truly MIT open source.
 
-For a solo-developer open-source project, Deyad competes credibly on features with VC-backed tools — and wins outright on privacy, price, and deployment flexibility.
+For a solo-developer open-source project, Dyad competes credibly on features with VC-backed tools — and wins outright on privacy, price, and deployment flexibility.

@@ -21,7 +21,7 @@ export function appDir(appsDir: string, appId: string): string {
 
 // ── Settings utility ──────────────────────────────────────────────────────────
 
-export interface DeyadSettings {
+export interface DyadSettings {
   ollamaHost: string;
   defaultModel: string;
   autocompleteEnabled: boolean;
@@ -34,7 +34,7 @@ export interface DeyadSettings {
   repeatPenalty: number;
 }
 
-export const DEFAULT_SETTINGS: DeyadSettings = {
+export const DEFAULT_SETTINGS: DyadSettings = {
   ollamaHost: 'http://localhost:11434',
   defaultModel: '',
   autocompleteEnabled: false,
@@ -47,7 +47,7 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   repeatPenalty: 1.1,
 };
 
-export function loadSettings(settingsPath: string): DeyadSettings {
+export function loadSettings(settingsPath: string): DyadSettings {
   try {
     if (fs.existsSync(settingsPath)) {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) };
@@ -56,7 +56,7 @@ export function loadSettings(settingsPath: string): DeyadSettings {
   return { ...DEFAULT_SETTINGS };
 }
 
-export function saveSettings(settingsPath: string, settings: DeyadSettings): void {
+export function saveSettings(settingsPath: string, settings: DyadSettings): void {
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 }
 

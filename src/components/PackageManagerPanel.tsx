@@ -16,7 +16,7 @@ export default function PackageManagerPanel({ appId }: Props) {
 
   const loadDeps = useCallback(async () => {
     try {
-      const result = await window.deyad.npmList(appId);
+      const result = await window.dyad.npmList(appId);
       setDeps(result.dependencies || {});
       setDevDeps(result.devDependencies || {});
     } catch (err) { console.debug('ignore:', err); }
@@ -29,7 +29,7 @@ export default function PackageManagerPanel({ appId }: Props) {
     if (!name || installing) return;
     setInstalling(true);
     setStatus(`Installing ${name}…`);
-    const result = await window.deyad.npmInstall(appId, name, isDev);
+    const result = await window.dyad.npmInstall(appId, name, isDev);
     if (result.success) {
       setStatus(`✓ Installed ${name}`);
       setInstallName('');
@@ -50,7 +50,7 @@ export default function PackageManagerPanel({ appId }: Props) {
     if (!name) return;
     setConfirmTarget(null);
     setStatus(`Removing ${name}…`);
-    const result = await window.deyad.npmUninstall(appId, name);
+    const result = await window.dyad.npmUninstall(appId, name);
     if (result.success) {
       setStatus(`✓ Removed ${name}`);
       loadDeps();

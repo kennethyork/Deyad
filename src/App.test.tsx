@@ -29,8 +29,8 @@ describe('App component', () => {
   beforeEach(() => {
     // clear any persisted widths
     localStorage.clear();
-    // provide a minimal deyad API stub to avoid undefined errors
-    (window as any).deyad = {
+    // provide a minimal dyad API stub to avoid undefined errors
+    (window as any).dyad = {
       listApps: vi.fn().mockResolvedValue([]),
       createApp: vi.fn(),
       readFiles: vi.fn().mockResolvedValue({}),
@@ -117,7 +117,7 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).dyad.listApps = vi.fn().mockResolvedValue([app]);
 
     const { container } = render(<App />);
 
@@ -142,8 +142,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'fullstack' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [{ name: 'Things', columns: ['a','b'] }] });
+    (window as any).dyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).dyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [{ name: 'Things', columns: ['a','b'] }] });
 
     const { container } = render(<App />);
     await screen.findByText('DB Test App');
@@ -167,8 +167,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/mobile' });
+    (window as any).dyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).dyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/mobile' });
 
     render(<App />);
     // wait for sidebar entry to appear
@@ -179,7 +179,7 @@ describe('App component', () => {
     // ConfirmDialog appears – click "Mobile/PWA" to export as mobile
     const mobileBtn = await screen.findByText('Mobile/PWA');
     fireEvent.click(mobileBtn);
-    await waitFor(() => expect(window.deyad.exportApp).toHaveBeenCalledWith('exp-app', 'mobile'));
+    await waitFor(() => expect(window.dyad.exportApp).toHaveBeenCalledWith('exp-app', 'mobile'));
   });
 
   it('exports as zip when ZIP is chosen in dialog', async () => {
@@ -190,8 +190,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/zip' });
+    (window as any).dyad.listApps = vi.fn().mockResolvedValue([app]);
+    (window as any).dyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/zip' });
 
     render(<App />);
     await screen.findByText('Export Test 2');
@@ -200,6 +200,6 @@ describe('App component', () => {
     // ConfirmDialog appears – click "ZIP" to export as zip
     const zipBtn = await screen.findByText('ZIP');
     fireEvent.click(zipBtn);
-    await waitFor(() => expect(window.deyad.exportApp).toHaveBeenCalledWith('exp-app2', 'zip'));
+    await waitFor(() => expect(window.dyad.exportApp).toHaveBeenCalledWith('exp-app2', 'zip'));
   });
 });

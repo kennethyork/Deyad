@@ -33,7 +33,7 @@ export default function DatabasePanel({ app, dbStatus, onDbToggle }: Props) {
     if (dbStatus !== 'running') { setPortReady(false); return; }
     let cancelled = false;
     const check = () => {
-      window.deyad.portCheck(guiPort)
+      window.dyad.portCheck(guiPort)
         .then((open) => {
           if (cancelled) return;
           if (open) setPortReady(true);
@@ -50,7 +50,7 @@ export default function DatabasePanel({ app, dbStatus, onDbToggle }: Props) {
   useEffect(() => {
     if (app.appType !== 'fullstack') return;
     setLoading(true);
-    window.deyad.dbDescribe(app.id)
+    window.dyad.dbDescribe(app.id)
       .then((res) => setTables(res.tables))
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
       .finally(() => setLoading(false));

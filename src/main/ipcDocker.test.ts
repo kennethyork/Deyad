@@ -39,7 +39,7 @@ beforeEach(() => {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-docker-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dyad-docker-test-'));
 });
 
 afterEach(() => {
@@ -152,7 +152,7 @@ model Post {
     fs.mkdirSync(path.join(backendDir, 'prisma'), { recursive: true });
     fs.mkdirSync(path.join(backendDir, 'node_modules', 'prisma'), { recursive: true });
     fs.writeFileSync(path.join(backendDir, 'prisma', 'schema.prisma'), 'model X { id Int @id }');
-    fs.writeFileSync(path.join(tmpDir, 'deyad.json'), JSON.stringify({ guiPort: 5555 }));
+    fs.writeFileSync(path.join(tmpDir, 'dyad.json'), JSON.stringify({ guiPort: 5555 }));
 
     const { registerDockerHandlers } = await import('./ipcDocker');
     registerDockerHandlers((_id: string) => tmpDir);

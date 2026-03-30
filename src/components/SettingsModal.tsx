@@ -25,7 +25,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   }, []);
 
   const loadSettings = async () => {
-    const settings = await window.deyad.getSettings();
+    const settings = await window.dyad.getSettings();
     setOllamaHost(settings.ollamaHost);
     setDefaultModel(settings.defaultModel);
     setAutocompleteEnabled(settings.autocompleteEnabled ?? false);
@@ -39,7 +39,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
 
   const loadModels = async () => {
     try {
-      const { models: list } = await window.deyad.listModels();
+      const { models: list } = await window.dyad.listModels();
       setModels(list.map((m) => m.name));
     } catch (err) { console.debug('not available:', err); }
   };
@@ -47,7 +47,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-    await window.deyad.setSettings({
+    await window.dyad.setSettings({
       ollamaHost: ollamaHost.trim(),
       defaultModel,
       autocompleteEnabled,
@@ -67,10 +67,10 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const handleTest = async () => {
     setTestResult('testing');
     try {
-      await window.deyad.setSettings({
+      await window.dyad.setSettings({
         ollamaHost: ollamaHost.trim(),
       });
-      const { models: list } = await window.deyad.listModels();
+      const { models: list } = await window.dyad.listModels();
       setModels(list.map((m) => m.name));
       setTestResult('success');
     } catch (err) {

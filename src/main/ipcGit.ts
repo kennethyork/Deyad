@@ -10,11 +10,11 @@ import { execFile } from 'node:child_process';
 
 const execFileAsync = promisify(execFile);
 
-const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndeyad-messages.json\n';
+const DEFAULT_GITIGNORE = 'node_modules/\ndist/\n.env\n*.log\ndyad-messages.json\n';
 
 // Fallback identity used for automated tool commits (overridden by global git config when present)
-const GIT_USER_NAME = 'Deyad';
-const GIT_USER_EMAIL = 'deyad@localhost';
+const GIT_USER_NAME = 'Dyad';
+const GIT_USER_EMAIL = 'dyad@localhost';
 
 export async function gitInit(appDir: (id: string) => string, appId: string): Promise<void> {
   const dir = appDir(appId);

@@ -35,7 +35,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
 
   const loadHistory = async () => {
     try {
-      const log = await window.deyad.gitLog(appId);
+      const log = await window.dyad.gitLog(appId);
       setCommits(log);
     } catch (err) { console.debug('Handled error:', err); setCommits([]); }
   };
@@ -46,7 +46,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     setFileContent(null);
     setLoading(true);
     try {
-      const files = await window.deyad.gitDiffStat(appId, commit.hash);
+      const files = await window.dyad.gitDiffStat(appId, commit.hash);
       setChangedFiles(files);
     } catch (err) { console.debug('Handled error:', err); setChangedFiles([]); }
     setLoading(false);
@@ -57,7 +57,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     setViewingFile(filePath);
     setLoading(true);
     try {
-      const content = await window.deyad.gitShow(appId, selectedCommit.hash, filePath);
+      const content = await window.dyad.gitShow(appId, selectedCommit.hash, filePath);
       setFileContent(content);
     } catch (err) { console.debug('Handled error:', err); setFileContent(null); }
     setLoading(false);
@@ -73,7 +73,7 @@ export default function VersionHistoryPanel({ appId, onClose, onRestore }: Props
     setConfirmOpen(false);
     setRestoring(true);
     try {
-      const result = await window.deyad.gitCheckout(appId, selectedCommit.hash);
+      const result = await window.dyad.gitCheckout(appId, selectedCommit.hash);
       if (result.success) {
         onRestore();
         onClose();

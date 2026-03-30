@@ -6,12 +6,12 @@ describe('isElectronApp', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns true when window.deyad is defined', () => {
-    vi.stubGlobal('window', { deyad: {} });
+  it('returns true when window.dyad is defined', () => {
+    vi.stubGlobal('window', { dyad: {} });
     expect(isElectronApp()).toBe(true);
   });
 
-  it('returns false when window.deyad is undefined', () => {
+  it('returns false when window.dyad is undefined', () => {
     vi.stubGlobal('window', {});
     expect(isElectronApp()).toBe(false);
   });

@@ -7,7 +7,7 @@
  *   <param name="key">value</param>
  *   </tool_call>
  *
- * This module parses those calls and executes them against the Deyad IPC API.
+ * This module parses those calls and executes them against the Dyad IPC API.
  */
 
 export interface ToolCall {
@@ -66,7 +66,7 @@ export async function executeTool(
   try {
     switch (call.name) {
       case 'list_files': {
-        const files = await window.deyad.readFiles(appId);
+        const files = await window.dyad.readFiles(appId);
         const paths = Object.keys(files).sort();
         return { tool: call.name, success: true, output: paths.join('\n') || '(no files)' };
       }
@@ -74,7 +74,7 @@ export async function executeTool(
       case 'read_file': {
         const filePath = call.params.path;
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
-        const files = await window.deyad.readFiles(appId);
+        const files = await window.dyad.readFiles(appId);
         const content = files[filePath];
         if (content === undefined) {
           return { tool: call.name, success: false, output: `File not found: ${filePath}` };
@@ -98,7 +98,7 @@ export async function executeTool(
         if (Object.keys(fileMap).length === 0) {
           return { tool: call.name, success: false, output: 'No files specified.' };
         }
-        await window.deyad.writeFiles(appId, fileMap);
+        await window.dyad.writeFiles(appId, fileMap);
         return {
           tool: call.name,
           success: true,
@@ -115,7 +115,7 @@ export async function executeTool(
       case 'search_files': {
         const query = call.params.query;
         if (!query) return { tool: call.name, success: false, output: 'Missing "query" parameter.' };
-        const files = await window.deyad.readFiles(appId);
+        const files = await window.dyad.readFiles(appId);
         const lowerQ = query.toLowerCase();
         const matches: string[] = [];
         for (const [path, content] of Object.entries(files)) {
@@ -131,7 +131,7 @@ export async function executeTool(
       }
 
       case 'db_schema': {
-        const schema = await window.deyad.dbDescribe(appId);
+        const schema = await window.dyad.dbDescribe(appId);
         if (schema.tables.length === 0) {
           return { tool: call.name, success: true, output: 'No tables found (schema may be empty or DB not running).' };
         }
@@ -147,34 +147,34 @@ export async function executeTool(
 
       case 'git_commit': {
         const msg = call.params.message || 'Update files';
-        const res = await window.deyad.gitCommitAgent(appId, msg);
+        const res = await window.dyad.gitCommitAgent(appId, msg);
         return { tool: call.name, success: res.success, output: res.output || res.error || 'Committed.' };
       }
 
       case 'git_remote_set': {
         const url = call.params.url;
         if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
-        const res = await window.deyad.gitRemoteSet(appId, url);
+        const res = await window.dyad.gitRemoteSet(appId, url);
         return { tool: call.name, success: res.success, output: res.success ? `Remote origin set to ${url}` : `Failed: ${res.error}` };
       }
 
       case 'git_remote_get': {
-        const remote = await window.deyad.gitRemoteGet(appId);
+        const remote = await window.dyad.gitRemoteGet(appId);
         return { tool: call.name, success: true, output: remote || 'No remote configured.' };
       }
 
       case 'git_push': {
-        const res = await window.deyad.gitPush(appId);
+        const res = await window.dyad.gitPush(appId);
         return { tool: call.name, success: res.success, output: res.success ? 'Pushed successfully.' : `Push failed: ${res.error}` };
       }
 
       case 'git_pull': {
-        const res = await window.deyad.gitPull(appId);
+        const res = await window.dyad.gitPull(appId);
         return { tool: call.name, success: res.success, output: res.success ? 'Pulled successfully.' : `Pull failed: ${res.error}` };
       }
 
       case 'git_branch': {
-        const info = await window.deyad.gitBranch(appId);
+        const info = await window.dyad.gitBranch(appId);
         const list = info.branches.map(b => b === info.current ? `* ${b}` : `  ${b}`).join('\n');
         return { tool: call.name, success: true, output: `Current: ${info.current}\n${list}` };
       }
@@ -182,19 +182,19 @@ export async function executeTool(
       case 'git_branch_create': {
         const name = call.params.name;
         if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
-        const res = await window.deyad.gitBranchCreate(appId, name);
+        const res = await window.dyad.gitBranchCreate(appId, name);
         return { tool: call.name, success: res.success, output: res.success ? `Created and switched to branch ${name}` : `Failed: ${res.error}` };
       }
 
       case 'git_branch_switch': {
         const name = call.params.name;
         if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
-        const res = await window.deyad.gitBranchSwitch(appId, name);
+        const res = await window.dyad.gitBranchSwitch(appId, name);
         return { tool: call.name, success: res.success, output: res.success ? `Switched to branch ${name}` : `Failed: ${res.error}` };
       }
 
       case 'git_log': {
-        const entries = await window.deyad.gitLog(appId);
+        const entries = await window.dyad.gitLog(appId);
         if (entries.length === 0) return { tool: call.name, success: true, output: 'No commits yet.' };
         const log = entries.slice(0, 10).map(e => `${e.hash.slice(0, 7)} ${e.message} (${e.date})`).join('\n');
         return { tool: call.name, success: true, output: log };
@@ -208,7 +208,7 @@ export async function executeTool(
         if (oldStr === undefined) return { tool: call.name, success: false, output: 'Missing "old_string" parameter.' };
         if (newStr === undefined) return { tool: call.name, success: false, output: 'Missing "new_string" parameter.' };
 
-        const files = await window.deyad.readFiles(appId);
+        const files = await window.dyad.readFiles(appId);
         const content = files[filePath];
         if (content === undefined) {
           return { tool: call.name, success: false, output: `File not found: ${filePath}` };
@@ -221,7 +221,7 @@ export async function executeTool(
           return { tool: call.name, success: false, output: `old_string found ${occurrences} times in ${filePath}. It must match exactly once. Add more context to make it unique.` };
         }
         const updated = content.replace(oldStr, newStr);
-        await window.deyad.writeFiles(appId, { [filePath]: updated });
+        await window.dyad.writeFiles(appId, { [filePath]: updated });
         return { tool: call.name, success: true, output: `Edited ${filePath} (replaced 1 occurrence).` };
       }
 
@@ -229,7 +229,7 @@ export async function executeTool(
         const filePath = call.params.path;
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
         try {
-          await window.deyad.deleteFiles(appId, [filePath]);
+          await window.dyad.deleteFiles(appId, [filePath]);
           return { tool: call.name, success: true, output: `Deleted ${filePath}` };
         } catch (err) {
           return { tool: call.name, success: false, output: `Failed to delete ${filePath}: ${err instanceof Error ? err.message : String(err)}` };
@@ -245,7 +245,7 @@ export async function executeTool(
         }
         try {
           const resp = await fetch(url, {
-            headers: { 'User-Agent': 'Deyad-Agent/1.0' },
+            headers: { 'User-Agent': 'Dyad-Agent/1.0' },
             signal: AbortSignal.timeout(15000),
           });
           if (!resp.ok) {
@@ -275,7 +275,7 @@ export async function executeTool(
         const isDev = call.params.dev === 'true';
         const manager = call.params.manager || 'npm'; // npm | pip | go
         if (manager === 'npm') {
-          const result = await window.deyad.npmInstall(appId, pkg, isDev);
+          const result = await window.dyad.npmInstall(appId, pkg, isDev);
           return { tool: call.name, success: result.success, output: result.success ? `Installed ${pkg}${isDev ? ' (dev)' : ''} via npm` : `Failed: ${result.error}` };
         }
         // pip / go fallback via run_command
@@ -300,7 +300,7 @@ export async function executeTool(
           return { tool: call.name, success: false, output: 'No edits specified. Use edit_0_path, edit_0_old_string, edit_0_new_string, ...' };
         }
 
-        const files = await window.deyad.readFiles(appId);
+        const files = await window.dyad.readFiles(appId);
         const writeMap: Record<string, string> = {};
         const results: string[] = [];
         let hasError = false;
@@ -331,7 +331,7 @@ export async function executeTool(
 
         // Write all modified files at once
         if (Object.keys(writeMap).length > 0) {
-          await window.deyad.writeFiles(appId, writeMap);
+          await window.dyad.writeFiles(appId, writeMap);
         }
 
         const editedCount = results.filter((r) => r.includes(': OK')).length;
@@ -362,14 +362,14 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
   return new Promise(async (resolve) => {
     let output = '';
     let done = false;
-    const termId = await window.deyad.createTerminal(appId);
+    const termId = await window.dyad.createTerminal(appId);
     const timeout = setTimeout(() => finish(), 30_000);
 
-    const unsubData = window.deyad.onTerminalData(({ id, data }) => {
+    const unsubData = window.dyad.onTerminalData(({ id, data }) => {
       if (id === termId) output += data;
     });
 
-    const unsubExit = window.deyad.onTerminalExit(({ id }) => {
+    const unsubExit = window.dyad.onTerminalExit(({ id }) => {
       if (id === termId) finish();
     });
 
@@ -383,7 +383,7 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
       if (checkInterval) clearInterval(checkInterval);
       unsubData();
       unsubExit();
-      window.deyad.terminalKill(termId).catch((err) => console.warn('terminalKill:', err));
+      window.dyad.terminalKill(termId).catch((err) => console.warn('terminalKill:', err));
       // Strip ANSI escape codes for cleaner output
       const cleaned = output.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim();
       // Truncate to avoid blowing up context
@@ -393,7 +393,7 @@ async function executeCommand(appId: string, command: string): Promise<ToolResul
 
     // Write the command + Enter, then a sentinel so we know when it finishes
     const sentinel = `__DEYAD_DONE_${Date.now()}__`;
-    await window.deyad.terminalWrite(termId, `${command} ; echo "${sentinel}"\n`);
+    await window.dyad.terminalWrite(termId, `${command} ; echo "${sentinel}"\n`);
 
     // Watch for sentinel in output
     checkInterval = setInterval(() => {

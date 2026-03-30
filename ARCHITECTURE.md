@@ -1,4 +1,4 @@
-# Deyad Architecture
+# Dyad Architecture
 
 Local-first AI app builder powered by Ollama. Ships as a cross-platform Electron desktop app.
 
@@ -21,7 +21,7 @@ Local-first AI app builder powered by Ollama. Ships as a cross-platform Electron
         ┌────────────────┼────────────────┐
         ▼                ▼                ▼
    File System      Ollama API      SQLite / DB
-   (deyad-apps/)   (localhost:11434)  (Prisma)
+   (dyad-apps/)   (localhost:11434)  (Prisma)
 ```
 
 ## Process Model
@@ -29,7 +29,7 @@ Local-first AI app builder powered by Ollama. Ships as a cross-platform Electron
 | Process | Entry | Role |
 | --------- | ------- | ------ |
 | **Main** | `src/main.ts` | Electron main process — window management, IPC hub, file I/O, child processes |
-| **Preload** | `src/preload.ts` | Secure bridge — exposes `window.deyad` API via `contextBridge` |
+| **Preload** | `src/preload.ts` | Secure bridge — exposes `window.dyad` API via `contextBridge` |
 | **Renderer** | `src/renderer.tsx` | React SPA — all UI components, agent chat, editor |
 
 ## Directory Structure
@@ -73,7 +73,7 @@ src/
 │   ├── electronCheck.ts     # Environment detection
 │   └── mainUtils.ts         # Settings I/O, path validation
 └── types/
-    └── deyad.d.ts       # Shared TypeScript interfaces
+    └── dyad.d.ts       # Shared TypeScript interfaces
 ```
 
 ## Security Model
@@ -81,7 +81,7 @@ src/
 - **Context isolation**: `contextIsolation: true` — renderer cannot access Node.js
 - **No node integration**: `nodeIntegration: false`
 - **Sandbox**: `sandbox: true` — renderer runs in Chromium sandbox
-- **Preload bridge**: All IPC goes through a typed `contextBridge` API (`window.deyad`)
+- **Preload bridge**: All IPC goes through a typed `contextBridge` API (`window.dyad`)
 - **Path validation**: All app file paths are validated against `APPS_DIR` to prevent traversal
 - **No shell injection**: Zero `shell: true` usage — all commands use array-form spawn
 - **CSP scoped**: Content-Security-Policy header stripping restricted to `localhost` origins only

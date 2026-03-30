@@ -9,7 +9,7 @@ const mockCommits = [
 ];
 
 beforeEach(() => {
-  (window as any).deyad = {
+  (window as any).dyad = {
     gitLog: vi.fn().mockResolvedValue(mockCommits),
     gitDiffStat: vi.fn().mockResolvedValue([
       { status: 'M', path: 'src/App.tsx' },
@@ -37,7 +37,7 @@ describe('VersionHistoryPanel', () => {
   it('calls gitLog on mount', async () => {
     render(<VersionHistoryPanel appId="app1" onClose={() => {}} onRestore={() => {}} />);
     await waitFor(() => {
-      expect(window.deyad.gitLog).toHaveBeenCalledWith('app1');
+      expect(window.dyad.gitLog).toHaveBeenCalledWith('app1');
     });
   });
 
@@ -46,7 +46,7 @@ describe('VersionHistoryPanel', () => {
     await waitFor(() => expect(screen.getByText('Add feature X')).toBeTruthy());
     fireEvent.click(screen.getByText('Add feature X'));
     await waitFor(() => {
-      expect(window.deyad.gitDiffStat).toHaveBeenCalledWith('app1', 'abc123');
+      expect(window.dyad.gitDiffStat).toHaveBeenCalledWith('app1', 'abc123');
       expect(screen.getByText('src/App.tsx')).toBeTruthy();
     });
   });
@@ -62,12 +62,12 @@ describe('VersionHistoryPanel', () => {
   });
 
   it('handles empty commit history', async () => {
-    (window as any).deyad.gitLog = vi.fn().mockResolvedValue([]);
+    (window as any).dyad.gitLog = vi.fn().mockResolvedValue([]);
     const { container } = render(
       <VersionHistoryPanel appId="app1" onClose={() => {}} onRestore={() => {}} />,
     );
     await waitFor(() => {
-      expect(window.deyad.gitLog).toHaveBeenCalled();
+      expect(window.dyad.gitLog).toHaveBeenCalled();
     });
     // Should render without crashing
     expect(container.innerHTML).toBeTruthy();

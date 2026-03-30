@@ -23,7 +23,7 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
     setChecking(true);
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const res = await window.deyad.listModels();
+        const res = await window.dyad.listModels();
         setModels(res.models ?? []);
         setOllamaOk(true);
         if (res.models?.length) {
@@ -51,7 +51,7 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
 
   const handleSelectModel = async () => {
     if (selectedModel) {
-      await window.deyad.setSettings({ defaultModel: selectedModel });
+      await window.dyad.setSettings({ defaultModel: selectedModel });
     }
     setStep('ready');
   };
@@ -84,10 +84,10 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
         {step === 'welcome' && (
           <div className="wizard-step">
             <div className="wizard-icon">&#x1F3D7;&#xFE0F;</div>
-            <h2>Welcome to Deyad</h2>
+            <h2>Welcome to Dyad</h2>
             <p>Build full-stack apps with local AI — powered by Ollama.</p>
             <p className="wizard-detail">
-              Your code stays on your machine. No API keys needed. Just describe what you want to build, and Deyad generates it.
+              Your code stays on your machine. No API keys needed. Just describe what you want to build, and Dyad generates it.
             </p>
             <div className="wizard-actions">
               <button className="btn-primary" onClick={() => setStep('ollama')}>
@@ -105,7 +105,7 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
           <div className="wizard-step">
             <div className="wizard-icon">&#x1F50C;</div>
             <h2>Connect to Ollama</h2>
-            <p>Deyad uses Ollama to run AI models locally on your machine.</p>
+            <p>Dyad uses Ollama to run AI models locally on your machine.</p>
 
             {checking && (
               <div className="wizard-status checking">
@@ -152,7 +152,7 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
           <div className="wizard-step">
             <div className="wizard-icon">&#x1F9E0;</div>
             <h2>Choose a Model</h2>
-            <p>Select the default model Deyad will use for code generation.</p>
+            <p>Select the default model Dyad will use for code generation.</p>
 
             {models.length > 0 ? (
               <div className="wizard-model-list">
@@ -197,7 +197,7 @@ export default function WelcomeWizard({ onComplete, onCreateApp }: Props) {
             <div className="wizard-icon">&#x1F680;</div>
             <h2>You&apos;re All Set!</h2>
             <p>
-              Deyad is ready to go. Create your first app and start building with AI.
+              Dyad is ready to go. Create your first app and start building with AI.
             </p>
             <ul className="wizard-tips">
               <li>Describe what you want to build in the chat</li>

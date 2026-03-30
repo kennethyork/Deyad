@@ -55,7 +55,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
 
   useEffect(() => {
     checkCLIs();
-    const unsub = window.deyad.onDeployLog(({ appId: id, data }) => {
+    const unsub = window.dyad.onDeployLog(({ appId: id, data }) => {
       if (id === appId) {
         setLogs((prev) => prev + data);
       }
@@ -71,7 +71,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
 
   const checkCLIs = async () => {
     setChecking(true);
-    const checks = await window.deyad.deployCheck();
+    const checks = await window.dyad.deployCheck();
     setAvailable(checks);
     setChecking(false);
   };
@@ -90,8 +90,8 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
     const isFullstackDeploy = selected === 'railway' || selected === 'flyio';
 
     const res = isFullstackDeploy
-      ? await window.deyad.deployFullstack(appId, selected as FullstackProvider)
-      : await window.deyad.deploy(appId, selected as FrontendProvider);
+      ? await window.dyad.deployFullstack(appId, selected as FullstackProvider)
+      : await window.dyad.deploy(appId, selected as FrontendProvider);
 
     setResult(res);
     setDeploying(false);
@@ -180,7 +180,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                 onClick={async () => {
                   setMobileWorking(true);
                   setMobileStatus(null);
-                  const res = await window.deyad.capacitorInit(appId);
+                  const res = await window.dyad.capacitorInit(appId);
                   if (res.alreadyInitialized) setMobileStatus('Capacitor already initialized.');
                   else if (res.success) setMobileStatus('Capacitor initialized successfully!');
                   else setMobileStatus(`Init failed: ${res.error}`);
@@ -209,7 +209,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                 onClick={async () => {
                   setMobileWorking(true);
                   setMobileStatus(null);
-                  const res = await window.deyad.capacitorOpen(appId, mobilePlatform);
+                  const res = await window.dyad.capacitorOpen(appId, mobilePlatform);
                   setMobileStatus(res.success ? `${mobilePlatform === 'android' ? 'Android Studio' : 'Xcode'} opened.` : `Error: ${res.error}`);
                   setMobileWorking(false);
                 }}
@@ -226,7 +226,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                 onClick={async () => {
                   setLoadingDevices(true);
                   setMobileStatus(null);
-                  const res = await window.deyad.capacitorListDevices(appId, mobilePlatform);
+                  const res = await window.dyad.capacitorListDevices(appId, mobilePlatform);
                   if (res.success && res.devices.length > 0) {
                     setDevices(res.devices);
                     setSelectedDevice(res.devices[0].id);
@@ -259,7 +259,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                 onClick={async () => {
                   setMobileWorking(true);
                   setMobileStatus('Building & deploying to device…');
-                  const res = await window.deyad.capacitorRun(appId, mobilePlatform, selectedDevice);
+                  const res = await window.dyad.capacitorRun(appId, mobilePlatform, selectedDevice);
                   setMobileStatus(res.success ? 'App launched on device!' : `Error: ${res.error}`);
                   setMobileWorking(false);
                 }}
@@ -279,7 +279,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                     const enable = e.target.checked;
                     setMobileWorking(true);
                     setMobileStatus(enable ? 'Enabling live reload…' : 'Disabling live reload…');
-                    const res = await window.deyad.capacitorLiveReload(appId, mobilePlatform, enable);
+                    const res = await window.dyad.capacitorLiveReload(appId, mobilePlatform, enable);
                     if (res.success) {
                       setLiveReload(enable);
                       setLiveReloadActive(enable);
@@ -294,7 +294,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
               </label>
               {liveReloadActive && <span className="deploy-mobile-live-badge">LIVE</span>}
               <span className="deploy-hint" style={{ margin: 0, fontSize: 11 }}>
-                Edits in Deyad update the device in real-time via your local network.
+                Edits in Dyad update the device in real-time via your local network.
               </span>
             </div>
 
@@ -367,7 +367,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                   setVpsWorking(true);
                   setVpsStatus('Deploying to VPS…');
                   setLogs('');
-                  const res = await window.deyad.deployVps(appId, {
+                  const res = await window.dyad.deployVps(appId, {
                     host: vpsHost,
                     user: vpsUser,
                     path: vpsPath,
@@ -415,7 +415,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
                   setDesktopWorking(true);
                   setDesktopStatus('Building desktop app…');
                   setLogs('');
-                  const res = await window.deyad.deployElectron(appId, desktopPlatform);
+                  const res = await window.dyad.deployElectron(appId, desktopPlatform);
                   if (res.success) {
                     setDesktopStatus(`Desktop app built! Output: ${res.outputDir}`);
                   } else {

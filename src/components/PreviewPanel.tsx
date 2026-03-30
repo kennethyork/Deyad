@@ -22,7 +22,7 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
 
   // Subscribe to dev-server log and status events
   useEffect(() => {
-    const unsubLog = window.deyad.onAppDevLog(({ appId, data }) => {
+    const unsubLog = window.dyad.onAppDevLog(({ appId, data }) => {
       if (appId !== app.id) return;
       setLogs((prev) => prev + data);
       // Only capture the URL from Vite's "Local:" output, not from backend logs
@@ -37,7 +37,7 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
       }
     });
 
-    const unsubStatus = window.deyad.onAppDevStatus(({ appId, status: s }) => {
+    const unsubStatus = window.dyad.onAppDevStatus(({ appId, status: s }) => {
       if (appId !== app.id) return;
       if (s === 'stopped') setStatus('stopped');
       if (s === 'starting') {
@@ -77,7 +77,7 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
     setLogs('');
     setStartError('');
     setPreviewUrl(FALLBACK_URL);
-    window.deyad.appDevStatus(app.id).then((res: { status: string }) => {
+    window.dyad.appDevStatus(app.id).then((res: { status: string }) => {
       if (res.status === 'running') {
         setStatus('running');
       } else {
@@ -90,7 +90,7 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
     setStartError('');
     setLogs('');
     setStatus('starting');
-    const result = await window.deyad.appDevStart(app.id);
+    const result = await window.dyad.appDevStart(app.id);
     if (!result.success) {
       setStatus('error');
       setStartError(result.error ?? 'Unknown error');
@@ -98,7 +98,7 @@ export default function PreviewPanel({ app, onPublish, refreshKey }: Props) {
   };
 
   const handleStop = async () => {
-    await window.deyad.appDevStop(app.id);
+    await window.dyad.appDevStop(app.id);
     setStatus('stopped');
   };
 

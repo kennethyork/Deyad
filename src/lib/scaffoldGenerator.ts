@@ -1,5 +1,5 @@
 /**
- * Scaffold generators for Deyad.
+ * Scaffold generators for Dyad.
  *
  * generateFrontendScaffold — a minimal runnable React + Vite + TypeScript project
  *   for frontend-only apps (enables in-app preview via `npm run dev`).
@@ -649,7 +649,7 @@ Frontend runs at **http://localhost:5173**
 
 ### 3. Open the database viewer (Prisma Studio)
 
-Click **▶ Start DB Viewer** inside Deyad, or run manually:
+Click **▶ Start DB Viewer** inside Dyad, or run manually:
 
 \`\`\`bash
 cd backend

@@ -94,7 +94,7 @@ function AppInner() {
   const [exportConfirm, setExportConfirm] = useState<{ open: boolean; appId: string }>({ open: false, appId: '' });
   const [exportResult, setExportResult] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('deyad-theme') as 'dark' | 'light') || 'dark';
+    return (localStorage.getItem('dyad-theme') as 'dark' | 'light') || 'dark';
   });
 
   // Helper to update per-app state
@@ -125,13 +125,13 @@ function AppInner() {
   useEffect(() => {
     loadApps();
     // Load autocomplete settings
-    window.deyad.getSettings().then((s) => {
+    window.dyad.getSettings().then((s) => {
       setAutocompleteEnabled(s.autocompleteEnabled ?? false);
       setCompletionModel(s.completionModel ?? '');
       setDefaultModel(s.defaultModel ?? '');
       if (s.theme) {
         setTheme(s.theme);
-        localStorage.setItem('deyad-theme', s.theme);
+        localStorage.setItem('dyad-theme', s.theme);
       }
       if (!s.hasCompletedWizard) setShowWizard(true);
     }).catch((err) => console.warn('Failed to load settings:', err));
@@ -151,7 +151,7 @@ function AppInner() {
   // Auto-refresh file tree when a background task completes (any app)
   useEffect(() => {
     taskQueue.setOnFilesChanged(async (appId) => {
-      const files = await window.deyad.readFiles(appId);
+      const files = await window.dyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files });
       setPreviewRefreshKey(k => k + 1);
     });
@@ -172,7 +172,7 @@ function AppInner() {
   // Apply theme class to <html>
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('deyad-theme', theme);
+    localStorage.setItem('dyad-theme', theme);
   }, [theme]);
 
   // Command palette & search keyboard shortcuts
@@ -195,7 +195,7 @@ function AppInner() {
 
   // Subscribe to DB status events (any app)
   useEffect(() => {
-    const unsub = window.deyad.onDbStatus(({ appId, status }) => {
+    const unsub = window.dyad.onDbStatus(({ appId, status }) => {
       setPerApp(prev => {
         if (!prev[appId]) return prev;
         return {
@@ -208,7 +208,7 @@ function AppInner() {
   }, []);
 
   const loadApps = async () => {
-    const list = await window.deyad.listApps();
+    const list = await window.dyad.listApps();
     setApps(list);
   };
 
@@ -217,12 +217,12 @@ function AppInner() {
     setOpenedApps(prev => prev.includes(app.id) ? prev : [...prev, app.id]);
 
     try {
-      const files = await window.deyad.readFiles(app.id);
-      const hasSnap = await window.deyad.hasSnapshot(app.id);
+      const files = await window.dyad.readFiles(app.id);
+      const hasSnap = await window.dyad.hasSnapshot(app.id);
 
       let dbSt: 'none' | 'running' | 'stopped' = 'none';
       if (app.appType === 'fullstack') {
-        const result = await window.deyad.dbStatus(app.id);
+        const result = await window.dyad.dbStatus(app.id);
         dbSt = result.status as 'none' | 'running' | 'stopped';
       }
 
@@ -265,11 +265,11 @@ function AppInner() {
     if (!s.pendingDiffFiles) return;
 
     if (s.preAgentFiles) {
-      await window.deyad.snapshotFiles(appId, s.preAgentFiles);
+      await window.dyad.snapshotFiles(appId, s.preAgentFiles);
     }
     // Write pending files to disk (chat mode doesn't write them during generation)
-    await window.deyad.writeFiles(appId, s.pendingDiffFiles);
-    const freshFiles = await window.deyad.readFiles(appId);
+    await window.dyad.writeFiles(appId, s.pendingDiffFiles);
+    const freshFiles = await window.dyad.readFiles(appId);
     const firstKey = Object.keys(s.pendingDiffFiles)[0];
     const updates: Partial<PerAppState> = {
       appFiles: freshFiles,
@@ -302,10 +302,10 @@ function AppInner() {
       }
     }
     if (Object.keys(revertMap).length > 0) {
-      await window.deyad.writeFiles(appId, revertMap);
+      await window.dyad.writeFiles(appId, revertMap);
     }
     if (newFilePaths.length > 0) {
-      await window.deyad.deleteFiles(appId, newFilePaths);
+      await window.dyad.deleteFiles(appId, newFilePaths);
     }
     updatePerApp(appId, {
       appFiles: s.preAgentFiles,
@@ -317,7 +317,7 @@ function AppInner() {
   const handleFileEdit = useCallback(async (filePath: string, content: string) => {
     if (!selectedApp) return;
     const appId = selectedApp.id;
-    await window.deyad.writeFiles(appId, { [filePath]: content });
+    await window.dyad.writeFiles(appId, { [filePath]: content });
     setPerApp(prev => {
       const s = prev[appId] ?? defaultPerAppState;
       return {
@@ -338,7 +338,7 @@ function AppInner() {
       // otherwise show a generic global menu (copy/paste/select all).
       const el = e.target as HTMLElement;
       if (!el.closest('.terminal-panel')) {
-        window.deyad.showContextMenu('global');
+        window.dyad.showContextMenu('global');
       }
     };
     window.addEventListener('contextmenu', handleContext);
@@ -367,7 +367,7 @@ function AppInner() {
 
 
   const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', templatePrompt?: string) => {
-    const app = await window.deyad.createApp(name, description, appType, 'sqlite');
+    const app = await window.dyad.createApp(name, description, appType, 'sqlite');
     setShowNewAppModal(false);
     await loadApps();
 
@@ -379,12 +379,12 @@ function AppInner() {
         description,
         guiPort: app.guiPort,
       });
-      await window.deyad.writeFiles(app.id, scaffold);
+      await window.dyad.writeFiles(app.id, scaffold);
     } else {
       // Write a minimal runnable Vite scaffold so the app can be previewed right away
       const { generateFrontendScaffold } = await import('./lib/scaffoldGenerator');
       const scaffold = generateFrontendScaffold({ appName: name, description });
-      await window.deyad.writeFiles(app.id, scaffold);
+      await window.dyad.writeFiles(app.id, scaffold);
     }
 
     // If a template prompt was selected, queue it for auto-send in ChatPanel
@@ -399,7 +399,7 @@ function AppInner() {
   const handleImportApp = async (name: string) => {
     setShowImportModal(false);
     try {
-      const app = await window.deyad.importApp(name);
+      const app = await window.dyad.importApp(name);
       if (app) {
         await loadApps();
         await selectApp(app);
@@ -413,8 +413,8 @@ function AppInner() {
 
   const handleDeleteApp = async (appId: string) => {
     // Stop dev server if running before deleting
-    await window.deyad.appDevStop(appId).catch((err) => console.warn('appDevStop:', err));
-    await window.deyad.deleteApp(appId);
+    await window.dyad.appDevStop(appId).catch((err) => console.warn('appDevStop:', err));
+    await window.dyad.deleteApp(appId);
     if (selectedApp?.id === appId) {
       setSelectedApp(null);
     }
@@ -430,7 +430,7 @@ function AppInner() {
   };
 
   const handleRenameApp = useCallback(async (appId: string, newName: string) => {
-    await window.deyad.renameApp(appId, newName);
+    await window.dyad.renameApp(appId, newName);
     setApps((prev) => prev.map((a) => a.id === appId ? { ...a, name: newName } : a));
     if (selectedApp?.id === appId) {
       setSelectedApp((prev) => prev ? { ...prev, name: newName } : prev);
@@ -439,7 +439,7 @@ function AppInner() {
   }, [selectedApp]);
 
   const handleDuplicateApp = async (appId: string) => {
-    const app = await window.deyad.duplicateApp(appId);
+    const app = await window.dyad.duplicateApp(appId);
     if (app) {
       await loadApps();
       await selectApp(app as AppProject);
@@ -455,13 +455,13 @@ function AppInner() {
       const s = perAppRef.current[appId] ?? defaultPerAppState;
       if (s.dbStatus === 'running') {
         updatePerApp(appId, { dbStatus: 'stopped' });
-        const result = await window.deyad.dbStop(appId);
+        const result = await window.dyad.dbStop(appId);
         if (!result.success) updatePerApp(appId, { dbStatus: 'running' });
         else addToast('info', 'Database stopped');
       } else {
         const prevStatus = s.dbStatus;
         updatePerApp(appId, { dbStatus: 'stopped' });
-        const result = await window.deyad.dbStart(appId);
+        const result = await window.dyad.dbStart(appId);
         if (result.success) {
           updatePerApp(appId, { dbStatus: 'running' });
           addToast('success', 'Database started');
@@ -476,9 +476,9 @@ function AppInner() {
   }, [updatePerApp]);
 
   const handleRevert = useCallback(async (appId: string) => {
-    const result = await window.deyad.revertFiles(appId);
+    const result = await window.dyad.revertFiles(appId);
     if (result.success) {
-      const files = await window.deyad.readFiles(appId);
+      const files = await window.dyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files, selectedFile: null, canRevert: false });
       setPreviewRefreshKey(k => k + 1);
       addToast('success', 'Changes reverted');
@@ -492,7 +492,7 @@ function AppInner() {
   const doExport = async (mobile: boolean) => {
     const appId = exportConfirm.appId;
     setExportConfirm({ open: false, appId: '' });
-    const result = await window.deyad.exportApp(appId, mobile ? 'mobile' : 'zip');
+    const result = await window.dyad.exportApp(appId, mobile ? 'mobile' : 'zip');
     if (result.success && result.path) {
       setExportResult(`${mobile ? 'Mobile export created at' : 'Exported to'} ${result.path}`);
       addToast('success', mobile ? 'Mobile export created' : 'Exported as ZIP');
@@ -518,7 +518,7 @@ function AppInner() {
       { id: 'tab.git', name: 'Show Git', icon: '🔀', run: () => updatePerApp(selectedApp.id, { rightTab: 'git' }) },
       { id: 'tab.search', name: 'Search Files', icon: '🔍', shortcut: 'Ctrl+Shift+F', run: () => updatePerApp(selectedApp.id, { rightTab: 'search' }) },
       { id: 'tab.env', name: 'Environment Variables', icon: '🔑', run: () => updatePerApp(selectedApp.id, { rightTab: 'envvars' }) },
-      { id: 'app.folder', name: 'Open in File Manager', icon: '📁', run: () => { window.deyad.openAppFolder(selectedApp.id); } },
+      { id: 'app.folder', name: 'Open in File Manager', icon: '📁', run: () => { window.dyad.openAppFolder(selectedApp.id); } },
     ] : []),
   ];
 
@@ -604,7 +604,7 @@ function AppInner() {
         <div className="empty-state">
           <div className="empty-state-content">
             <div className="empty-logo"></div>
-            <h2>Welcome to Deyad</h2>
+            <h2>Welcome to Dyad</h2>
             <p>A local AI app builder powered exclusively by Ollama.</p>
             <p className="empty-hint">Create a new app to get started →</p>
             <button className="btn-primary" onClick={() => setShowNewAppModal(true)}>
@@ -683,7 +683,7 @@ function AppInner() {
                 files={cur.appFiles}
                 selectedFile={cur.selectedFile}
                 onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file })}
-                onOpenFolder={() => window.deyad.openAppFolder(selectedApp.id)}
+                onOpenFolder={() => window.dyad.openAppFolder(selectedApp.id)}
                 onFileEdit={handleFileEdit}
                 autocompleteEnabled={autocompleteEnabled}
                 completionModel={completionModel || defaultModel}
@@ -698,7 +698,7 @@ function AppInner() {
               <GitPanel
                 appId={selectedApp.id}
                 onFilesChanged={async () => {
-                  const files = await window.deyad.readFiles(selectedApp.id);
+                  const files = await window.dyad.readFiles(selectedApp.id);
                   updatePerApp(selectedApp.id, { appFiles: files });
                   setPreviewRefreshKey(k => k + 1);
                 }}
@@ -733,7 +733,7 @@ function AppInner() {
           onClose={() => {
             setShowSettings(false);
             // Reload settings to pick up autocomplete changes
-            window.deyad.getSettings().then((s) => {
+            window.dyad.getSettings().then((s) => {
               setAutocompleteEnabled(s.autocompleteEnabled ?? false);
               setCompletionModel(s.completionModel ?? '');
               setDefaultModel(s.defaultModel ?? '');
@@ -773,7 +773,7 @@ function AppInner() {
           appId={selectedApp.id}
           onClose={() => setShowVersionHistory(false)}
           onRestore={async () => {
-            const files = await window.deyad.readFiles(selectedApp.id);
+            const files = await window.dyad.readFiles(selectedApp.id);
             updatePerApp(selectedApp.id, { appFiles: files, selectedFile: null });
           }}
         />
@@ -789,7 +789,7 @@ function AppInner() {
           model={defaultModel}
           onClose={() => setShowTaskQueue(false)}
           onRefreshFiles={async () => {
-            const files = await window.deyad.readFiles(selectedApp.id);
+            const files = await window.dyad.readFiles(selectedApp.id);
             updatePerApp(selectedApp.id, { appFiles: files });
           }}
         />
@@ -824,7 +824,7 @@ function AppInner() {
         <WelcomeWizard
           onComplete={() => {
             setShowWizard(false);
-            window.deyad.setSettings({ hasCompletedWizard: true }).then((s) => {
+            window.dyad.setSettings({ hasCompletedWizard: true }).then((s) => {
               setDefaultModel(s.defaultModel ?? '');
             }).catch((err) => console.warn('setSettings:', err));
           }}

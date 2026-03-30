@@ -54,7 +54,7 @@ beforeEach(() => {
     handlers.set(channel, handler);
     return undefined as any;
   });
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-apps-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dyad-apps-test-'));
 });
 
 afterEach(() => {
@@ -104,7 +104,7 @@ describe('ipcApps handler registration', () => {
     const { appsDir, snapDir } = setupHandlers();
     const appSubdir = path.join(appsDir, 'test-app');
     fs.mkdirSync(appSubdir, { recursive: true });
-    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), JSON.stringify({
+    fs.writeFileSync(path.join(appSubdir, 'dyad.json'), JSON.stringify({
       name: 'Test App', description: 'A test', createdAt: '2024-01-01', appType: 'frontend',
     }));
 
@@ -128,7 +128,7 @@ describe('ipcApps handler registration', () => {
     const result = await handler({}, { name: 'My App', description: 'desc', appType: 'frontend' });
     expect(result.name).toBe('My App');
     expect(result.id).toBeTruthy();
-    expect(fs.existsSync(path.join(appsDir, result.id, 'deyad.json'))).toBe(true);
+    expect(fs.existsSync(path.join(appsDir, result.id, 'dyad.json'))).toBe(true);
   });
 
   it('apps:read-files returns empty for nonexistent dir', async () => {
@@ -172,7 +172,7 @@ describe('ipcApps handler registration', () => {
     const { appsDir, snapDir } = setupHandlers();
     const appSubdir = path.join(appsDir, 'app1');
     fs.mkdirSync(appSubdir, { recursive: true });
-    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), JSON.stringify({ name: 'Old Name' }));
+    fs.writeFileSync(path.join(appSubdir, 'dyad.json'), JSON.stringify({ name: 'Old Name' }));
 
     const { registerAppHandlers } = await import('./ipcApps');
     registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
@@ -180,7 +180,7 @@ describe('ipcApps handler registration', () => {
     const handler = handlers.get('apps:rename')!;
     const result = handler({}, { appId: 'app1', newName: 'New Name' });
     expect(result).toBe(true);
-    const meta = JSON.parse(fs.readFileSync(path.join(appSubdir, 'deyad.json'), 'utf-8'));
+    const meta = JSON.parse(fs.readFileSync(path.join(appSubdir, 'dyad.json'), 'utf-8'));
     expect(meta.name).toBe('New Name');
   });
 

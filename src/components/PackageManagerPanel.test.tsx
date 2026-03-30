@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PackageManagerPanel from './PackageManagerPanel';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  (window as any).dyad = {
     npmList: vi.fn().mockResolvedValue({
       dependencies: { react: '18.2.0', 'react-dom': '18.2.0' },
       devDependencies: { vitest: '1.0.0' },
@@ -35,7 +35,7 @@ describe('PackageManagerPanel', () => {
   it('calls npmList on mount', async () => {
     render(<PackageManagerPanel appId="app1" />);
     await waitFor(() => {
-      expect(window.deyad.npmList).toHaveBeenCalledWith('app1');
+      expect(window.dyad.npmList).toHaveBeenCalledWith('app1');
     });
   });
 
@@ -51,7 +51,7 @@ describe('PackageManagerPanel', () => {
     fireEvent.change(input, { target: { value: 'lodash' } });
     fireEvent.click(screen.getByText(/Install/i));
     await waitFor(() => {
-      expect(window.deyad.npmInstall).toHaveBeenCalledWith('app1', 'lodash', false);
+      expect(window.dyad.npmInstall).toHaveBeenCalledWith('app1', 'lodash', false);
     });
   });
 });

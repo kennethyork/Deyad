@@ -245,7 +245,7 @@ export async function embedChunks(
     const batch = toEmbed.slice(i, i + EMBED_BATCH_SIZE);
     const inputs = batch.map((c) => c.text);
     try {
-      const result = await window.deyad.embed(model, inputs);
+      const result = await window.dyad.embed(model, inputs);
       if (result.embeddings.length === batch.length) {
         for (let j = 0; j < batch.length; j++) {
           batch[j].embedding = result.embeddings[j];
@@ -280,7 +280,7 @@ export async function retrieveChunks(
   let queryVec = index.queryCache.get(query);
   if (!queryVec) {
     try {
-      const result = await window.deyad.embed(model, query);
+      const result = await window.dyad.embed(model, query);
       if (result.embeddings[0]) {
         queryVec = result.embeddings[0];
         // Keep cache small

@@ -31,7 +31,7 @@ export interface TaskQueueItem {
 type Listener = () => void;
 type FilesChangedCallback = (appId: string) => void;
 
-const STORAGE_KEY = 'deyad-task-queue';
+const STORAGE_KEY = 'dyad-task-queue';
 const MAX_HISTORY = 50;
 
 class TaskQueue {
@@ -167,7 +167,7 @@ class TaskQueue {
 
     try {
       // Get current files for context
-      const appFiles = await window.deyad.readFiles(next.appId);
+      const appFiles = await window.dyad.readFiles(next.appId);
 
       const callbacks: AgentCallbacks = {
         onContent: (text: string) => {

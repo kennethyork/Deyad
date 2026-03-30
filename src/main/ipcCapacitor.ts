@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
 function capWebDir(appDirFn: (id: string) => string, appId: string): string {
   const dir = appDirFn(appId);
   try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+    const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
     if (meta.appType === 'fullstack') return path.join(dir, 'frontend');
   } catch (err) { console.debug('default:', err); }
   return dir;
@@ -41,7 +41,7 @@ export function registerCapacitorHandlers(appDir: (id: string) => string): void 
     let appName = 'MyApp';
     let appType = 'frontend';
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       appName = meta.name || appName;
       appType = meta.appType || appType;
     } catch (err) { console.debug('use default:', err); }
@@ -49,7 +49,7 @@ export function registerCapacitorHandlers(appDir: (id: string) => string): void 
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
     if (!fs.existsSync(webDir)) return { success: false, error: 'Frontend directory not found' };
 
-    const capId = appName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '') || 'com.deyad.app';
+    const capId = appName.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '') || 'com.dyad.app';
 
     if (fs.existsSync(path.join(webDir, 'capacitor.config.ts'))) {
       return { success: true, alreadyInitialized: true };
@@ -61,7 +61,7 @@ export function registerCapacitorHandlers(appDir: (id: string) => string): void 
       const capConfig = `import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.deyad.${capId}',
+  appId: 'com.dyad.${capId}',
   appName: ${JSON.stringify(appName)},
   webDir: 'dist',
   server: {
@@ -90,7 +90,7 @@ export default config;
 
     let webDir = dir;
     try {
-      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
+      const meta = JSON.parse(fs.readFileSync(path.join(dir, 'dyad.json'), 'utf-8'));
       if (meta.appType === 'fullstack') webDir = path.join(dir, 'frontend');
     } catch (err) { console.debug('use root:', err); }
 

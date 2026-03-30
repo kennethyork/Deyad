@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import DeployModal from './DeployModal';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  (window as any).dyad = {
     deployCheck: vi.fn().mockResolvedValue({ netlify: true, vercel: true, surge: false, railway: false, flyio: false }),
     deploy: vi.fn().mockResolvedValue({ success: true, url: 'https://example.netlify.app' }),
     deployFullstack: vi.fn().mockResolvedValue({ success: true, url: 'https://example.fly.dev' }),
@@ -31,12 +31,12 @@ describe('DeployModal', () => {
   it('checks CLI availability on mount', async () => {
     render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
     await waitFor(() => {
-      expect(window.deyad.deployCheck).toHaveBeenCalled();
+      expect(window.dyad.deployCheck).toHaveBeenCalled();
     });
   });
 
   it('shows checking state initially', () => {
-    (window as any).deyad.deployCheck = vi.fn(() => new Promise(() => {})); // never resolves
+    (window as any).dyad.deployCheck = vi.fn(() => new Promise(() => {})); // never resolves
     render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
     expect(screen.getByText(/checking/i)).toBeTruthy();
   });
@@ -59,6 +59,6 @@ describe('DeployModal', () => {
 
   it('subscribes to deploy logs on mount', () => {
     render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
-    expect(window.deyad.onDeployLog).toHaveBeenCalled();
+    expect(window.dyad.onDeployLog).toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ let tmpDir: string;
 const fakeAppDir = (_id: string) => tmpDir;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-git-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dyad-git-test-'));
 });
 
 afterEach(() => {

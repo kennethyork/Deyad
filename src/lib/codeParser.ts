@@ -45,7 +45,7 @@ export function isFullStackRequest(message: string): boolean {
 /**
  * System prompt for frontend-only (Ollama-only) app generation.
  */
-export const FRONTEND_SYSTEM_PROMPT = `You are Deyad, a local AI app builder powered exclusively by Ollama.
+export const FRONTEND_SYSTEM_PROMPT = `You are Dyad, a local AI app builder powered exclusively by Ollama.
 You help users build web applications by generating code.
 
 The user will often phrase requests colloquially, e.g. "make a login page",
@@ -79,7 +79,7 @@ Always include a brief explanation before the code blocks.`;
  * Planning mode system prompt — asks the AI to produce a structured plan
  * instead of code. The plan is shown to the user for approval before execution.
  */
-export const PLANNING_SYSTEM_PROMPT = `You are Deyad, a local AI app builder. The user has enabled PLANNING MODE.
+export const PLANNING_SYSTEM_PROMPT = `You are Dyad, a local AI app builder. The user has enabled PLANNING MODE.
 
 Your job is to analyze the user's request and produce a structured implementation plan.
 Do NOT generate any code. Instead, output a plan in this exact format:
@@ -116,7 +116,7 @@ Implement every step completely. Do not skip any files.`;
 /**
  * System prompt for full-stack (React + Express + SQLite via Prisma) app generation.
  */
-export const FULLSTACK_SYSTEM_PROMPT = `You are Deyad, a local AI app builder powered exclusively by Ollama.
+export const FULLSTACK_SYSTEM_PROMPT = `You are Dyad, a local AI app builder powered exclusively by Ollama.
 You help users build full-stack web applications.
 
 The project uses this fixed stack:

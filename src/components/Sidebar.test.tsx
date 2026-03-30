@@ -34,9 +34,9 @@ describe('Sidebar', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it('renders Deyad logo and buttons', () => {
+  it('renders Dyad logo and buttons', () => {
     render(<Sidebar {...defaults} />);
-    expect(screen.getByText('Deyad')).toBeTruthy();
+    expect(screen.getByText('Dyad')).toBeTruthy();
     expect(screen.getByText('Import')).toBeTruthy();
     expect(screen.getByText('+')).toBeTruthy();
     expect(screen.getByText('Settings')).toBeTruthy();

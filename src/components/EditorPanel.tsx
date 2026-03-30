@@ -319,7 +319,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
 
                 if (token.isCancellationRequested) { resolve([]); return; }
 
-                const completion = await window.deyad.fimComplete(
+                const completion = await window.dyad.fimComplete(
                   completionModelName,
                   prefix,
                   textAfterPosition || undefined,

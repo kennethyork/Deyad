@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import WelcomeWizard from './WelcomeWizard';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  (window as any).dyad = {
     listModels: vi.fn().mockResolvedValue({ models: [{ name: 'llama3', details: { parameter_size: '8B' } }] }),
     setSettings: vi.fn().mockResolvedValue(undefined),
   };
@@ -18,7 +18,7 @@ afterEach(() => {
 describe('WelcomeWizard', () => {
   it('renders welcome step initially', () => {
     render(<WelcomeWizard onComplete={() => {}} onCreateApp={() => {}} />);
-    expect(screen.getByText('Welcome to Deyad')).toBeTruthy();
+    expect(screen.getByText('Welcome to Dyad')).toBeTruthy();
   });
 
   it('has progress dots', () => {
@@ -38,7 +38,7 @@ describe('WelcomeWizard', () => {
     render(<WelcomeWizard onComplete={() => {}} onCreateApp={() => {}} />);
     fireEvent.click(screen.getByText('Get Started'));
     await waitFor(() => {
-      expect(window.deyad.listModels).toHaveBeenCalled();
+      expect(window.dyad.listModels).toHaveBeenCalled();
     });
   });
 

@@ -106,7 +106,7 @@ function getAgentSystemPrompt(appType: string, _dbProvider?: string): string {
     ? 'This is a full-stack project (React + Vite + TypeScript frontend, Express + Prisma backend, SQLite database).'
     : 'This is a frontend project (React + Vite + TypeScript).';
 
-  return `You are Deyad Agent, an autonomous AI developer powered by Ollama.
+  return `You are Dyad Agent, an autonomous AI developer powered by Ollama.
 You can independently read code, write files, run shell commands, and iterate until the task is complete.
 
 ${stackInfo}
@@ -166,18 +166,18 @@ function streamOllamaTurn(
     let cleaned = false;
     const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
+    const unsubToken = window.dyad.onStreamToken(requestId, (token: string) => {
       if (isAborted()) { cleanup(); resolve(buf); return; }
       buf += token;
       onToken(token);
     });
 
-    const unsubDone = window.deyad.onStreamDone(requestId, () => {
+    const unsubDone = window.dyad.onStreamDone(requestId, () => {
       cleanup();
       resolve(buf);
     });
 
-    const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
+    const unsubError = window.dyad.onStreamError(requestId, (err: string) => {
       cleanup();
       reject(new Error(err));
     });
@@ -190,7 +190,7 @@ function streamOllamaTurn(
       unsubError();
     }
 
-    window.deyad.chatStream(model, messages, requestId, modelOptions).catch((err) => {
+    window.dyad.chatStream(model, messages, requestId, modelOptions).catch((err) => {
       cleanup();
       reject(err);
     });
@@ -243,7 +243,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
       // Inject DB schema if available
       if (dbStatus === 'running' && appType === 'fullstack') {
         try {
-          const schema = await window.deyad.dbDescribe(appId);
+          const schema = await window.dyad.dbDescribe(appId);
           if (schema.tables.length > 0) {
             const schemaText = schema.tables.map((t) => `${t.name}: ${t.columns.join(', ')}`).join('\n');
             messages.push({
@@ -338,7 +338,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
               allChangedFiles.add(call.params.path);
               // Read the updated file so the UI can show the diff
               try {
-                const freshFiles = await window.deyad.readFiles(appId);
+                const freshFiles = await window.dyad.readFiles(appId);
                 const updatedContent = freshFiles[call.params.path];
                 if (updatedContent !== undefined) {
                   await callbacks.onFilesWritten({ [call.params.path]: updatedContent });
@@ -360,7 +360,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
             // Read all edited files so the UI can show the diff
             if (editedPaths.length > 0) {
               try {
-                const freshFiles = await window.deyad.readFiles(appId);
+                const freshFiles = await window.dyad.readFiles(appId);
                 const editedMap: Record<string, string> = {};
                 for (const p of editedPaths) {
                   if (freshFiles[p] !== undefined) editedMap[p] = freshFiles[p];
@@ -381,7 +381,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         // Re-read project files after writes so the next iteration sees updated code
         if (filesChanged) {
           try {
-            const freshFiles = await window.deyad.readFiles(appId);
+            const freshFiles = await window.dyad.readFiles(appId);
             const freshContext = embedModel
               ? await buildSmartContextWithRAG({
                   files: freshFiles,
@@ -429,7 +429,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         let autoReviewText = '';
         if (filesChanged && !aborted) {
           try {
-            const freshFiles = await window.deyad.readFiles(appId);
+            const freshFiles = await window.dyad.readFiles(appId);
             const issues: string[] = [];
             for (const [filePath, content] of Object.entries(freshFiles)) {
               if (!filePath.endsWith('.tsx') && !filePath.endsWith('.ts')) continue;
@@ -471,11 +471,11 @@ export function runAgentLoop(options: AgentOptions): () => void {
         let runtimeErrorText = '';
         if (filesChanged && !aborted) {
           try {
-            const devStatus = await window.deyad.appDevStatus(appId);
+            const devStatus = await window.dyad.appDevStatus(appId);
             if (devStatus.status === 'running') {
               // Collect dev server output for a few seconds to catch compilation/runtime errors
               const logChunks: string[] = [];
-              const unsub = window.deyad.onAppDevLog(({ appId: logAppId, data }) => {
+              const unsub = window.dyad.onAppDevLog(({ appId: logAppId, data }) => {
                 if (logAppId === appId) logChunks.push(data);
               });
               await new Promise(resolve => setTimeout(resolve, 3000));

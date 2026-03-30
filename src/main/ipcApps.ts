@@ -80,7 +80,7 @@ async function buildZipBuffer(baseDir: string): Promise<Buffer> {
       if (entry.name === 'node_modules' || entry.name === '.git') continue;
       if (entry.isDirectory()) {
         walk(fullPath, relPath);
-      } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+      } else if (entry.name !== 'dyad.json' && entry.name !== 'dyad-messages.json') {
         try {
           entries.push({ name: relPath, data: fs.readFileSync(fullPath) });
         } catch (err) { console.debug('skip unreadable:', err); }
@@ -187,7 +187,7 @@ export function registerAppHandlers(
       return entries
         .filter((e) => e.isDirectory())
         .map((e) => {
-          const metaPath = path.join(APPS_DIR, e.name, 'deyad.json');
+          const metaPath = path.join(APPS_DIR, e.name, 'dyad.json');
           let meta: Record<string, unknown> = { name: e.name, description: '', createdAt: '', appType: 'frontend' };
           if (fs.existsSync(metaPath)) {
             try { meta = { ...meta, ...JSON.parse(fs.readFileSync(metaPath, 'utf-8')) }; } catch (err) { console.debug('ignore:', err); }
@@ -216,7 +216,7 @@ export function registerAppHandlers(
       const [, guiPort] = await allocateAppPorts(id);
       meta.guiPort = guiPort;
     }
-    fs.writeFileSync(path.join(dir, 'deyad.json'), JSON.stringify(meta, null, 2));
+    fs.writeFileSync(path.join(dir, 'dyad.json'), JSON.stringify(meta, null, 2));
     await gitInit(appDir, id);
     return { id, ...meta };
   });
@@ -232,7 +232,7 @@ export function registerAppHandlers(
         const relPath = rel ? `${rel}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {
           if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
-        } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+        } else if (entry.name !== 'dyad.json' && entry.name !== 'dyad-messages.json') {
           try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch (err) { console.debug('skip binary:', err); }
         }
       }
@@ -291,7 +291,7 @@ export function registerAppHandlers(
   });
 
   ipcMain.handle('apps:rename', (_event, { appId, newName }: { appId: string; newName: string }) => {
-    const metaPath = path.join(appDir(appId), 'deyad.json');
+    const metaPath = path.join(appDir(appId), 'dyad.json');
     if (!fs.existsSync(metaPath)) return false;
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -305,13 +305,13 @@ export function registerAppHandlers(
     const dir = appDir(appId);
     if (!fs.existsSync(dir)) return false;
     try {
-      fs.writeFileSync(path.join(dir, 'deyad-messages.json'), JSON.stringify(messages), 'utf-8');
+      fs.writeFileSync(path.join(dir, 'dyad-messages.json'), JSON.stringify(messages), 'utf-8');
       return true;
     } catch (err) { console.debug('Handled error:', err); return false; }
   });
 
   ipcMain.handle('apps:load-messages', (_event, appId: string) => {
-    const file = path.join(appDir(appId), 'deyad-messages.json');
+    const file = path.join(appDir(appId), 'dyad-messages.json');
     if (!fs.existsSync(file)) return [];
     try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
     catch (err) { console.debug('Handled error:', err); return []; }
@@ -427,7 +427,7 @@ export function registerAppHandlers(
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
     let appName = appId;
-    const metaPath = path.join(dir, 'deyad.json');
+    const metaPath = path.join(dir, 'dyad.json');
     if (fs.existsSync(metaPath)) {
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
@@ -508,7 +508,7 @@ export function registerAppHandlers(
         if (entry.name === 'node_modules' || entry.name === '.git') continue;
         if (entry.isDirectory()) {
           walk(fullPath);
-        } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+        } else if (entry.name !== 'dyad.json' && entry.name !== 'dyad-messages.json') {
           try { fs.unlinkSync(fullPath); } catch (err) { console.debug('skip:', err); }
         }
       }
@@ -571,7 +571,7 @@ export function registerAppHandlers(
       const [, guiPort] = await allocateAppPorts(id);
       meta.guiPort = guiPort;
     }
-    fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(meta, null, 2));
+    fs.writeFileSync(path.join(destDir, 'dyad.json'), JSON.stringify(meta, null, 2));
 
     await gitInit(appDir, id);
 
@@ -585,7 +585,7 @@ export function registerAppHandlers(
     if (!fs.existsSync(srcDir)) return null;
 
     // Read source metadata
-    const metaPath = path.join(srcDir, 'deyad.json');
+    const metaPath = path.join(srcDir, 'dyad.json');
     let srcMeta: Record<string, unknown> = {};
     if (fs.existsSync(metaPath)) {
       try { srcMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch { /* ignore */ }
@@ -607,7 +607,7 @@ export function registerAppHandlers(
       newMeta.dbPort = dbPort;
       newMeta.guiPort = guiPort;
     }
-    fs.writeFileSync(path.join(destDir, 'deyad.json'), JSON.stringify(newMeta, null, 2));
+    fs.writeFileSync(path.join(destDir, 'dyad.json'), JSON.stringify(newMeta, null, 2));
 
     await gitInit(appDir, id);
 
@@ -639,7 +639,7 @@ export function registerAppHandlers(
         const relPath = rel ? `${rel}/${entry.name}` : entry.name;
         if (entry.isDirectory()) {
           if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
-        } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
+        } else if (entry.name !== 'dyad.json' && entry.name !== 'dyad-messages.json') {
           try {
             const content = fs.readFileSync(fullPath, 'utf-8');
             const lines = content.split('\n');

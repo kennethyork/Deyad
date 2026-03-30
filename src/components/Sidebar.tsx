@@ -67,7 +67,7 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-logo">Deyad</span>
+        <span className="sidebar-logo">Dyad</span>
         <div className="sidebar-header-actions">
           <button className="btn-import-app" onClick={onImportApp} title="Import existing project">
             Import

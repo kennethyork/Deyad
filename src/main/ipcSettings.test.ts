@@ -5,7 +5,7 @@ import os from 'node:os';
 
 vi.mock('electron', () => ({
   app: {
-    getPath: vi.fn(() => '/tmp/deyad-test-userdata'),
+    getPath: vi.fn(() => '/tmp/dyad-test-userdata'),
     whenReady: vi.fn(() => Promise.resolve()),
   },
   ipcMain: { handle: vi.fn() },
@@ -31,7 +31,7 @@ beforeEach(() => {
     handlers.set(channel, handler);
     return undefined as any;
   });
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-settings-test-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dyad-settings-test-'));
 });
 
 afterEach(() => {
@@ -40,10 +40,10 @@ afterEach(() => {
   vi.resetModules();
 });
 
-import type { DeyadSettings } from '../lib/mainUtils';
+import type { DyadSettings } from '../lib/mainUtils';
 
 describe('ipcSettings handler registration', () => {
-  const defaultSettings: DeyadSettings = {
+  const defaultSettings: DyadSettings = {
     ollamaHost: 'http://localhost:11434',
     defaultModel: '',
     autocompleteEnabled: false,
@@ -54,10 +54,10 @@ describe('ipcSettings handler registration', () => {
   };
 
   function setup() {
-    let current: DeyadSettings = { ...defaultSettings };
+    let current: DyadSettings = { ...defaultSettings };
     return {
       getSettings: () => current,
-      setSettings: (s: DeyadSettings) => { current = s; },
+      setSettings: (s: DyadSettings) => { current = s; },
     };
   }
 
