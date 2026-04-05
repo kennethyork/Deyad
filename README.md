@@ -174,25 +174,23 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 
 ## How It Compares
 
-| | **Deyad** | Bolt.new | Lovable | Cursor | Base44 | v0 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Local AI (no cloud) | ✅ | — | — | — | — | — |
-| Free forever | ✅ | — | — | — | — | — |
-| Open source | ✅ | — | — | — | — | — |
-| Works offline | ✅ | — | — | — | — | — |
-| Full-stack + database | ✅ | — | Partial | — | Partial | — |
-| Autonomous agent | ✅ | Partial | Partial | ✅ | Partial | — |
-| Error self-fix | ✅ | — | — | — | — | — |
-| Built-in DB admin | ✅ | — | — | — | — | — |
-| Git auto-commit | ✅ | — | — | — | — | — |
-| RAG + embeddings | ✅ | — | — | ✅ | — | — |
-| Plan → approve → execute | ✅ | — | — | — | — | — |
-| Deploy (7 targets) | ✅ | ✅ | ✅ | — | ✅ | Vercel |
-| Desktop packaging | ✅ | — | — | — | — | — |
-| Mobile preview | ✅ | — | — | — | — | — |
-| Plugin system | ✅ | — | — | ✅ | — | — |
+| | **Deyad** | Dyad | Bolt.new | Lovable | Cursor | Windsurf | Replit | v0 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Price** | Free forever | $20–79/mo | $20+/mo | $20+/mo | $20/mo | $15/mo | $25+/mo | $20+/mo |
+| **100% local** | ✅ | Partial (cloud API) | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
+| **Offline** | ✅ | ❌ | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
+| **Full-stack scaffold** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **Database GUI** | ✅ Prisma Studio | Supabase | ❌ | Supabase | ❌ | ❌ | ✅ | ❌ |
+| **Agent loop** | ✅ 30-iter | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **CLI agent** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Editor** | ✅ Monaco | ✅ visual | Basic | Basic | ✅ VS Code | ✅ VS Code | ✅ | ❌ |
+| **Terminal** | ✅ PTY | ❌ | ✅ WebContainer | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Deploy targets** | 7 | 2 | 2 | 2 | ❌ | ❌ | 1 | 1 |
+| **Desktop export** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Mobile export** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Open source** | ✅ MIT | Source-available | ❌ | ❌ | ❌ | ❌ | Partial | ❌ |
 
-> Every other AI app builder sends your code to a cloud API. Deyad runs inference entirely on your hardware via Ollama. Zero cloud dependency. Zero cost. Zero data leakage.
+> Deyad is the only tool that is free, fully local, fully offline, open source MIT, has a CLI agent, exports to desktop/mobile, and deploys to 7 targets. No competitor checks all those boxes.
 
 [Full comparison →](COMPARISON.md)
 
@@ -311,24 +309,32 @@ The agent has autonomous access to:
 - **Diff display** — colored unified diffs for every file change
 - **Auto-confirm** — `-y` flag skips all confirmation prompts
 
-### CLI vs Claude Code
+### CLI vs Other AI Coding CLIs
 
-| Feature | Deyad CLI | Claude Code |
-| --- | --- | --- |
-| 100% local / offline | ✅ | ❌ (Anthropic API) |
-| Free forever | ✅ | ❌ (usage-based) |
-| Interactive REPL | ✅ | ✅ |
-| One-shot mode | ✅ | ✅ |
-| Headless/CI mode | ✅ | ✅ |
-| Regex/glob search | ✅ | ✅ |
-| Web fetch | ✅ | ✅ |
-| Image/multimodal | ✅ | ✅ |
-| Memory file | ✅ (DEYAD.md) | ✅ (CLAUDE.md) |
-| Markdown rendering | ✅ | ✅ |
-| Session resume | ✅ | ✅ |
-| Parallel tools | ✅ | ✅ |
-| .gitignore parsing | ✅ | ✅ |
-| Token tracking | ✅ | ✅ |
+| Feature | **Deyad CLI** | **Claude Code** | **Aider** | **Copilot CLI** | **Cline** | **OpenHands** |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Price** | Free forever | $20/mo (Pro) | Free (BYO key) | $10–19/mo | Free (BYO key) | Free (BYO key) |
+| **100% local** | ✅ Ollama | ❌ Anthropic API | ❌ needs API key | ❌ GitHub API | ❌ needs API key | ❌ needs API key |
+| **Offline** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Interactive REPL** | ✅ | ✅ | ✅ | ❌ | ✅ (VS Code) | ✅ (web UI) |
+| **One-shot mode** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Headless/CI mode** | ✅ `--print` | ✅ `--print` | ❌ | ✅ | ❌ | ❌ |
+| **File read/write/edit** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Shell commands** | ✅ | ✅ | ✅ (limited) | ✅ | ✅ | ✅ |
+| **Regex/glob search** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Web fetch** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Image/multimodal** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Memory file** | ✅ DEYAD.md | ✅ CLAUDE.md | ✅ .aider.conf | ❌ | ❌ | ❌ |
+| **Markdown rendering** | ✅ | ✅ | ✅ | ✅ | N/A (GUI) | N/A (GUI) |
+| **Session resume** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Parallel tools** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **.gitignore aware** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Token tracking** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Diff display + undo** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| **Git integration** | ✅ | ✅ | ✅ (auto-commit) | ❌ | ✅ | ✅ |
+| **MCP servers** | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **Model choice** | Any Ollama model | Claude only | Any (BYO key) | GPT-4/Copilot | Any (BYO key) | Any (BYO key) |
+| **Open source** | ✅ MIT | ❌ | ✅ Apache 2.0 | ❌ | ✅ Apache 2.0 | ✅ MIT |
 
 ### Environment Variables
 
