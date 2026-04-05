@@ -1,0 +1,26 @@
+{
+  "name": "deyad-cli",
+  "version": "1.0.0",
+  "description": "Local AI coding agent powered by Ollama — like Claude Code, but fully offline",
+  "bin": {
+    "deyad": "./dist/bin/deyad.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/bin/deyad.js"
+  },
+  "keywords": ["ai", "coding", "agent", "ollama", "cli", "local"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
+  }
+}

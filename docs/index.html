@@ -265,6 +265,52 @@
     .deploy-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
     .deploy-card p { font-size: 12px; color: var(--text-muted); }
 
+    /* ── CLI install ─────────────────────────────────────────────────── */
+    .cli-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 768px) { .cli-grid { grid-template-columns: 1fr; } }
+    .cli-info h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+    .cli-info p { font-size: 15px; color: var(--text-muted); line-height: 1.7; margin-bottom: 16px; }
+    .cli-info ul {
+      list-style: none; padding: 0; margin: 0 0 20px;
+    }
+    .cli-info ul li {
+      font-size: 14px; color: var(--text-muted); padding: 4px 0;
+    }
+    .cli-info ul li::before {
+      content: '▸ '; color: var(--accent-light);
+    }
+    .terminal-block {
+      background: #0d0d14; border: 1px solid var(--border);
+      border-radius: 14px; overflow: hidden;
+    }
+    .terminal-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px; background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .terminal-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .terminal-dot.r { background: #ef4444; }
+    .terminal-dot.y { background: #f59e0b; }
+    .terminal-dot.g { background: #22c55e; }
+    .terminal-bar span {
+      font-size: 12px; color: var(--text-muted); margin-left: 8px;
+    }
+    .terminal-body {
+      padding: 20px; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 13px; line-height: 1.7; overflow-x: auto;
+    }
+    .terminal-body .prompt { color: var(--accent-light); }
+    .terminal-body .cmd { color: var(--text); }
+    .terminal-body .comment { color: #555570; }
+    .terminal-body .output { color: var(--text-muted); }
+    .terminal-body .success { color: var(--success); }
+    .terminal-body .flag { color: #f59e0b; }
+
     /* ── CTA ──────────────────────────────────────────────────────────── */
     .cta-section {
       text-align: center; padding: 100px 24px;
@@ -311,6 +357,7 @@
     <a href="#comparison">Compare</a>
     <a href="#grades">Grades</a>
     <a href="#deploy">Deploy</a>
+    <a href="#cli">CLI</a>
     <a href="https://github.com/kennethyork/Deyad/releases/latest" class="btn btn-sm btn-primary">Download</a>
   </div>
 </nav>
@@ -662,6 +709,88 @@
     <div class="deploy-card"><div class="icon">🪁</div><h4>Fly.io</h4><p>Containers</p></div>
     <div class="deploy-card"><div class="icon">🖥️</div><h4>VPS (SSH)</h4><p>Any server</p></div>
     <div class="deploy-card"><div class="icon">💻</div><h4>Electron</h4><p>Desktop app</p></div>
+  </div>
+</section>
+
+<!-- ── CLI ──────────────────────────────────────────────────────────── -->
+<section id="cli">
+  <div class="section-center">
+    <div class="section-label">CLI Agent</div>
+    <h2 class="section-title">Your terminal. Your AI. Your code.</h2>
+    <p class="section-desc">Like Claude Code — but fully offline, powered by Ollama. An agentic coding assistant that lives in your terminal.</p>
+  </div>
+  <div class="cli-grid">
+    <div class="cli-info">
+      <h3>Install</h3>
+      <p>The CLI is bundled in the Deyad repo. Clone, build, and link it globally in three commands:</p>
+      <div class="terminal-block">
+        <div class="terminal-bar">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <span>bash</span>
+        </div>
+        <div class="terminal-body">
+          <span class="comment"># Clone &amp; build</span><br>
+          <span class="prompt">$</span> <span class="cmd">git clone https://github.com/kennethyork/Deyad.git</span><br>
+          <span class="prompt">$</span> <span class="cmd">cd Deyad/cli &amp;&amp; npm install &amp;&amp; npm run build</span><br><br>
+          <span class="comment"># Link globally</span><br>
+          <span class="prompt">$</span> <span class="cmd">npm link</span><br><br>
+          <span class="comment"># Verify</span><br>
+          <span class="prompt">$</span> <span class="cmd">deyad</span> <span class="flag">--help</span><br>
+        </div>
+      </div>
+
+      <h3 style="margin-top:32px">Requirements</h3>
+      <ul>
+        <li><strong>Node.js 18+</strong> — runtime</li>
+        <li><strong>Ollama</strong> — local AI inference</li>
+        <li><strong>Git</strong> — version control (for /undo, /diff)</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:12px">Usage</h3>
+      <div class="terminal-block">
+        <div class="terminal-bar">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <span>deyad</span>
+        </div>
+        <div class="terminal-body">
+          <span class="comment"># Interactive mode — opens a REPL</span><br>
+          <span class="prompt">$</span> <span class="cmd">deyad</span><br><br>
+          <span class="comment"># One-shot — describe what you want</span><br>
+          <span class="prompt">$</span> <span class="cmd">deyad</span> <span class="output">"add user authentication"</span><br><br>
+          <span class="comment"># Pick a model</span><br>
+          <span class="prompt">$</span> <span class="cmd">deyad</span> <span class="flag">-m</span> <span class="cmd">qwen3:32b</span> <span class="output">"fix all tests"</span><br><br>
+          <span class="comment"># Auto-confirm all changes</span><br>
+          <span class="prompt">$</span> <span class="cmd">deyad</span> <span class="flag">-y</span> <span class="output">"refactor to TypeScript"</span><br>
+        </div>
+      </div>
+
+      <h3 style="font-size:20px;font-weight:700;margin:32px 0 12px">Slash Commands</h3>
+      <div class="terminal-block">
+        <div class="terminal-bar">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <span>commands</span>
+        </div>
+        <div class="terminal-body">
+          <span class="flag">/help</span>  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Show all commands</span><br>
+          <span class="flag">/model</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Switch Ollama model</span><br>
+          <span class="flag">/add</span> <span class="cmd">&lt;file&gt;</span>&nbsp;&nbsp;&nbsp; <span class="output">Add file to context</span><br>
+          <span class="flag">/drop</span> <span class="cmd">&lt;file&gt;</span>&nbsp;&nbsp; <span class="output">Remove from context</span><br>
+          <span class="flag">/diff</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Show all uncommitted changes</span><br>
+          <span class="flag">/undo</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Revert agent's file changes</span><br>
+          <span class="flag">/run</span> <span class="cmd">&lt;cmd&gt;</span>&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Run a shell command</span><br>
+          <span class="flag">/compact</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Show token &amp; message stats</span><br>
+          <span class="flag">/clear</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Reset conversation</span><br>
+          <span class="flag">/quit</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="output">Exit</span><br>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
