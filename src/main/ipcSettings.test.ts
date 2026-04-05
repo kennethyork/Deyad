@@ -51,6 +51,9 @@ describe('ipcSettings handler registration', () => {
     embedModel: '',
     hasCompletedWizard: false,
     theme: 'dark',
+    temperature: 0.7,
+    topP: 0.9,
+    repeatPenalty: 1.1,
   };
 
   function setup() {

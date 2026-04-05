@@ -209,14 +209,16 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     editorRef.current = editor;
 
     // Configure TypeScript/JavaScript to not show false errors
-    const tsDefaults = monaco.languages.typescript.typescriptDefaults;
-    const jsDefaults = monaco.languages.typescript.javascriptDefaults;
+    // Monaco 0.55+ marks languages.typescript as deprecated in types but it still works at runtime
+    const ts = (monaco.languages as any).typescript;
+    const tsDefaults = ts.typescriptDefaults;
+    const jsDefaults = ts.javascriptDefaults;
 
-    const sharedCompilerOptions: import('monaco-editor').languages.typescript.CompilerOptions = {
-      target: monaco.languages.typescript.ScriptTarget.ESNext,
-      module: monaco.languages.typescript.ModuleKind.ESNext,
-      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+    const sharedCompilerOptions = {
+      target: ts.ScriptTarget.ESNext,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.NodeJs,
+      jsx: ts.JsxEmit.ReactJSX,
       esModuleInterop: true,
       allowSyntheticDefaultImports: true,
       allowJs: true,
