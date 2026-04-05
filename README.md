@@ -13,7 +13,7 @@ Describe what you want. Get a working app. No cloud. No API keys. No subscriptio
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-[Download](https://github.com/kennethyork/Deyad/releases/latest) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
+[Download](https://github.com/kennethyork/Deyad/releases/latest) · [CLI](#deyad-cli) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
 
 </div>
 
@@ -207,6 +207,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | Editor | Monaco |
 | Terminal | xterm.js + node-pty |
 | AI | Ollama (any local model) |
+| CLI | Node.js + TypeScript (no Electron) |
 | Frontend scaffold | React + Vite + TypeScript |
 | Backend scaffold | Express + TypeScript |
 | Database | SQLite + Prisma |
@@ -214,6 +215,127 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | Version control | Git |
 | Packaging | Electron Builder |
 | Tests | Vitest (308 passing) |
+
+---
+
+## Deyad CLI
+
+A terminal-based AI coding agent — like Claude Code, but 100% local via Ollama. No API keys, no cloud, no cost.
+
+### Install
+
+```bash
+git clone https://github.com/kennethyork/Deyad.git
+cd Deyad/cli
+npm install && npm run build
+npm link   # makes 'deyad' available globally
+```
+
+**Requirements:** Node.js >= 18, Ollama running with at least one model pulled.
+
+### Usage
+
+```bash
+deyad                              # Interactive REPL
+deyad "add a login page"           # One-shot mode
+deyad -m codestral "fix bugs"      # Specify model
+deyad --print "explain this repo"  # Headless/CI mode (no REPL, exits after)
+deyad --resume                     # Resume last saved conversation
+deyad init                         # Create DEYAD.md memory file
+```
+
+### Options
+
+| Flag | Description |
+| --- | --- |
+| `-m, --model <name>` | Ollama model to use |
+| `-d, --dir <path>` | Project directory (default: cwd) |
+| `-y, --yes` | Auto-confirm all tool actions |
+| `-p, --print <prompt>` | Headless mode — run prompt, print result, exit |
+| `--resume` | Resume last saved conversation |
+| `-h, --help` | Show help |
+
+### Slash Commands
+
+| Command | Description |
+| --- | --- |
+| `/help` | Show help |
+| `/model` | Switch Ollama model |
+| `/clear` | Clear conversation history |
+| `/compact` | Show token/message stats |
+| `/diff` | Show git diff of all changes |
+| `/undo` | Revert last agent changes (git checkout) |
+| `/add <file>` | Add a file to conversation context |
+| `/drop <file>` | Remove a file from context |
+| `/run <cmd>` | Run a shell command directly |
+| `/init` | Create a DEYAD.md memory file |
+| `/save` | Save conversation to disk |
+| `/resume` | Resume last saved conversation |
+| `/image <path>` | Attach an image for multimodal models |
+| `/quit` | Exit |
+
+### CLI Tools (15)
+
+The agent has autonomous access to:
+
+| Tool | Purpose |
+| --- | --- |
+| `list_files` | List project files (respects .gitignore) |
+| `read_file` | Read file contents |
+| `write_files` | Create or overwrite files |
+| `edit_file` | Surgical find-and-replace |
+| `delete_file` | Remove a file |
+| `run_command` | Execute shell commands |
+| `search_files` | Regex search across files with glob filtering |
+| `glob_files` | Find files by glob pattern |
+| `fetch_url` | Fetch content from a URL |
+| `memory_read` | Read project DEYAD.md memory |
+| `memory_write` | Update project DEYAD.md memory |
+| `git_status` | Check working tree status |
+| `git_commit` | Stage all and commit |
+| `git_log` | View recent commits |
+| `git_diff` | Show uncommitted changes |
+
+### Features
+
+- **Parallel tool execution** — read-only tools run concurrently via Promise.all
+- **Markdown rendering** — agent responses rendered with ANSI (headers, bold, code blocks, lists)
+- **Token tracking** — real Ollama eval counts with chars/3.5 fallback (matches desktop app)
+- **Session persistence** — auto-saves to `.deyad-session.json`, resume anytime
+- **DEYAD.md memory** — persistent project context file (like CLAUDE.md)
+- **.gitignore-aware** — file listing respects .gitignore via minimatch
+- **Image/multimodal** — attach images for vision-capable models
+- **Headless/CI mode** — `--print` flag for non-interactive pipelines
+- **Streaming + thinking** — live token streaming with dimmed `<think>` blocks
+- **Double Ctrl+C** — first cancels current operation, second exits
+- **Diff display** — colored unified diffs for every file change
+- **Auto-confirm** — `-y` flag skips all confirmation prompts
+
+### CLI vs Claude Code
+
+| Feature | Deyad CLI | Claude Code |
+| --- | --- | --- |
+| 100% local / offline | ✅ | ❌ (Anthropic API) |
+| Free forever | ✅ | ❌ (usage-based) |
+| Interactive REPL | ✅ | ✅ |
+| One-shot mode | ✅ | ✅ |
+| Headless/CI mode | ✅ | ✅ |
+| Regex/glob search | ✅ | ✅ |
+| Web fetch | ✅ | ✅ |
+| Image/multimodal | ✅ | ✅ |
+| Memory file | ✅ (DEYAD.md) | ✅ (CLAUDE.md) |
+| Markdown rendering | ✅ | ✅ |
+| Session resume | ✅ | ✅ |
+| Parallel tools | ✅ | ✅ |
+| .gitignore parsing | ✅ | ✅ |
+| Token tracking | ✅ | ✅ |
+
+### Environment Variables
+
+| Variable | Description |
+| --- | --- |
+| `OLLAMA_HOST` | Ollama API URL (default: `http://127.0.0.1:11434`) |
+| `DEYAD_MODEL` | Default model name |
 
 ---
 
