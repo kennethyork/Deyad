@@ -4,17 +4,18 @@
  * Deyad CLI — local AI coding agent powered by Ollama.
  *
  * Usage:
- *   deyad                    # interactive mode in current directory
- *   deyad "add a login page" # one-shot mode
- *   deyad --model codestral  # specify model
+ *   deyad                         # interactive mode in current directory
+ *   deyad "add a login page"      # one-shot mode
+ *   deyad --model codestral       # specify model
+ *   deyad --print "fix the bug"   # headless CI mode (no REPL)
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync } from 'node:child_process';
-import { checkOllama, listModels } from '../src/ollama.js';
-import { runAgentLoop } from '../src/agent.js';
+import { checkOllama, listModels, estimateTokens } from '../src/ollama.js';
 import type { OllamaMessage } from '../src/ollama.js';
+import { runAgentLoop } from '../src/agent.js';
 import type { AgentResult, TokenStats } from '../src/agent.js';
 import { runCommand } from '../src/tools.js';
 import {
@@ -27,13 +28,28 @@ import {
   formatToolStart,
   formatToolResult,
   formatDiff,
+  renderMarkdown,
   Spinner,
   c, bold, red, green, yellow, cyan, dim, gray,
 } from '../src/ui.js';
 
+const SESSION_FILE = '.deyad-session.json';
+const MEMORY_FILE = 'DEYAD.md';
+
 // ── Parse args ──────────────────────────────────────────────────────
-function parseArgs(argv: string[]): { model?: string; message?: string; dir?: string; help?: boolean; autoConfirm?: boolean } {
-  const result: { model?: string; message?: string; dir?: string; help?: boolean; autoConfirm?: boolean } = {};
+interface CliArgs {
+  model?: string;
+  message?: string;
+  dir?: string;
+  help?: boolean;
+  autoConfirm?: boolean;
+  print?: string;
+  resume?: boolean;
+  init?: boolean;
+}
+
+function parseArgs(argv: string[]): CliArgs {
+  const result: CliArgs = {};
   const positional: string[] = [];
 
   for (let i = 2; i < argv.length; i++) {
@@ -46,6 +62,12 @@ function parseArgs(argv: string[]): { model?: string; message?: string; dir?: st
       result.autoConfirm = true;
     } else if (arg === '--help' || arg === '-h') {
       result.help = true;
+    } else if (arg === '--print' || arg === '-p') {
+      result.print = argv[++i];
+    } else if (arg === '--resume') {
+      result.resume = true;
+    } else if (arg === 'init') {
+      result.init = true;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -63,14 +85,19 @@ function printUsage() {
 ${bold('Deyad CLI')} — Local AI coding agent powered by Ollama
 
 ${bold('Usage:')}
-  deyad                          Interactive mode
-  deyad "add a login page"       One-shot mode
-  deyad -m codestral "fix bugs"  Specify model
+  deyad                              Interactive mode
+  deyad "add a login page"           One-shot mode
+  deyad -m codestral "fix bugs"      Specify model
+  deyad --print "fix the bug"        Headless/CI mode (no REPL, exits after)
+  deyad --resume                     Resume last saved conversation
+  deyad init                         Create DEYAD.md memory file
 
 ${bold('Options:')}
   -m, --model <name>    Ollama model to use
   -d, --dir <path>      Project directory (default: cwd)
   -y, --yes             Auto-confirm all tool actions
+  -p, --print <prompt>  Headless mode: execute prompt and exit
+  --resume              Resume last saved conversation
   -h, --help            Show this help
 
 ${bold('Environment:')}
@@ -83,6 +110,62 @@ function formatTokenStats(stats: TokenStats): string {
   return dim(`[tokens: ~${stats.promptTokens.toLocaleString()} in, ~${stats.completionTokens.toLocaleString()} out, ~${stats.totalTokens.toLocaleString()} total]`);
 }
 
+// ── Session save/load ───────────────────────────────────────────────
+function saveSession(cwd: string, history: OllamaMessage[], model: string, stats: TokenStats, changedFiles: string[]) {
+  const sessionPath = path.join(cwd, SESSION_FILE);
+  const data = { model, history, stats, changedFiles, savedAt: new Date().toISOString() };
+  fs.writeFileSync(sessionPath, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+function loadSession(cwd: string): { model: string; history: OllamaMessage[]; stats: TokenStats; changedFiles: string[] } | null {
+  const sessionPath = path.join(cwd, SESSION_FILE);
+  if (!fs.existsSync(sessionPath)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(sessionPath, 'utf-8'));
+    return { model: data.model, history: data.history || [], stats: data.stats || { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, changedFiles: data.changedFiles || [] };
+  } catch { return null; }
+}
+
+// ── Init command ────────────────────────────────────────────────────
+function initMemory(cwd: string) {
+  const memPath = path.join(cwd, MEMORY_FILE);
+  if (fs.existsSync(memPath)) {
+    console.log(dim(`DEYAD.md already exists at ${memPath}`));
+    return;
+  }
+  const projectName = path.basename(cwd);
+  const template = `# ${projectName}
+
+## Project Overview
+<!-- Describe your project here -->
+
+## Key Conventions
+<!-- Add coding conventions, architecture decisions, etc. -->
+
+## Build & Test
+<!-- Add build/test commands here -->
+\`\`\`bash
+# npm run build
+# npm test
+\`\`\`
+
+## Notes
+<!-- The AI agent will read this file for project context -->
+`;
+  fs.writeFileSync(memPath, template, 'utf-8');
+  console.log(green(`✓ Created ${MEMORY_FILE}`));
+  console.log(dim('  Edit it to add project context for the AI agent.'));
+}
+
+// ── Image helpers ───────────────────────────────────────────────────
+function loadImageBase64(imagePath: string): string | null {
+  const absPath = path.resolve(imagePath);
+  if (!fs.existsSync(absPath)) return null;
+  const ext = path.extname(absPath).toLowerCase();
+  if (!['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) return null;
+  return fs.readFileSync(absPath).toString('base64');
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 async function main() {
   const args = parseArgs(process.argv);
@@ -93,6 +176,13 @@ async function main() {
   }
 
   const cwd = path.resolve(args.dir || process.cwd());
+
+  // Handle init subcommand
+  if (args.init) {
+    initMemory(cwd);
+    process.exit(0);
+  }
+
   const rl = createInterface();
 
   // Check Ollama
@@ -117,6 +207,24 @@ async function main() {
     process.exit(1);
   }
 
+  // Load session if --resume
+  let history: OllamaMessage[] = [];
+  let cumulativeStats: TokenStats = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  let allChangedFiles: string[] = [];
+
+  if (args.resume) {
+    const session = loadSession(cwd);
+    if (session) {
+      history = session.history;
+      cumulativeStats = session.stats;
+      allChangedFiles = session.changedFiles;
+      if (!args.model && session.model) args.model = session.model;
+      console.log(green(`✓ Resumed session (${history.length} messages, ${formatTokenStats(cumulativeStats)})`));
+    } else {
+      console.log(dim('No saved session found. Starting fresh.'));
+    }
+  }
+
   // Select model
   let model = args.model || process.env.DEYAD_MODEL || '';
   if (!model) {
@@ -126,20 +234,25 @@ async function main() {
       model = await selectModel(rl, models);
     }
   }
-  // Validate model exists
   if (!models.some(m => m.startsWith(model))) {
     console.log(red(`Model "${model}" not found. Available: ${models.join(', ')}`));
     rl.close();
     process.exit(1);
   }
 
+  // ── --print headless mode ─────────────────────────────────────
+  if (args.print) {
+    const confirmFn = args.autoConfirm ? async (_q: string) => true : async (question: string) => uiConfirm(rl, question);
+    const result = await runOnce(model, args.print, cwd, history, confirmFn, [], true);
+    rl.close();
+    process.exit(0);
+  }
+
   printBanner(model, cwd);
 
-  let history: OllamaMessage[] = [];
-  let cumulativeStats: TokenStats = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-  let allChangedFiles: string[] = [];
-  /** Files explicitly added to context with /add */
   const contextFiles: string[] = [];
+  /** Pending images to attach to next message */
+  let pendingImages: string[] = [];
 
   // ── Confirm callback ────────────────────────────────────────────
   const confirmFn = args.autoConfirm
@@ -160,7 +273,7 @@ async function main() {
 
   // ── One-shot mode ───────────────────────────────────────────────
   if (args.message) {
-    await runOnce(model, args.message, cwd, history, confirmFn, contextFiles);
+    await runOnce(model, args.message, cwd, history, confirmFn, contextFiles, false);
     rl.close();
     process.exit(0);
   }
@@ -209,7 +322,7 @@ async function main() {
     }
     if (trimmed === '/compact') {
       const chars = history.reduce((s, m) => s + m.content.length, 0);
-      console.log(dim(`Messages: ${history.length} · Characters: ${chars.toLocaleString()}`));
+      console.log(dim(`Messages: ${history.length} · Characters: ${chars.toLocaleString()} · Estimated tokens: ~${estimateTokens(chars).toLocaleString()}`));
       console.log(formatTokenStats(cumulativeStats));
       if (allChangedFiles.length > 0) {
         console.log(dim(`Files changed: ${allChangedFiles.join(', ')}`));
@@ -247,7 +360,6 @@ async function main() {
           console.log(green(`✓ Reverted: ${allChangedFiles.join(', ')}`));
           allChangedFiles = [];
         } catch {
-          // Try git stash as fallback
           console.log(red('✗ Failed to revert. Try git checkout manually.'));
         }
       }
@@ -284,6 +396,39 @@ async function main() {
       console.log(result.success ? result.output : red(result.output));
       continue;
     }
+    if (trimmed === '/init') {
+      initMemory(cwd);
+      continue;
+    }
+    if (trimmed === '/save') {
+      saveSession(cwd, history, model, cumulativeStats, allChangedFiles);
+      console.log(green(`✓ Session saved to ${SESSION_FILE}`));
+      continue;
+    }
+    if (trimmed === '/resume') {
+      const session = loadSession(cwd);
+      if (session) {
+        history = session.history;
+        cumulativeStats = session.stats;
+        allChangedFiles = session.changedFiles;
+        if (session.model) model = session.model;
+        console.log(green(`✓ Resumed session (${history.length} messages)`));
+      } else {
+        console.log(dim('No saved session found.'));
+      }
+      continue;
+    }
+    if (trimmed.startsWith('/image ')) {
+      const imagePath = trimmed.slice(7).trim();
+      const b64 = loadImageBase64(path.resolve(cwd, imagePath));
+      if (!b64) {
+        console.log(red(`Cannot load image: ${imagePath} (must be png/jpg/gif/webp)`));
+      } else {
+        pendingImages.push(b64);
+        console.log(green(`✓ Image attached: ${imagePath} (will be sent with next message)`));
+      }
+      continue;
+    }
 
     // Handle multi-line input (lines ending with \)
     let fullInput = trimmed;
@@ -309,7 +454,11 @@ async function main() {
       }
     }
 
-    const result = await runOnce(model, contextPrefix + fullInput, cwd, history, confirmFn, contextFiles);
+    // Attach pending images
+    const images = pendingImages.length > 0 ? [...pendingImages] : undefined;
+    pendingImages = [];
+
+    const result = await runOnce(model, contextPrefix + fullInput, cwd, history, confirmFn, contextFiles, false, images);
     history = result.history;
     cumulativeStats.promptTokens += result.stats.promptTokens;
     cumulativeStats.completionTokens += result.stats.completionTokens;
@@ -321,7 +470,9 @@ async function main() {
     // Show token stats after each turn
     console.log(formatTokenStats(cumulativeStats));
 
-    // Offer auto-commit if files changed
+    // Auto-save session
+    saveSession(cwd, history, model, cumulativeStats, allChangedFiles);
+
     if (result.changedFiles.length > 0) {
       console.log(dim(`  Changed: ${result.changedFiles.join(', ')}`));
     }
@@ -338,45 +489,52 @@ async function runOnce(
   history: OllamaMessage[],
   confirmFn: (q: string) => Promise<boolean>,
   _contextFiles: string[],
+  headless: boolean = false,
+  images?: string[],
 ): Promise<AgentResult> {
-  console.log(''); // blank line before response
+  if (!headless) console.log(''); // blank line before response
 
   let currentLine = '';
   let inToolBlock = false;
   let inThinkBlock = false;
+  let fullResponse = '';
+
+  // Build the user message with optional images
+  const userMsg: OllamaMessage = { role: 'user', content: message };
+  if (images && images.length > 0) {
+    userMsg.images = images;
+  }
 
   const result = await runAgentLoop(model, message, cwd, {
     onToken: (token: string) => {
       currentLine += token;
+      fullResponse += token;
 
       // Show <think> blocks in dimmed style
       if (currentLine.includes('<think>')) {
         inThinkBlock = true;
-        // Print what came before <think>
         const before = currentLine.split('<think>')[0];
-        if (before && !inToolBlock) process.stdout.write(before);
+        if (before && !inToolBlock) process.stdout.write(headless ? '' : before);
         currentLine = currentLine.split('<think>').slice(1).join('<think>');
       }
       if (inThinkBlock) {
         if (currentLine.includes('</think>')) {
-          // Print the thinking content dimmed
           const thinkContent = currentLine.split('</think>')[0];
-          if (thinkContent.trim()) {
+          if (thinkContent.trim() && !headless) {
             process.stdout.write(`${c.dim}${thinkContent}${c.reset}`);
           }
-          process.stdout.write('\n');
+          if (!headless) process.stdout.write('\n');
           inThinkBlock = false;
           currentLine = currentLine.split('</think>').slice(1).join('</think>');
           return;
         }
-        // Stream thinking tokens dimmed
-        process.stdout.write(`${c.dim}${token}${c.reset}`);
+        if (!headless) process.stdout.write(`${c.dim}${token}${c.reset}`);
         return;
       }
 
       // Don't print tool XML to the user
       if (currentLine.includes('<tool_call>')) { inToolBlock = true; }
-      if (!inToolBlock && !inThinkBlock) {
+      if (!inToolBlock && !inThinkBlock && !headless) {
         process.stdout.write(token);
       }
       if (currentLine.includes('</tool_call>') || currentLine.includes('<done')) {
@@ -385,17 +543,26 @@ async function runOnce(
       }
     },
     onToolStart: (name, params) => {
-      console.log(`\n${formatToolStart(name, params)}`);
+      if (!headless) console.log(`\n${formatToolStart(name, params)}`);
     },
     onToolResult: (result) => {
-      console.log(formatToolResult(result.tool, result.success, result.output));
-      console.log(''); // spacing
+      if (!headless) {
+        console.log(formatToolResult(result.tool, result.success, result.output));
+        console.log('');
+      }
     },
     onDiff: (filePath, diff) => {
-      console.log(formatDiff(filePath, diff));
+      if (!headless) console.log(formatDiff(filePath, diff));
     },
-    onDone: (_summary) => {
-      console.log(`\n${green('✓ Done')}\n`);
+    onDone: (summary) => {
+      if (headless) {
+        // In headless mode, render markdown and print the final summary
+        if (summary.trim()) {
+          console.log(renderMarkdown(summary));
+        }
+      } else {
+        console.log(`\n${green('✓ Done')}\n`);
+      }
     },
     onError: (error) => {
       console.log(`\n${red('✗ ' + error)}\n`);

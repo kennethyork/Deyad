@@ -1,11 +1,13 @@
 /**
- * Ollama API client — streaming chat completions.
+ * Ollama API client — streaming chat completions + multimodal support.
  * No external dependencies, uses native fetch.
  */
 
 export interface OllamaMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** Base64-encoded images for multimodal models */
+  images?: string[];
 }
 
 export interface OllamaOptions {
@@ -15,9 +17,28 @@ export interface OllamaOptions {
   num_ctx?: number;
 }
 
+/** Token usage reported by Ollama (from the final streaming chunk). */
+export interface OllamaUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface StreamChatResult {
+  content: string;
+  usage: OllamaUsage;
+}
+
+/** Chars-per-token ratio matching the GUI (3.5 chars ≈ 1 token). */
+export const CHARS_PER_TOKEN = 3.5;
+
+/** Estimate token count from character length. */
+export function estimateTokens(chars: number): number {
+  return Math.round(chars / CHARS_PER_TOKEN);
+}
+
 /**
  * Stream a chat completion from Ollama.
- * Calls onToken for each token, returns the full response when done.
+ * Calls onToken for each token. Returns full content + token usage.
  */
 export async function streamChat(
   model: string,
@@ -25,7 +46,7 @@ export async function streamChat(
   onToken: (token: string) => void,
   options: OllamaOptions = {},
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<StreamChatResult> {
   const baseUrl = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
   const body = {
     model,
@@ -57,6 +78,7 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buf = '';
   let full = '';
+  let usage: OllamaUsage = { promptTokens: 0, completionTokens: 0 };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -74,6 +96,11 @@ export async function streamChat(
           full += json.message.content;
           onToken(json.message.content);
         }
+        // Ollama sends token counts in the final chunk (done=true)
+        if (json.done && json.prompt_eval_count != null) {
+          usage.promptTokens = json.prompt_eval_count;
+          usage.completionTokens = json.eval_count ?? 0;
+        }
       } catch {
         // skip malformed lines
       }
@@ -88,12 +115,25 @@ export async function streamChat(
         full += json.message.content;
         onToken(json.message.content);
       }
+      if (json.done && json.prompt_eval_count != null) {
+        usage.promptTokens = json.prompt_eval_count;
+        usage.completionTokens = json.eval_count ?? 0;
+      }
     } catch {
       // ignore
     }
   }
 
-  return full;
+  // Fallback: estimate tokens if Ollama didn't report them
+  if (usage.promptTokens === 0) {
+    const promptChars = messages.reduce((s, m) => s + m.content.length, 0);
+    usage.promptTokens = estimateTokens(promptChars);
+  }
+  if (usage.completionTokens === 0) {
+    usage.completionTokens = estimateTokens(full.length);
+  }
+
+  return { content: full, usage };
 }
 
 /** List available chat models from Ollama (excludes embedding models). */

@@ -1,11 +1,12 @@
 /**
- * CLI agent tools — file I/O, shell execution, search, git.
+ * CLI agent tools — file I/O, shell execution, search, git, web fetch, memory.
  * Pure Node.js, no Electron dependencies.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import { minimatch } from 'minimatch';
 
 export interface ToolCall {
   name: string;
@@ -97,35 +98,73 @@ export function simpleDiff(oldText: string, newText: string, filePath: string): 
   return hasChanges ? hunks.join('\n') : '(no changes)';
 }
 
-// ── Ignore patterns ────────────────────────────────────────────────
-const IGNORE_DIRS = new Set([
+// ── Ignore patterns (.gitignore-aware) ─────────────────────────────
+const DEFAULT_IGNORE_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', '__pycache__',
   '.venv', 'venv', '.tox', 'target', '.gradle', 'vendor',
 ]);
 
-const IGNORE_EXTENSIONS = new Set([
+const BINARY_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.svg',
   '.woff', '.woff2', '.ttf', '.eot', '.mp3', '.mp4', '.zip',
   '.tar', '.gz', '.lock', '.pyc', '.class', '.o', '.so', '.dll',
 ]);
 
-/** Recursively list files in a directory. */
-export function walkDir(dir: string, root: string, results: string[] = []): string[] {
+/** Parse .gitignore file and return an array of minimatch-compatible patterns. */
+function parseGitignore(dir: string): string[] {
+  const gitignorePath = path.join(dir, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) return [];
+  try {
+    return fs.readFileSync(gitignorePath, 'utf-8')
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'));
+  } catch { return []; }
+}
+
+/** Check if a relative path matches any .gitignore pattern. */
+function isGitignored(relPath: string, patterns: string[]): boolean {
+  for (const pat of patterns) {
+    // Negation patterns not supported for simplicity
+    if (pat.startsWith('!')) continue;
+    const p = pat.endsWith('/') ? pat + '**' : pat;
+    if (minimatch(relPath, p, { dot: true }) || minimatch(relPath, '**/' + p, { dot: true })) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Recursively list files in a directory, respecting .gitignore. */
+export function walkDir(dir: string, root: string, results: string[] = [], gitignorePatterns?: string[]): string[] {
+  // Load .gitignore patterns once from root
+  if (!gitignorePatterns) {
+    gitignorePatterns = parseGitignore(root);
+  }
+
   let entries: fs.Dirent[];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return results; }
   for (const entry of entries) {
-    if (IGNORE_DIRS.has(entry.name)) continue;
-    if (entry.name.startsWith('.') && entry.name !== '.env') continue;
+    if (DEFAULT_IGNORE_DIRS.has(entry.name)) continue;
+    if (entry.name.startsWith('.') && entry.name !== '.env' && entry.name !== '.gitignore') continue;
     const full = path.join(dir, entry.name);
+    const rel = path.relative(root, full);
+    if (isGitignored(rel, gitignorePatterns)) continue;
     if (entry.isDirectory()) {
-      walkDir(full, root, results);
+      walkDir(full, root, results, gitignorePatterns);
     } else {
       const ext = path.extname(entry.name).toLowerCase();
-      if (IGNORE_EXTENSIONS.has(ext)) continue;
-      results.push(path.relative(root, full));
+      if (BINARY_EXTENSIONS.has(ext)) continue;
+      results.push(rel);
     }
   }
   return results;
+}
+
+/** Match files by glob pattern. */
+export function globFiles(pattern: string, cwd: string): string[] {
+  const allFiles = walkDir(cwd, cwd);
+  return allFiles.filter(f => minimatch(f, pattern, { dot: true }));
 }
 
 /** Execute a tool call against the local filesystem. */
@@ -242,24 +281,33 @@ export async function executeTool(
       case 'search_files': {
         const query = call.params.query;
         if (!query) return { tool: call.name, success: false, output: 'Missing "query" parameter.' };
-        const files = walkDir(cwd, cwd);
-        const lowerQ = query.toLowerCase();
+        const isRegex = call.params.regex === 'true';
+        const includeGlob = call.params.include || '';
+        const files = includeGlob ? globFiles(includeGlob, cwd) : walkDir(cwd, cwd);
+        let regex: RegExp;
+        try {
+          regex = isRegex ? new RegExp(query, 'i') : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        } catch {
+          return { tool: call.name, success: false, output: `Invalid regex: ${query}` };
+        }
         const matches: string[] = [];
         for (const rel of files) {
-          if (rel.toLowerCase().includes(lowerQ)) {
+          // Match filename
+          if (regex.test(rel)) {
             matches.push(rel);
             continue;
           }
+          // Match content
           try {
             const content = fs.readFileSync(path.join(cwd, rel), 'utf-8');
-            if (content.toLowerCase().includes(lowerQ)) {
-              const lines = content.split('\n');
-              const matchLines: string[] = [];
-              for (let i = 0; i < lines.length && matchLines.length < 3; i++) {
-                if (lines[i].toLowerCase().includes(lowerQ)) {
-                  matchLines.push(`  L${i + 1}: ${lines[i].trim().slice(0, 120)}`);
-                }
+            const lines = content.split('\n');
+            const matchLines: string[] = [];
+            for (let i = 0; i < lines.length && matchLines.length < 5; i++) {
+              if (regex.test(lines[i])) {
+                matchLines.push(`  L${i + 1}: ${lines[i].trim().slice(0, 120)}`);
               }
+            }
+            if (matchLines.length > 0) {
               matches.push(`${rel}\n${matchLines.join('\n')}`);
             }
           } catch { /* skip unreadable */ }
@@ -267,8 +315,63 @@ export async function executeTool(
         return {
           tool: call.name,
           success: true,
-          output: matches.length > 0 ? matches.join('\n') : 'No matches found.',
+          output: matches.length > 0 ? matches.slice(0, 50).join('\n') : 'No matches found.',
         };
+      }
+
+      case 'glob_files': {
+        const pattern = call.params.pattern;
+        if (!pattern) return { tool: call.name, success: false, output: 'Missing "pattern" parameter.' };
+        const matched = globFiles(pattern, cwd);
+        return { tool: call.name, success: true, output: matched.length > 0 ? matched.join('\n') : 'No files matched.' };
+      }
+
+      case 'fetch_url': {
+        const url = call.params.url;
+        if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        // Only allow http/https
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          return { tool: call.name, success: false, output: 'Only http:// and https:// URLs allowed.' };
+        }
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Fetch URL: ${url}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15_000);
+          const resp = await fetch(url, {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Deyad-CLI/1.0' },
+          });
+          clearTimeout(timeout);
+          const text = await resp.text();
+          // Strip HTML tags for readability
+          const clean = text.replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const truncated = clean.length > 8000 ? clean.slice(0, 8000) + '\n... (truncated)' : clean;
+          return { tool: call.name, success: true, output: `[${resp.status}] ${truncated}` };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: `Fetch failed: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+
+      case 'memory_read': {
+        const memPath = path.join(cwd, 'DEYAD.md');
+        if (!fs.existsSync(memPath)) return { tool: call.name, success: true, output: '(no DEYAD.md found — use memory_write to create one)' };
+        const content = fs.readFileSync(memPath, 'utf-8');
+        return { tool: call.name, success: true, output: content };
+      }
+
+      case 'memory_write': {
+        const content = call.params.content;
+        if (!content) return { tool: call.name, success: false, output: 'Missing "content" parameter.' };
+        const memPath = path.join(cwd, 'DEYAD.md');
+        fs.writeFileSync(memPath, content, 'utf-8');
+        return { tool: call.name, success: true, output: 'Updated DEYAD.md', changedFiles: ['DEYAD.md'] };
       }
 
       case 'git_status': return await runCommand('git status --short', cwd);
@@ -325,6 +428,8 @@ export const TOOLS_DESCRIPTION = `You have the following tools. Call them using 
 <param name="key">value</param>
 </tool_call>
 
+You may call MULTIPLE tools in a single message — they will be executed in parallel.
+
 Available tools:
 
 1. **list_files** — List all files in the project. No parameters.
@@ -347,16 +452,29 @@ Available tools:
 6. **run_command** — Run a shell command.
    <param name="command">npm test</param>
 
-7. **search_files** — Search file names and contents.
-   <param name="query">search term</param>
+7. **search_files** — Search file names and contents (supports regex).
+   <param name="query">search term or regex pattern</param>
+   <param name="regex">true</param>  (optional, default false)
+   <param name="include">**/*.ts</param>  (optional glob to filter files)
 
-8. **git_status** — Show git status. No parameters.
+8. **glob_files** — Find files matching a glob pattern.
+   <param name="pattern">src/**/*.ts</param>
 
-9. **git_commit** — Stage all and commit.
-   <param name="message">commit message</param>
+9. **fetch_url** — Fetch content from a URL.
+   <param name="url">https://example.com</param>
 
-10. **git_log** — Show recent commits. No parameters.
+10. **memory_read** — Read the project's DEYAD.md memory file. No parameters.
 
-11. **git_diff** — Show full diff of uncommitted changes. No parameters.
+11. **memory_write** — Update the project's DEYAD.md memory file.
+    <param name="content">full contents</param>
+
+12. **git_status** — Show git status. No parameters.
+
+13. **git_commit** — Stage all and commit.
+    <param name="message">commit message</param>
+
+14. **git_log** — Show recent commits. No parameters.
+
+15. **git_diff** — Show full diff of uncommitted changes. No parameters.
 
 When the task is complete, output <done/>.`;

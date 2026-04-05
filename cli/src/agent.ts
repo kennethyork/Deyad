@@ -2,10 +2,12 @@
  * CLI agent loop — multi-turn conversation with Ollama + tool execution.
  */
 
-import { streamChat } from './ollama.js';
-import type { OllamaMessage, OllamaOptions } from './ollama.js';
+import { streamChat, estimateTokens } from './ollama.js';
+import type { OllamaMessage, OllamaOptions, OllamaUsage } from './ollama.js';
 import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION } from './tools.js';
 import type { ToolResult, ToolCallbacks } from './tools.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 const MAX_ITERATIONS = 30;
 const MAX_CONVERSATION_CHARS = 112_000;
@@ -88,7 +90,9 @@ RULES:
 - After changes, verify by running build/test commands if applicable.
 - If a command fails, read the error and fix the issue.
 - Keep explanations concise — focus on actions.
-- You can make multiple tool calls in a single response.`;
+- You can make multiple tool calls in a single response — they execute in parallel.
+- Use memory_read at the start to check for project conventions in DEYAD.md.
+- Use memory_write to save important project notes and conventions.`;
 }
 
 /**
@@ -102,7 +106,7 @@ async function buildContext(cwd: string): Promise<string> {
   let context = `Project files (${files.length}):\n${listing.output}\n`;
 
   // Auto-read key config files
-  const keyFiles = ['package.json', 'tsconfig.json', 'Cargo.toml', 'pyproject.toml', 'go.mod', 'Makefile', '.env'];
+  const keyFiles = ['package.json', 'tsconfig.json', 'Cargo.toml', 'pyproject.toml', 'go.mod', 'Makefile', '.env', 'DEYAD.md'];
   for (const f of keyFiles) {
     if (files.includes(f)) {
       const result = await exec({ name: 'read_file', params: { path: f } }, cwd);
@@ -151,11 +155,7 @@ export async function runAgentLoop(
       iteration++;
       compactConversation(messages);
 
-      // Estimate prompt tokens (rough: 4 chars ≈ 1 token)
-      const promptChars = messages.reduce((s, m) => s + m.content.length, 0);
-      stats.promptTokens += Math.ceil(promptChars / 4);
-
-      const turnResponse = await streamChat(
+      const result = await streamChat(
         model,
         messages,
         callbacks.onToken,
@@ -165,8 +165,11 @@ export async function runAgentLoop(
 
       if (abortController.signal.aborted) break;
 
-      // Estimate completion tokens
-      stats.completionTokens += Math.ceil(turnResponse.length / 4);
+      const turnResponse = result.content;
+
+      // Accumulate token counts from Ollama (uses real counts or 3.5-ratio estimate)
+      stats.promptTokens += result.usage.promptTokens;
+      stats.completionTokens += result.usage.completionTokens;
       stats.totalTokens = stats.promptTokens + stats.completionTokens;
 
       // Parse tool calls
@@ -182,22 +185,43 @@ export async function runAgentLoop(
       // Record assistant message
       messages.push({ role: 'assistant', content: turnResponse });
 
-      // Execute tools with diff callback
+      // Execute tools — parallel for read-only, sequential for writes
       const toolCb: ToolCallbacks = {
         confirm: callbacks.confirm,
         onDiff: callbacks.onDiff,
       };
-      const results: ToolResult[] = [];
-      for (const call of toolCalls) {
-        if (abortController.signal.aborted) break;
-        callbacks.onToolStart(call.name, call.params);
-        const result = await executeTool(call, cwd, toolCb);
-        results.push(result);
-        callbacks.onToolResult(result);
-        // Track changed files
-        if (result.changedFiles) {
-          for (const f of result.changedFiles) {
-            if (!changedFiles.includes(f)) changedFiles.push(f);
+
+      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff']);
+      const allReadOnly = toolCalls.every(c => readOnlyTools.has(c.name));
+
+      let results: ToolResult[];
+      if (allReadOnly && toolCalls.length > 1) {
+        // Parallel execution for read-only tools
+        for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
+        results = await Promise.all(
+          toolCalls.map(call => executeTool(call, cwd, toolCb))
+        );
+        for (const result of results) {
+          callbacks.onToolResult(result);
+          if (result.changedFiles) {
+            for (const f of result.changedFiles) {
+              if (!changedFiles.includes(f)) changedFiles.push(f);
+            }
+          }
+        }
+      } else {
+        // Sequential execution (for writes or mixed)
+        results = [];
+        for (const call of toolCalls) {
+          if (abortController.signal.aborted) break;
+          callbacks.onToolStart(call.name, call.params);
+          const result = await executeTool(call, cwd, toolCb);
+          results.push(result);
+          callbacks.onToolResult(result);
+          if (result.changedFiles) {
+            for (const f of result.changedFiles) {
+              if (!changedFiles.includes(f)) changedFiles.push(f);
+            }
           }
         }
       }

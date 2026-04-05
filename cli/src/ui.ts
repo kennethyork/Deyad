@@ -125,11 +125,16 @@ ${bold('Commands:')}
   ${cyan('/add <file>')}    Add a file to conversation context
   ${cyan('/drop <file>')}   Remove a file from context
   ${cyan('/run <cmd>')}     Run a shell command directly
+  ${cyan('/init')}          Create a DEYAD.md memory file
+  ${cyan('/resume')}        Resume last saved conversation
+  ${cyan('/save')}          Save conversation to disk
   ${cyan('/quit')}          Exit
 
 ${bold('Tips:')}
-  • The agent can read/write files, run commands, and search your code
+  • The agent can read/write files, run commands, search your code, and fetch URLs
   • It will ask for confirmation before writing files or running commands
+  • Use --print "prompt" for headless/CI mode (no REPL, exits after response)
+  • Attach images: /image path/to/image.png (for multimodal models)
   • Press Ctrl+C to abort the current operation, twice to quit
   • Multi-line input: end with \\ to continue on next line
 `);
@@ -162,4 +167,98 @@ export function formatToolResult(tool: string, success: boolean, output: string)
   const preview = output.split('\n').slice(0, 5).join('\n');
   const more = output.split('\n').length > 5 ? dim(`  ... (${output.split('\n').length} lines)`) : '';
   return `${icon} ${dim(tool)}\n${gray(preview)}${more}`;
+}
+
+// ── Markdown terminal rendering ─────────────────────────────────────
+/**
+ * Render markdown text with ANSI terminal formatting.
+ * Handles: headers, bold, italic, inline code, code blocks, lists, links, horizontal rules.
+ */
+export function renderMarkdown(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let inCodeBlock = false;
+  let codeBlockLang = '';
+
+  for (const line of lines) {
+    // Fenced code blocks
+    if (line.trimStart().startsWith('```')) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLang = line.trimStart().slice(3).trim();
+        out.push(dim('─── ' + (codeBlockLang || 'code') + ' ─────────────────────────'));
+      } else {
+        inCodeBlock = false;
+        out.push(dim('────────────────────────────────────'));
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      out.push(`${c.gray}  ${line}${c.reset}`);
+      continue;
+    }
+
+    let processed = line;
+
+    // Headers
+    if (processed.startsWith('### ')) {
+      out.push(`${c.bold}${c.cyan}${processed.slice(4)}${c.reset}`);
+      continue;
+    }
+    if (processed.startsWith('## ')) {
+      out.push(`\n${c.bold}${c.blue}${processed.slice(3)}${c.reset}`);
+      continue;
+    }
+    if (processed.startsWith('# ')) {
+      out.push(`\n${c.bold}${c.magenta}${processed.slice(2)}${c.reset}`);
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^---+$/.test(processed.trim()) || /^\*\*\*+$/.test(processed.trim())) {
+      out.push(dim('────────────────────────────────────'));
+      continue;
+    }
+
+    // Bullet lists
+    if (/^\s*[-*+]\s/.test(processed)) {
+      const indent = processed.match(/^(\s*)/)?.[1] || '';
+      processed = processed.replace(/^(\s*)[-*+]\s/, '');
+      processed = renderInline(processed);
+      out.push(`${indent}${c.cyan}•${c.reset} ${processed}`);
+      continue;
+    }
+
+    // Numbered lists
+    if (/^\s*\d+\.\s/.test(processed)) {
+      const match = processed.match(/^(\s*)(\d+)\.\s(.*)/);
+      if (match) {
+        const rendered = renderInline(match[3]);
+        out.push(`${match[1]}${c.cyan}${match[2]}.${c.reset} ${rendered}`);
+        continue;
+      }
+    }
+
+    // Regular text — apply inline formatting
+    out.push(renderInline(processed));
+  }
+
+  return out.join('\n');
+}
+
+/** Apply inline markdown formatting (bold, italic, code, links). */
+function renderInline(text: string): string {
+  let s = text;
+  // Inline code (must be before bold/italic)
+  s = s.replace(/`([^`]+)`/g, `${c.cyan}$1${c.reset}`);
+  // Bold + italic
+  s = s.replace(/\*\*\*([^*]+)\*\*\*/g, `${c.bold}${c.magenta}$1${c.reset}`);
+  // Bold
+  s = s.replace(/\*\*([^*]+)\*\*/g, `${c.bold}$1${c.reset}`);
+  // Italic
+  s = s.replace(/\*([^*]+)\*/g, `${c.magenta}$1${c.reset}`);
+  // Links: [text](url)
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, `$1 ${c.dim}(${c.cyan}$2${c.reset}${c.dim})${c.reset}`);
+  return s;
 }
