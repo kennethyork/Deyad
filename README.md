@@ -296,7 +296,7 @@ The agent has autonomous access to:
 | `git_log` | View recent commits |
 | `git_diff` | Show uncommitted changes |
 
-### Features
+### Highlights
 
 - **Parallel tool execution** — read-only tools run concurrently via Promise.all
 - **Markdown rendering** — agent responses rendered with ANSI (headers, bold, code blocks, lists)
