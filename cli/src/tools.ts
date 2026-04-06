@@ -271,6 +271,20 @@ async function executeToolRaw(
       case 'run_command': {
         const cmd = call.params.command;
         if (!cmd) return { tool: call.name, success: false, output: 'Missing "command" parameter.' };
+        // Block dangerous commands
+        const BLOCKED_PATTERNS = [
+          /\brm\s+(-[a-z]*f|-[a-z]*r).*\//i,
+          /\bsudo\b/i,
+          /\bmkfs\b/i,
+          /\bdd\s+.*of=\/dev\//i,
+          /\b(shutdown|reboot|halt|poweroff)\b/i,
+          />\s*\/dev\/(sda|nvme|disk)/i,
+          /\bcurl\b.*\|\s*(ba)?sh/i,
+          /\bwget\b.*\|\s*(ba)?sh/i,
+        ];
+        if (BLOCKED_PATTERNS.some(p => p.test(cmd))) {
+          return { tool: call.name, success: false, output: 'Command blocked: potentially destructive operation.' };
+        }
         if (cb?.confirm) {
           const ok = await cb.confirm(`Run: ${cmd}`);
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
@@ -333,6 +347,16 @@ async function executeToolRaw(
         if (!url.startsWith('http://') && !url.startsWith('https://')) {
           return { tool: call.name, success: false, output: 'Only http:// and https:// URLs allowed.' };
         }
+        // Block private/internal IPs (SSRF protection)
+        try {
+          const parsed = new URL(url);
+          const host = parsed.hostname;
+          if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|localhost|::1|\[::1\]|metadata\.google|169\.254\.)/i.test(host)) {
+            return { tool: call.name, success: false, output: 'Blocked: private/internal addresses are not allowed.' };
+          }
+        } catch {
+          return { tool: call.name, success: false, output: 'Invalid URL format.' };
+        }
         if (cb?.confirm) {
           const ok = await cb.confirm(`Fetch URL: ${url}?`);
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
@@ -387,6 +411,153 @@ async function executeToolRaw(
 
       case 'git_log': return await runCommand('git log --oneline -10', cwd);
       case 'git_diff': return await runCommand('git diff', cwd);
+
+      case 'git_push': {
+        if (cb?.confirm) {
+          const ok = await cb.confirm('Push to remote?');
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        return await runCommand('git push', cwd);
+      }
+
+      case 'git_pull': {
+        return await runCommand('git pull', cwd);
+      }
+
+      case 'git_branch': {
+        return await runCommand('git branch -a', cwd);
+      }
+
+      case 'git_branch_create': {
+        const name = call.params.name;
+        if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
+        if (!/^[a-zA-Z0-9._\-/]+$/.test(name)) return { tool: call.name, success: false, output: 'Invalid branch name.' };
+        return await runCommand(`git checkout -b ${name}`, cwd);
+      }
+
+      case 'git_branch_switch': {
+        const name = call.params.name;
+        if (!name) return { tool: call.name, success: false, output: 'Missing "name" parameter.' };
+        if (!/^[a-zA-Z0-9._\-/]+$/.test(name)) return { tool: call.name, success: false, output: 'Invalid branch name.' };
+        return await runCommand(`git checkout ${name}`, cwd);
+      }
+
+      case 'git_remote_get': {
+        return await runCommand('git remote get-url origin 2>/dev/null || echo "No remote configured."', cwd);
+      }
+
+      case 'git_remote_set': {
+        const url = call.params.url;
+        if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Set remote origin to ${url}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        const hasRemote = await runCommand('git remote get-url origin 2>/dev/null', cwd);
+        const cmd = hasRemote.success ? `git remote set-url origin "${url.replace(/"/g, '\\"')}"` : `git remote add origin "${url.replace(/"/g, '\\"')}"`;
+        return await runCommand(cmd, cwd);
+      }
+
+      case 'multi_edit': {
+        const edits: Array<{ path: string; oldStr: string; newStr: string }> = [];
+        for (let i = 0; i < 20; i++) {
+          const p = call.params[`edit_${i}_path`];
+          const o = call.params[`edit_${i}_old_string`];
+          const n = call.params[`edit_${i}_new_string`];
+          if (!p) break;
+          if (o === undefined || n === undefined) {
+            return { tool: call.name, success: false, output: `Edit ${i}: missing old_string or new_string.` };
+          }
+          edits.push({ path: p, oldStr: o, newStr: n });
+        }
+        if (edits.length === 0) {
+          return { tool: call.name, success: false, output: 'No edits specified. Use edit_0_path, edit_0_old_string, edit_0_new_string, ...' };
+        }
+        if (cb?.confirm) {
+          const paths = [...new Set(edits.map(e => e.path))];
+          const ok = await cb.confirm(`Multi-edit ${edits.length} changes across ${paths.length} file(s): ${paths.join(', ')}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        const writeMap: Record<string, string> = {};
+        const results: string[] = [];
+        let hasError = false;
+        const allChangedFiles: string[] = [];
+        for (let i = 0; i < edits.length; i++) {
+          const { path: fp, oldStr: o, newStr: n } = edits[i];
+          const absPath = path.resolve(cwd, fp);
+          if (!absPath.startsWith(resolvedCwd)) {
+            results.push(`Edit ${i} (${fp}): FAILED — path traversal not allowed`);
+            hasError = true;
+            continue;
+          }
+          // Use already-modified version if we edited this file earlier in the batch
+          let content = writeMap[fp];
+          if (content === undefined) {
+            if (!fs.existsSync(absPath)) {
+              results.push(`Edit ${i} (${fp}): FAILED — file not found`);
+              hasError = true;
+              continue;
+            }
+            content = fs.readFileSync(absPath, 'utf-8');
+          }
+          const occurrences = content.split(o).length - 1;
+          if (occurrences === 0) {
+            results.push(`Edit ${i} (${fp}): FAILED — old_string not found`);
+            hasError = true;
+            continue;
+          }
+          if (occurrences > 1) {
+            results.push(`Edit ${i} (${fp}): FAILED — old_string found ${occurrences} times (must be unique)`);
+            hasError = true;
+            continue;
+          }
+          writeMap[fp] = content.replace(o, n);
+          results.push(`Edit ${i} (${fp}): OK`);
+          if (!allChangedFiles.includes(fp)) allChangedFiles.push(fp);
+        }
+        // Write all modified files
+        for (const [fp, content] of Object.entries(writeMap)) {
+          const absPath = path.resolve(cwd, fp);
+          if (cb?.onDiff) {
+            const old = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf-8') : '';
+            cb.onDiff(fp, simpleDiff(old, content, fp));
+          }
+          fs.mkdirSync(path.dirname(absPath), { recursive: true });
+          fs.writeFileSync(absPath, content, 'utf-8');
+        }
+        const editedCount = results.filter(r => r.includes(': OK')).length;
+        return {
+          tool: call.name,
+          success: !hasError,
+          output: `Applied ${editedCount}/${edits.length} edits:\n${results.join('\n')}`,
+          changedFiles: allChangedFiles,
+        };
+      }
+
+      case 'install_package': {
+        const pkg = call.params.package;
+        if (!pkg) return { tool: call.name, success: false, output: 'Missing "package" parameter.' };
+        if (!/^[@a-zA-Z0-9._\-/]+$/.test(pkg)) {
+          return { tool: call.name, success: false, output: 'Invalid package name: only alphanumeric, @, ., _, -, / characters are allowed.' };
+        }
+        const isDev = call.params.dev === 'true';
+        const manager = call.params.manager || 'npm';
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Install ${pkg} via ${manager}${isDev ? ' (dev)' : ''}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        let cmd: string;
+        if (manager === 'npm') {
+          cmd = `npm install ${isDev ? '-D ' : ''}${pkg}`;
+        } else if (manager === 'pip') {
+          cmd = `pip install ${pkg}`;
+        } else if (manager === 'go') {
+          cmd = `go get ${pkg}`;
+        } else {
+          cmd = `npm install ${pkg}`;
+        }
+        return await runCommand(cmd, cwd);
+      }
 
       default:
         return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
@@ -473,36 +644,73 @@ Available tools:
    <param name="path">file.ts</param>
    <param name="old_string">exact match</param>
    <param name="new_string">replacement</param>
+   Prefer edit_file over write_files when you only need to change a small part of a file.
+   Include enough surrounding context in old_string so it matches exactly once.
 
-5. **delete_file** — Delete a file.
+5. **multi_edit** — Apply multiple surgical edits across one or more files in a single operation.
+   <param name="edit_0_path">path/to/first/file</param>
+   <param name="edit_0_old_string">exact text to find in first file</param>
+   <param name="edit_0_new_string">replacement for first file</param>
+   <param name="edit_1_path">path/to/second/file</param>
+   <param name="edit_1_old_string">exact text to find in second file</param>
+   <param name="edit_1_new_string">replacement for second file</param>
+   Supports up to 20 edits. Edits to the same file are applied sequentially.
+   Use this instead of multiple edit_file calls when you need to change several files at once.
+
+6. **delete_file** — Delete a file.
    <param name="path">relative/path</param>
 
-6. **run_command** — Run a shell command.
+7. **run_command** — Run a shell command.
    <param name="command">npm test</param>
 
-7. **search_files** — Search file names and contents (supports regex).
+8. **search_files** — Search file names and contents (supports regex).
    <param name="query">search term or regex pattern</param>
    <param name="regex">true</param>  (optional, default false)
    <param name="include">**/*.ts</param>  (optional glob to filter files)
 
-8. **glob_files** — Find files matching a glob pattern.
+9. **glob_files** — Find files matching a glob pattern.
    <param name="pattern">src/**/*.ts</param>
 
-9. **fetch_url** — Fetch content from a URL.
-   <param name="url">https://example.com</param>
+10. **fetch_url** — Fetch content from a URL.
+    <param name="url">https://example.com</param>
 
-10. **memory_read** — Read the project's DEYAD.md memory file. No parameters.
+11. **install_package** — Install a package using npm, pip, or go.
+    <param name="package">express</param>
+    <param name="manager">npm</param>  (npm | pip | go, defaults to npm)
+    <param name="dev">false</param>  (optional, npm only — install as devDependency)
 
-11. **memory_write** — Update the project's DEYAD.md memory file.
+12. **memory_read** — Read the project's DEYAD.md memory file. No parameters.
+
+13. **memory_write** — Update the project's DEYAD.md memory file.
     <param name="content">full contents</param>
 
-12. **git_status** — Show git status. No parameters.
+14. **git_status** — Show git status. No parameters.
 
-13. **git_commit** — Stage all and commit.
+15. **git_commit** — Stage all and commit.
     <param name="message">commit message</param>
 
-14. **git_log** — Show recent commits. No parameters.
+16. **git_log** — Show recent commits. No parameters.
 
-15. **git_diff** — Show full diff of uncommitted changes. No parameters.
+17. **git_diff** — Show full diff of uncommitted changes. No parameters.
 
+18. **git_push** — Push commits to the remote repository. No parameters.
+
+19. **git_pull** — Pull latest changes from the remote repository. No parameters.
+
+20. **git_branch** — List all branches and show the current one. No parameters.
+
+21. **git_branch_create** — Create a new branch and switch to it.
+    <param name="name">feature-xyz</param>
+
+22. **git_branch_switch** — Switch to an existing branch.
+    <param name="name">main</param>
+
+23. **git_remote_get** — Get the current remote origin URL. No parameters.
+
+24. **git_remote_set** — Set the remote origin URL.
+    <param name="url">https://github.com/user/repo.git</param>
+
+When the user asks for any git operation (push, pull, commit, branch, status, log, remote, etc.), use the dedicated git_* tools directly — do NOT use run_command with git.
+
+After your tool calls, you will receive results in <tool_result> blocks.
 When the task is complete, output <done/>.`;

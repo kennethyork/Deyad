@@ -225,9 +225,9 @@ export async function runAgentLoop(
         onDiff: callbacks.onDiff,
       };
 
-      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff']);
+      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff', 'git_branch', 'git_remote_get']);
       const allReadOnly = toolCalls.every(c => readOnlyTools.has(c.name) || (mcpManager?.isMcpTool(c.name) ?? false));
-      const writeTools = new Set(['write_files', 'edit_file', 'delete_file']);
+      const writeTools = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit']);
 
       let results: ToolResult[];
       let filesChanged = false;
