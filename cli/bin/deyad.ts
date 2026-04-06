@@ -229,7 +229,7 @@ async function main() {
   // Select model
   let model = args.model || process.env.DEYAD_MODEL || '';
   if (!model) {
-    if (models.length === 1) {
+    if (models.length === 1 || args.print) {
       model = models[0];
     } else {
       model = await selectModel(rl, models);
@@ -541,7 +541,7 @@ async function runOnce(
       if (currentLine.includes('<think>')) {
         inThinkBlock = true;
         const before = currentLine.split('<think>')[0];
-        if (before && !inToolBlock) process.stdout.write(headless ? '' : before);
+        if (before && !inToolBlock) process.stdout.write(before);
         currentLine = currentLine.split('<think>').slice(1).join('<think>');
       }
       if (inThinkBlock) {
@@ -559,34 +559,30 @@ async function runOnce(
         return;
       }
 
-      // Don't print tool XML to the user
+      // Don't print tool XML or done tag to the user
       if (currentLine.includes('<tool_call>')) { inToolBlock = true; }
-      if (!inToolBlock && !inThinkBlock && !headless) {
+      if (currentLine.includes('<done')) { inToolBlock = true; }
+      if (!inToolBlock && !inThinkBlock) {
         process.stdout.write(token);
       }
-      if (currentLine.includes('</tool_call>') || currentLine.includes('<done')) {
+      if (currentLine.includes('</tool_call>')) {
         inToolBlock = false;
         currentLine = '';
       }
     },
     onToolStart: (name, params) => {
-      if (!headless) console.log(`\n${formatToolStart(name, params)}`);
+      console.log(`\n${formatToolStart(name, params)}`);
     },
     onToolResult: (result) => {
-      if (!headless) {
-        console.log(formatToolResult(result.tool, result.success, result.output));
-        console.log('');
-      }
+      console.log(formatToolResult(result.tool, result.success, result.output));
+      console.log('');
     },
     onDiff: (filePath, diff) => {
-      if (!headless) console.log(formatDiff(filePath, diff));
+      console.log(formatDiff(filePath, diff));
     },
     onDone: (summary) => {
       if (headless) {
-        // In headless mode, render markdown and print the final summary
-        if (summary.trim()) {
-          console.log(renderMarkdown(summary));
-        }
+        console.log(''); // newline after streamed output
       } else {
         console.log(`\n${green('✓ Done')}\n`);
       }
