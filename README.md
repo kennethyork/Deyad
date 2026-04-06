@@ -270,9 +270,10 @@ deyad init                         # Create DEYAD.md memory file
 | `/save` | Save conversation to disk |
 | `/resume` | Resume last saved conversation |
 | `/image <path>` | Attach an image for multimodal models |
+| `/mcp` | Show connected MCP servers and tools |
 | `/quit` | Exit |
 
-### CLI Tools (15)
+### CLI Tools (15 built-in + MCP)
 
 The agent has autonomous access to:
 
@@ -293,6 +294,7 @@ The agent has autonomous access to:
 | `git_commit` | Stage all and commit |
 | `git_log` | View recent commits |
 | `git_diff` | Show uncommitted changes |
+| `mcp_*` | Any tool from connected MCP servers (auto-discovered) |
 
 ### Highlights
 
@@ -305,6 +307,7 @@ The agent has autonomous access to:
 - **Image/multimodal** — attach images for vision-capable models
 - **Headless/CI mode** — `--print` flag for non-interactive pipelines
 - **Streaming + thinking** — live token streaming with dimmed `<think>` blocks
+- **MCP servers** — connect external tools via `.deyad.json` (GitHub, Slack, databases, etc.)
 - **Double Ctrl+C** — first cancels current operation, second exits
 - **Diff display** — colored unified diffs for every file change
 - **Auto-confirm** — `-y` flag skips all confirmation prompts
@@ -332,9 +335,31 @@ The agent has autonomous access to:
 | **Token tracking** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | **Diff display + undo** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
 | **Git integration** | ✅ | ✅ | ✅ (auto-commit) | ❌ | ✅ | ✅ |
-| **MCP servers** | ❌ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| **MCP servers** | ✅ `.deyad.json` | ✅ | ❌ | ❌ | ✅ | ❌ |
 | **Model choice** | Any Ollama model | Claude only | Any (BYO key) | GPT-4/Copilot | Any (BYO key) | Any (BYO key) |
 | **Open source** | ✅ MIT | ❌ | ✅ Apache 2.0 | ❌ | ✅ Apache 2.0 | ✅ MIT |
+
+### MCP Server Configuration
+
+Add external tools by creating `.deyad.json` in your project (or `~/.config/deyad/mcp.json` globally):
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "ghp_..." }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }
+}
+```
+
+Servers are auto-connected on startup. Tools are namespaced as `mcp_<server>_<tool>` and injected into the agent's system prompt.
 
 ### Environment Variables
 

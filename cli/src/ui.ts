@@ -128,6 +128,8 @@ ${bold('Commands:')}
   ${cyan('/init')}          Create a DEYAD.md memory file
   ${cyan('/resume')}        Resume last saved conversation
   ${cyan('/save')}          Save conversation to disk
+  ${cyan('/image <file>')} Attach an image to next message
+  ${cyan('/mcp')}          Show connected MCP servers and tools
   ${cyan('/quit')}          Exit
 
 ${bold('Tips:')}
@@ -137,6 +139,7 @@ ${bold('Tips:')}
   • Attach images: /image path/to/image.png (for multimodal models)
   • Press Ctrl+C to abort the current operation, twice to quit
   • Multi-line input: end with \\ to continue on next line
+  • MCP: add servers to ${cyan('.deyad.json')} to extend with external tools
 `);
 }
 

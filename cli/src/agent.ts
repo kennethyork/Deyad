@@ -6,6 +6,7 @@ import { streamChat, estimateTokens } from './ollama.js';
 import type { OllamaMessage, OllamaOptions, OllamaUsage } from './ollama.js';
 import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION } from './tools.js';
 import type { ToolResult, ToolCallbacks } from './tools.js';
+import type { McpManager } from './mcp.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -70,11 +71,11 @@ function compactConversation(messages: OllamaMessage[]): void {
   });
 }
 
-function getSystemPrompt(cwd: string): string {
+function getSystemPrompt(cwd: string, mcpToolsDesc: string = ''): string {
   return `You are Deyad CLI, an autonomous AI coding agent powered by Ollama.
 You work directly in the user's project directory: ${cwd}
 
-${TOOLS_DESCRIPTION}
+${TOOLS_DESCRIPTION}${mcpToolsDesc}
 
 WORKFLOW:
 1. Understand the request. Explore the project first (list_files, read_file).
@@ -93,6 +94,22 @@ RULES:
 - You can make multiple tool calls in a single response — they execute in parallel.
 - Use memory_read at the start to check for project conventions in DEYAD.md.
 - Use memory_write to save important project notes and conventions.`;
+}
+
+/**
+ * Route a tool call to either the built-in executor or an MCP server.
+ */
+async function executeToolOrMcp(
+  call: { name: string; params: Record<string, string> },
+  cwd: string,
+  cb: ToolCallbacks,
+  mcpManager?: McpManager,
+): Promise<ToolResult> {
+  if (mcpManager?.isMcpTool(call.name)) {
+    const result = await mcpManager.callTool(call.name, call.params);
+    return { tool: call.name, success: result.success, output: result.output };
+  }
+  return executeTool(call, cwd, cb);
 }
 
 /**
@@ -130,6 +147,7 @@ export async function runAgentLoop(
   callbacks: AgentCallbacks,
   history: OllamaMessage[] = [],
   ollamaOptions?: OllamaOptions,
+  mcpManager?: McpManager,
 ): Promise<AgentResult> {
   const abortController = new AbortController();
   const changedFiles: string[] = [];
@@ -141,9 +159,10 @@ export async function runAgentLoop(
 
   try {
     const context = await buildContext(cwd);
+    const mcpToolsDesc = mcpManager ? mcpManager.getToolsDescription() : '';
 
     const messages: OllamaMessage[] = [
-      { role: 'system', content: getSystemPrompt(cwd) },
+      { role: 'system', content: getSystemPrompt(cwd, mcpToolsDesc) },
       { role: 'system', content: `Project context:\n\n${context}` },
       ...history,
       { role: 'user', content: userMessage },
@@ -192,14 +211,14 @@ export async function runAgentLoop(
       };
 
       const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff']);
-      const allReadOnly = toolCalls.every(c => readOnlyTools.has(c.name));
+      const allReadOnly = toolCalls.every(c => readOnlyTools.has(c.name) || (mcpManager?.isMcpTool(c.name) ?? false));
 
       let results: ToolResult[];
       if (allReadOnly && toolCalls.length > 1) {
         // Parallel execution for read-only tools
         for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
         results = await Promise.all(
-          toolCalls.map(call => executeTool(call, cwd, toolCb))
+          toolCalls.map(call => executeToolOrMcp(call, cwd, toolCb, mcpManager))
         );
         for (const result of results) {
           callbacks.onToolResult(result);
@@ -215,7 +234,7 @@ export async function runAgentLoop(
         for (const call of toolCalls) {
           if (abortController.signal.aborted) break;
           callbacks.onToolStart(call.name, call.params);
-          const result = await executeTool(call, cwd, toolCb);
+          const result = await executeToolOrMcp(call, cwd, toolCb, mcpManager);
           results.push(result);
           callbacks.onToolResult(result);
           if (result.changedFiles) {

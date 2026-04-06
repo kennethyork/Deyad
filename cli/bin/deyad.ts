@@ -18,6 +18,7 @@ import type { OllamaMessage } from '../src/ollama.js';
 import { runAgentLoop } from '../src/agent.js';
 import type { AgentResult, TokenStats } from '../src/agent.js';
 import { runCommand } from '../src/tools.js';
+import { McpManager } from '../src/mcp.js';
 import {
   createInterface,
   prompt,
@@ -240,10 +241,22 @@ async function main() {
     process.exit(1);
   }
 
+  // ── Connect to MCP servers ─────────────────────────────────────
+  const mcpManager = new McpManager();
+  await mcpManager.connect(cwd, (msg) => console.log(dim(msg)));
+  const mcpTools = mcpManager.getTools();
+  if (mcpTools.length > 0) {
+    console.log(green(`✓ MCP: ${mcpTools.length} tools from ${mcpManager.getStatus().length} server(s)`));
+  }
+
+  // Cleanup MCP on exit
+  process.on('exit', () => { mcpManager.disconnect().catch(() => {}); });
+
   // ── --print headless mode ─────────────────────────────────────
   if (args.print) {
     const confirmFn = args.autoConfirm ? async (_q: string) => true : async (question: string) => uiConfirm(rl, question);
-    const result = await runOnce(model, args.print, cwd, history, confirmFn, [], true);
+    const result = await runOnce(model, args.print, cwd, history, confirmFn, [], true, undefined, mcpManager);
+    await mcpManager.disconnect();
     rl.close();
     process.exit(0);
   }
@@ -273,7 +286,8 @@ async function main() {
 
   // ── One-shot mode ───────────────────────────────────────────────
   if (args.message) {
-    await runOnce(model, args.message, cwd, history, confirmFn, contextFiles, false);
+    await runOnce(model, args.message, cwd, history, confirmFn, contextFiles, false, undefined, mcpManager);
+    await mcpManager.disconnect();
     rl.close();
     process.exit(0);
   }
@@ -429,6 +443,18 @@ async function main() {
       }
       continue;
     }
+    if (trimmed === '/mcp') {
+      const status = mcpManager.getStatus();
+      if (status.length === 0) {
+        console.log(dim('No MCP servers connected.'));
+        console.log(dim('  Add servers to .deyad.json:'));
+        console.log(dim('  { "mcpServers": { "name": { "command": "npx", "args": ["-y", "pkg"] } } }'));
+      } else {
+        console.log(bold('MCP Servers:'));
+        for (const s of status) console.log(`  ${s}`);
+      }
+      continue;
+    }
 
     // Handle multi-line input (lines ending with \)
     let fullInput = trimmed;
@@ -458,7 +484,7 @@ async function main() {
     const images = pendingImages.length > 0 ? [...pendingImages] : undefined;
     pendingImages = [];
 
-    const result = await runOnce(model, contextPrefix + fullInput, cwd, history, confirmFn, contextFiles, false, images);
+    const result = await runOnce(model, contextPrefix + fullInput, cwd, history, confirmFn, contextFiles, false, images, mcpManager);
     history = result.history;
     cumulativeStats.promptTokens += result.stats.promptTokens;
     cumulativeStats.completionTokens += result.stats.completionTokens;
@@ -491,6 +517,7 @@ async function runOnce(
   _contextFiles: string[],
   headless: boolean = false,
   images?: string[],
+  mcpManager?: McpManager,
 ): Promise<AgentResult> {
   if (!headless) console.log(''); // blank line before response
 
@@ -568,7 +595,7 @@ async function runOnce(
       console.log(`\n${red('✗ ' + error)}\n`);
     },
     confirm: confirmFn,
-  }, history);
+  }, history, undefined, mcpManager);
 
   return result;
 }
