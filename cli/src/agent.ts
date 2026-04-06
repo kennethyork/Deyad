@@ -9,8 +9,7 @@ import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { McpManager } from './mcp.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-
-const MAX_ITERATIONS = 30;
+import { execSync } from 'node:child_process';
 const MAX_CONVERSATION_CHARS = 128_000;
 
 export interface TokenStats {
@@ -73,27 +72,45 @@ function compactConversation(messages: OllamaMessage[]): void {
 
 function getSystemPrompt(cwd: string, mcpToolsDesc: string = ''): string {
   return `You are Deyad CLI, an autonomous AI coding agent powered by Ollama.
+You can independently read code, write files, run shell commands, and iterate until the task is complete.
 You work directly in the user's project directory: ${cwd}
 
 ${TOOLS_DESCRIPTION}${mcpToolsDesc}
 
 WORKFLOW:
-1. Understand the request. Explore the project first (list_files, read_file).
-2. Plan your approach briefly.
+1. First, understand the request and explore the current project (list_files, read_file).
+2. Plan your approach briefly in prose.
 3. Implement changes using write_files, edit_file, and run_command.
-4. Verify your work (read files, run tests/build).
-5. When done, write a summary and output <done/>.
+4. Verify your work (e.g. check for errors, read files to confirm).
+5. When everything is done, write a brief SUMMARY of what you did (which files you created/modified and what changed), then output <done/>.
 
 RULES:
-- Follow the user's instructions exactly.
-- Explore before editing — understand the codebase first.
-- Prefer edit_file for small changes, write_files for new files.
-- After changes, verify by running build/test commands if applicable.
+- ALWAYS follow the user's instructions and constraints exactly. If the user says "only modify X", or any other constraint, obey it literally.
+- Only modify files and components that are directly relevant to the user's request. Do NOT change unrelated code unless explicitly asked.
+- Always explore the project structure before making changes.
+- Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
+- After writing files, run build/lint commands to verify if applicable.
 - If a command fails, read the error and fix the issue.
-- Keep explanations concise — focus on actions.
+- Keep your prose explanations concise — focus on actions.
+- Make reasonable decisions autonomously for implementation details, but never override the user's explicit constraints.
 - You can make multiple tool calls in a single response — they execute in parallel.
 - Use memory_read at the start to check for project conventions in DEYAD.md.
-- Use memory_write to save important project notes and conventions.`;
+- Use memory_write to save important project notes and conventions.
+- When the user asks for any git operation, use the dedicated git_* tools directly — do NOT use run_command with git.
+
+SELF-REVIEW — After writing code, verify these before outputting <done/>:
+- Array/list lengths match their declared count.
+- Loop bounds and index offsets are correct (0-based vs 1-based).
+- All state variables referenced in JSX/templates are initialized with valid values matching their types.
+- Conditional gates (disabled, hidden, etc.) don't accidentally block the user from progressing.
+- Navigation flows are reachable end-to-end.
+- Read back the files you wrote and mentally trace the user flow to catch logic errors.
+
+OUTPUT — Always write visible prose that the user can read:
+- Before tool calls, briefly state what you're about to do.
+- After making changes, summarize what you did.
+- NEVER output only tool calls with no prose — the user cannot see tool calls, only your text.
+- Before <done/>, always write a summary like: "Done! I created/modified X, Y, Z. Here's what changed: ..."`;  
 }
 
 /**
@@ -168,10 +185,8 @@ export async function runAgentLoop(
       { role: 'user', content: userMessage },
     ];
 
-    let iteration = 0;
-
-    while (iteration < MAX_ITERATIONS && !abortController.signal.aborted) {
-      iteration++;
+    // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
+    while (!abortController.signal.aborted) {
       compactConversation(messages);
 
       const result = await streamChat(
@@ -212,8 +227,10 @@ export async function runAgentLoop(
 
       const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff']);
       const allReadOnly = toolCalls.every(c => readOnlyTools.has(c.name) || (mcpManager?.isMcpTool(c.name) ?? false));
+      const writeTools = new Set(['write_files', 'edit_file', 'delete_file']);
 
       let results: ToolResult[];
+      let filesChanged = false;
       if (allReadOnly && toolCalls.length > 1) {
         // Parallel execution for read-only tools
         for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
@@ -242,19 +259,96 @@ export async function runAgentLoop(
               if (!changedFiles.includes(f)) changedFiles.push(f);
             }
           }
+          if (writeTools.has(call.name) && result.success) filesChanged = true;
         }
       }
 
-      // Feed results back to the model
-      const resultXml = results.map(r =>
-        `<tool_result>\n<name>${r.tool}</name>\n<success>${r.success}</success>\n<output>${r.output}</output>\n</tool_result>`
-      ).join('\n');
+      // Re-read project context after writes so the next iteration sees updated code
+      if (filesChanged) {
+        try {
+          const freshContext = await buildContext(cwd);
+          // Replace the stale project context message (index 1)
+          if (messages.length > 1 && messages[1].role === 'system' && messages[1].content.startsWith('Project context:')) {
+            messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
+          }
+        } catch (_err) { /* context stays as-is */ }
+      }
 
-      messages.push({ role: 'user', content: resultXml });
-    }
+      // Feed results back to the model (matching desktop format: <status> not <success>)
+      const resultsText = results.map(r =>
+        `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`
+      ).join('\n\n');
 
-    if (iteration >= MAX_ITERATIONS) {
-      callbacks.onError(`Reached maximum iterations (${MAX_ITERATIONS}).`);
+      // Auto-lint: after file changes, run a quick type-check and append errors
+      let autoLintText = '';
+      if (filesChanged && !abortController.signal.aborted) {
+        try {
+          const hasTS = fs.existsSync(path.join(cwd, 'tsconfig.json'));
+          if (hasTS) {
+            const lintOutput = execSync('timeout 10 npx tsc --noEmit --pretty false 2>&1 | head -40', {
+              cwd,
+              encoding: 'utf-8',
+              timeout: 15_000,
+            }).trim();
+            if (lintOutput && /error\s+TS/i.test(lintOutput)) {
+              autoLintText = `\n\n<auto_lint>\nTypeScript errors detected after your changes — please fix them:\n${lintOutput}\n</auto_lint>`;
+            }
+          }
+        } catch (_err) { /* ignore lint failures */ }
+      }
+
+      // Auto-review: after file changes, scan for common logical bugs
+      let autoReviewText = '';
+      if (filesChanged && !abortController.signal.aborted) {
+        try {
+          const issues: string[] = [];
+          for (const f of changedFiles) {
+            if (!f.endsWith('.ts') && !f.endsWith('.tsx')) continue;
+            const fullPath = path.resolve(cwd, f);
+            if (!fs.existsSync(fullPath)) continue;
+            const content = fs.readFileSync(fullPath, 'utf-8');
+
+            // Check: array length vs declared count mismatch
+            const countMatches = [...content.matchAll(/(?:const|let)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(\d+)/g)];
+            for (const m of countMatches) {
+              const varName = m[1];
+              const declaredCount = parseInt(m[2], 10);
+              const lowerName = varName.toLowerCase();
+              if (!(lowerName.includes('total') || lowerName.includes('count') || lowerName.includes('steps'))) continue;
+              const arrayPattern = /\[([^\]]{20,})\]/g;
+              for (const arrMatch of content.matchAll(arrayPattern)) {
+                const arrContent = arrMatch[0];
+                let depth = 0;
+                let commas = 0;
+                for (const ch of arrContent) {
+                  if (ch === '[' || ch === '(' || ch === '{') depth++;
+                  else if (ch === ']' || ch === ')' || ch === '}') depth--;
+                  else if (ch === ',' && depth === 1) commas++;
+                }
+                const elementCount = commas > 0 ? commas + 1 : 0;
+                if (elementCount > 0 && Math.abs(elementCount - declaredCount) === 1) {
+                  issues.push(`${f}: ${varName} = ${declaredCount} but the associated array appears to have ${elementCount} elements (off-by-one?)`);
+                }
+              }
+            }
+
+            // Check: state initialized with undefined but typed without undefined
+            const stateMatches = [...content.matchAll(/useState<([^>]+)>\(([^)]+)\)/g)];
+            for (const sm of stateMatches) {
+              const type = sm[1];
+              const init = sm[2].trim();
+              if (init === 'undefined' && !type.includes('undefined') && !type.includes('null')) {
+                issues.push(`${f}: useState<${type}> initialized with undefined but type doesn't allow it`);
+              }
+            }
+          }
+          if (issues.length > 0) {
+            autoReviewText = `\n\n<auto_review>\nPotential logic issues detected — please verify and fix:\n${issues.join('\n')}\n</auto_review>`;
+          }
+        } catch (_err) { /* ignore review failures */ }
+      }
+
+      messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText });
     }
 
     return { history: messages, changedFiles, stats };
