@@ -94,3 +94,145 @@ describeGit('gitCommit', () => {
     expect(fs.existsSync(path.join(tmpDir, '.git'))).toBe(false);
   });
 });
+
+// ── Handler registration tests ────────────────────────────────────────────
+
+// Capture handlers registered via ipcMain.handle
+const handlers = new Map<string, Function>();
+import { ipcMain } from 'electron';
+
+describeGit('registerGitHandlers', () => {
+  beforeEach(async () => {
+    handlers.clear();
+    vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+      handlers.set(channel, handler);
+      return undefined as any;
+    });
+    const { registerGitHandlers } = await import('./ipcGit');
+    registerGitHandlers(fakeAppDir);
+  });
+
+  it('registers all expected git IPC channels', () => {
+    const expected = ['git:commit', 'git:log', 'git:show', 'git:diff-stat', 'git:checkout',
+                      'git:remote-get', 'git:remote-set', 'git:push', 'git:pull',
+                      'git:branch', 'git:branch-create', 'git:branch-switch'];
+    for (const ch of expected) {
+      expect(handlers.has(ch)).toBe(true);
+    }
+  });
+
+  it('git:log returns empty for no .git', async () => {
+    const h = handlers.get('git:log')!;
+    const result = await h({}, 'noapp');
+    expect(result).toEqual([]);
+  });
+
+  it('git:log returns commits after init', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:log')!;
+    const result = await h({}, 'app');
+    expect(result.length).toBeGreaterThanOrEqual(1);
+    expect(result[0].hash).toBeTruthy();
+    expect(result[0].message).toContain('Initial scaffold');
+  });
+
+  it('git:show validates hash format', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:show')!;
+    // Invalid hash
+    expect(await h({}, 'app', '; rm -rf /', 'foo.ts')).toBeNull();
+    // Path traversal
+    expect(await h({}, 'app', 'abcdef', '../../etc/passwd')).toBeNull();
+    // Absolute path
+    expect(await h({}, 'app', 'abcdef', '/etc/passwd')).toBeNull();
+  });
+
+  it('git:diff-stat validates hash format', async () => {
+    const h = handlers.get('git:diff-stat')!;
+    // Invalid hash - should return empty
+    expect(await h({}, 'app', 'not-a-hash!!')).toEqual([]);
+  });
+
+  it('git:checkout validates hash format', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:checkout')!;
+    const result = await h({}, 'app', '; rm -rf /');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid hash');
+  });
+
+  it('git:remote-get returns null for no .git', async () => {
+    const h = handlers.get('git:remote-get')!;
+    expect(await h({}, 'noapp')).toBeNull();
+  });
+
+  it('git:remote-set validates URL format', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:remote-set')!;
+    // Invalid URL
+    const result = await h({}, 'app', 'ftp://not-valid');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid remote URL');
+  });
+
+  it('git:remote-set accepts valid HTTPS URL', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:remote-set')!;
+    const result = await h({}, 'app', 'https://github.com/user/repo.git');
+    expect(result.success).toBe(true);
+  });
+
+  it('git:remote-set accepts valid SSH URL', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:remote-set')!;
+    const result = await h({}, 'app', 'git@github.com:user/repo.git');
+    expect(result.success).toBe(true);
+  });
+
+  it('git:branch-create validates branch name', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:branch-create')!;
+    const result = await h({}, 'app', 'invalid name with spaces');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid branch name');
+  });
+
+  it('git:branch-create creates a new branch', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:branch-create')!;
+    const result = await h({}, 'app', 'feature-test');
+    expect(result.success).toBe(true);
+  });
+
+  it('git:branch-switch validates branch name', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:branch-switch')!;
+    const result = await h({}, 'app', '../../etc');
+    expect(result.success).toBe(false);
+  });
+
+  it('git:branch returns current branch info', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'foo.ts'), 'x');
+    await gitInit(fakeAppDir, 'app');
+    const h = handlers.get('git:branch')!;
+    const result = await h({}, 'app');
+    expect(result.current).toBeTruthy();
+    expect(Array.isArray(result.branches)).toBe(true);
+  });
+
+  it('git:commit returns error for no .git', async () => {
+    const h = handlers.get('git:commit')!;
+    const result = await h({}, 'noapp', 'test');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('No git repo');
+  });
+});

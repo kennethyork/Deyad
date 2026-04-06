@@ -226,6 +226,7 @@ export function registerAppHandlers(
     if (!fs.existsSync(dir)) return {};
     const result: Record<string, string> = {};
     const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', '.vite', '.next', '__pycache__']);
+    const MAX_FILE_SIZE = 512 * 1024; // Skip files > 512 KB (likely binaries or generated)
     const walk = (base: string, rel = '') => {
       for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
         const fullPath = path.join(base, entry.name);
@@ -233,7 +234,11 @@ export function registerAppHandlers(
         if (entry.isDirectory()) {
           if (!SKIP_DIRS.has(entry.name)) walk(fullPath, relPath);
         } else if (entry.name !== 'deyad.json' && entry.name !== 'deyad-messages.json') {
-          try { result[relPath] = fs.readFileSync(fullPath, 'utf-8'); } catch (err) { console.debug('skip binary:', err); }
+          try {
+            const stat = fs.statSync(fullPath);
+            if (stat.size > MAX_FILE_SIZE) continue;
+            result[relPath] = fs.readFileSync(fullPath, 'utf-8');
+          } catch (err) { console.debug('skip binary:', err); }
         }
       }
     };

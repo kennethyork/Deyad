@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getOrBuildIndex, rankFilesByQuery } from './codebaseIndexer';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getOrBuildIndex, rankFilesByQuery, embedChunks, retrieveChunks, rankFilesBySemantic, clearIndex } from './codebaseIndexer';
 
 const sampleFiles: Record<string, string> = {
   'src/App.tsx': `import React from 'react';
@@ -126,5 +126,150 @@ describe('rankFilesByQuery', () => {
     const scores = rankFilesByQuery(index, 'xyzzyplugh');
     // xyzzyplugh is nonsense — should not match any tokens
     expect(scores.size).toBe(0);
+  });
+});
+
+describe('embedChunks', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window || {};
+    (globalThis as any).window.deyad = {
+      embed: vi.fn().mockResolvedValue({ embeddings: [] }),
+    };
+  });
+
+  it('calls embed API for each batch of chunks', async () => {
+    const embedMock = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
+      embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
+    }));
+    (globalThis as any).window.deyad.embed = embedMock;
+
+    const id = 'test-embed-call-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    expect(embedMock).toHaveBeenCalled();
+  });
+
+  it('sets embeddingsReady after successful embed', async () => {
+    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
+      embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
+    }));
+
+    const id = 'test-embed-ready-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    const index = getOrBuildIndex(id, sampleFiles);
+    expect(index.embeddingsReady).toBe(true);
+  });
+
+  it('handles embed API failure gracefully', async () => {
+    (globalThis as any).window.deyad.embed = vi.fn().mockRejectedValue(new Error('Ollama down'));
+
+    const id = 'test-embed-fail-' + Date.now();
+    await expect(embedChunks(id, sampleFiles, 'nomic-embed-text')).resolves.not.toThrow();
+  });
+
+  it('skips re-embedding when already ready', async () => {
+    const embedMock = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
+      embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
+    }));
+    (globalThis as any).window.deyad.embed = embedMock;
+
+    const id = 'test-embed-skip-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    const callCount = embedMock.mock.calls.length;
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    expect(embedMock.mock.calls.length).toBe(callCount); // no new calls
+  });
+});
+
+describe('retrieveChunks', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window || {};
+    (globalThis as any).window.deyad = {
+      embed: vi.fn().mockResolvedValue({ embeddings: [] }),
+    };
+  });
+
+  it('returns empty when embeddings not ready', async () => {
+    const id = 'test-retrieve-empty-' + Date.now();
+    const results = await retrieveChunks(id, sampleFiles, 'login', 'nomic-embed-text');
+    expect(results).toEqual([]);
+  });
+
+  it('retrieves relevant chunks after embedding', async () => {
+    // Mock embed to return simple vectors
+    let callCount = 0;
+    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+      callCount++;
+      if (Array.isArray(inputs)) {
+        return { embeddings: inputs.map((_: string, i: number) => [i * 0.1, 0.5, 0.3]) };
+      }
+      // Query embedding
+      return { embeddings: [[0.0, 0.5, 0.3]] };
+    });
+
+    const id = 'test-retrieve-chunks-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    const results = await retrieveChunks(id, sampleFiles, 'auth login', 'nomic-embed-text');
+    expect(Array.isArray(results)).toBe(true);
+    // Results may be empty if cosine similarity < 0.3 threshold
+    for (const r of results) {
+      expect(r.chunk).toBeDefined();
+      expect(r.score).toBeGreaterThan(0);
+    }
+  });
+
+  it('respects topK limit', async () => {
+    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+      if (Array.isArray(inputs)) {
+        return { embeddings: inputs.map(() => [0.9, 0.8, 0.7]) };
+      }
+      return { embeddings: [[0.9, 0.8, 0.7]] };
+    });
+
+    const id = 'test-retrieve-topk-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    const results = await retrieveChunks(id, sampleFiles, 'react', 'nomic-embed-text', 2);
+    expect(results.length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('rankFilesBySemantic', () => {
+  beforeEach(() => {
+    (globalThis as any).window = (globalThis as any).window || {};
+    (globalThis as any).window.deyad = {
+      embed: vi.fn().mockResolvedValue({ embeddings: [] }),
+    };
+  });
+
+  it('returns empty map when no embeddings', async () => {
+    const id = 'test-semantic-empty-' + Date.now();
+    const scores = await rankFilesBySemantic(id, sampleFiles, 'auth', 'nomic-embed-text');
+    expect(scores.size).toBe(0);
+  });
+
+  it('returns normalized scores after embedding', async () => {
+    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+      if (Array.isArray(inputs)) {
+        return { embeddings: inputs.map(() => [0.9, 0.8, 0.7]) };
+      }
+      return { embeddings: [[0.9, 0.8, 0.7]] };
+    });
+
+    const id = 'test-semantic-scores-' + Date.now();
+    await embedChunks(id, sampleFiles, 'nomic-embed-text');
+    const scores = await rankFilesBySemantic(id, sampleFiles, 'react component', 'nomic-embed-text');
+    for (const score of scores.values()) {
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
+describe('clearIndex', () => {
+  it('clears the cached index for an appId', () => {
+    const id = 'test-clear-' + Date.now();
+    const index1 = getOrBuildIndex(id, sampleFiles);
+    clearIndex(id);
+    const index2 = getOrBuildIndex(id, sampleFiles);
+    expect(index2).not.toBe(index1); // different reference = rebuilt
   });
 });

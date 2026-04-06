@@ -8,7 +8,7 @@ Describe what you want. Get a working app. No cloud. No API keys. No subscriptio
 
 ![Electron](https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20AI-000000)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -73,7 +73,7 @@ You describe your app in chat
   → Runs commands to verify
   → Auto-fixes errors from dev server logs
   → Auto-commits every change to Git
-  → Repeats until done (up to 30 iterations)
+  → Repeats until done (no iteration cap — Ollama is local)
 ```
 
 ---
@@ -181,7 +181,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | **Offline** | ✅ | ❌ | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
 | **Full-stack scaffold** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
 | **Database GUI** | ✅ Prisma Studio | Supabase | ❌ | Supabase | ❌ | ❌ | ✅ | ❌ |
-| **Agent loop** | ✅ 30-iter | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Agent loop** | ✅ unlimited | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | **CLI agent** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Editor** | ✅ Monaco | ✅ visual | Basic | Basic | ✅ VS Code | ✅ VS Code | ✅ | ❌ |
 | **Terminal** | ✅ PTY | ❌ | ✅ WebContainer | ❌ | ✅ | ✅ | ✅ | ❌ |
@@ -201,7 +201,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | Layer | Technology |
 | --- | --- |
 | Desktop | Electron 40 + Vite |
-| UI | React 18 + TypeScript 5 |
+| UI | React 18 + TypeScript 6 |
 | Editor | Monaco |
 | Terminal | xterm.js + node-pty |
 | AI | Ollama (any local model) |
@@ -212,7 +212,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | DB Admin | Prisma Studio |
 | Version control | Git |
 | Packaging | Electron Builder |
-| Tests | Vitest (308 passing) |
+| Tests | Vitest (427 passing) |
 
 ---
 
@@ -457,6 +457,23 @@ npm run dist:linux    # Package for Linux (deb, rpm, AppImage)
 npm run dist:win      # Package for Windows (exe)
 npm run dist:all      # Package for Linux + Windows
 ```
+
+---
+
+## Security
+
+Deyad is designed to be safe by default. The agent operates inside project sandboxes with multiple layers of protection:
+
+| Layer | Protection |
+| --- | --- |
+| **Command blocklist** | `rm -rf /`, `sudo`, `mkfs`, `dd of=/dev/`, `shutdown`, `reboot`, `curl\|bash`, `wget\|bash` are blocked |
+| **Package validation** | npm package names are validated against `^[@a-zA-Z0-9._\-/]+$` — no shell injection |
+| **SSRF protection** | `fetch_url` blocks private IPs (127.x, 10.x, 192.168.x, 172.16-31.x), localhost, `::1`, cloud metadata endpoints |
+| **Path traversal** | `write_files` blocks `..`, leading `/`, and leading `\` — all writes scoped to the project |
+| **Git hash validation** | Git tool inputs are validated against `^[a-f0-9]+$` to prevent command injection |
+| **Audit trail** | Every tool execution is logged to an in-memory audit ring buffer |
+
+All security checks are covered by automated tests.
 
 ---
 

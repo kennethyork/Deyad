@@ -182,4 +182,117 @@ describe('TaskQueue', () => {
     expect(task.steps).toEqual([]);
     expect(task.createdAt).toBeGreaterThan(0);
   });
+
+  it('cancel calls abort function when task is running', async () => {
+    const abortFn = vi.fn();
+    mockRunAgentLoop.mockReturnValue(abortFn);
+
+    const id = taskQueue.enqueue({
+      appId: 'test-app',
+      appName: 'Test',
+      appType: 'frontend',
+      dbStatus: 'none',
+      model: 'llama3',
+      prompt: 'build something',
+    });
+
+    // Give processNext time to start the task
+    await new Promise((r) => setTimeout(r, 50));
+
+    const task = taskQueue.getAll().find((t) => t.id === id);
+    if (task?.status === 'running') {
+      taskQueue.cancel(id);
+      expect(abortFn).toHaveBeenCalled();
+    }
+  });
+
+  it('cancel does nothing for non-existent task', () => {
+    // Should not throw
+    taskQueue.cancel('nonexistent-id-999');
+  });
+
+  it('setOnFilesChanged registers callback', () => {
+    const cb = vi.fn();
+    taskQueue.setOnFilesChanged(cb);
+    // Can set it back to null
+    taskQueue.setOnFilesChanged(null);
+  });
+
+  it('saves queue to localStorage on enqueue', () => {
+    taskQueue.enqueue({
+      appId: 'test-app',
+      appName: 'Test',
+      appType: 'frontend',
+      dbStatus: 'none',
+      model: 'llama3',
+      prompt: 'test save',
+    });
+    // Check that localStorage.setItem was called (save() is called via notify())
+    const stored = localStorage.getItem('deyad-task-queue');
+    expect(stored).toBeTruthy();
+    expect(typeof stored).toBe('string');
+    // Should be valid JSON
+    expect(() => JSON.parse(stored!)).not.toThrow();
+  });
+
+  it('handles corrupted localStorage gracefully', () => {
+    localStorage.setItem('deyad-task-queue', 'not-json!!!');
+    // Creating a new module load would test constructor, but we can't easily
+    // reload modules. Instead, verify the queue is still functional.
+    const all = taskQueue.getAll();
+    expect(Array.isArray(all)).toBe(true);
+  });
+
+  it('getAll returns a copy, not the internal array', () => {
+    const all1 = taskQueue.getAll();
+    const all2 = taskQueue.getAll();
+    expect(all1).not.toBe(all2); // different array references
+  });
+
+  it('multiple enqueue calls create unique IDs', () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 5; i++) {
+      ids.add(taskQueue.enqueue({
+        appId: 'test-app',
+        appName: 'Test',
+        appType: 'frontend',
+        dbStatus: 'none',
+        model: 'llama3',
+        prompt: `task ${i}`,
+      }));
+    }
+    expect(ids.size).toBe(5);
+  });
+
+  it('clearHistory preserves queued and running tasks', () => {
+    // Enqueue a task (will be queued or running)
+    const id = taskQueue.enqueue({
+      appId: 'test-app',
+      appName: 'Test',
+      appType: 'frontend',
+      dbStatus: 'none',
+      model: 'llama3',
+      prompt: 'keep me',
+    });
+    taskQueue.clearHistory();
+    const task = taskQueue.getAll().find((t) => t.id === id);
+    // Task should still exist since it's queued or running
+    expect(task).toBeDefined();
+  });
+
+  it('listener is not called after unsubscribe', () => {
+    const listener = vi.fn();
+    const unsub = taskQueue.subscribe(listener);
+    unsub();
+    listener.mockClear();
+    taskQueue.enqueue({
+      appId: 'test-app',
+      appName: 'Test',
+      appType: 'frontend',
+      dbStatus: 'none',
+      model: 'llama3',
+      prompt: 'after unsub',
+    });
+    expect(listener).not.toHaveBeenCalled();
+  });
 });

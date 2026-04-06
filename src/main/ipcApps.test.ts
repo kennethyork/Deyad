@@ -39,7 +39,7 @@ vi.mock('./ipcGit', () => ({
 }));
 
 vi.mock('./ipcDocker', () => ({
-  stopCompose: vi.fn(),
+  stopCompose: vi.fn(() => Promise.resolve()),
 }));
 
 const handlers = new Map<string, Function>();
@@ -239,5 +239,91 @@ describe('ipcApps handler registration', () => {
     const handler = handlers.get('apps:get-dir')!;
     expect(handler({}, 'app1')).toBe(path.join(appsDir, 'app1'));
     expect(handler({})).toBe(appsDir);
+  });
+
+  it('apps:delete removes app directory', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'doomed');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'file.ts'), 'x');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:delete')!;
+    const result = await handler({}, 'doomed');
+    expect(result).toBe(true);
+    expect(fs.existsSync(appSubdir)).toBe(false);
+  });
+
+  it('apps:delete-files removes specific files', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'a.ts'), 'a');
+    fs.writeFileSync(path.join(appSubdir, 'b.ts'), 'b');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:delete-files')!;
+    const result = await handler({}, { appId: 'app1', paths: ['a.ts'] });
+    expect(result).toBe(true);
+    expect(fs.existsSync(path.join(appSubdir, 'a.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(appSubdir, 'b.ts'))).toBe(true);
+  });
+
+  it('apps:delete-files rejects path traversal', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:delete-files')!;
+    await expect(handler({}, { appId: 'app1', paths: ['../../etc/passwd'] })).rejects.toThrow('Invalid file path');
+  });
+
+  it('apps:search-files returns matching lines', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'index.ts'), 'const name = "hello";\nconst other = "world";\n');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:search-files')!;
+    const result = handler({}, { appId: 'app1', query: 'hello' });
+    expect(result.length).toBe(1);
+    expect(result[0].file).toBe('index.ts');
+    expect(result[0].line).toBe(1);
+    expect(result[0].text).toContain('hello');
+  });
+
+  it('apps:search-files returns empty for no dir', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:search-files')!;
+    const result = handler({}, { appId: 'nonexistent', query: 'test' });
+    expect(result).toEqual([]);
+  });
+
+  it('apps:search-files handles invalid regex gracefully', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'test.ts'), 'a[b');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:search-files')!;
+    // Invalid regex should fallback to literal match
+    const result = handler({}, { appId: 'app1', query: 'a[b' });
+    expect(result.length).toBe(1);
   });
 });

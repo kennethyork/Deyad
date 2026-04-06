@@ -129,28 +129,30 @@ describe('agentLoop', () => {
     await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
   });
 
-  it('stops after MAX_ITERATIONS and fires onError', async () => {
+  it('loop continues past 30 iterations with no cap (Ollama is local)', async () => {
     const { runAgentLoop } = await import('./agentLoop');
     const { parseToolCalls: parseMock, isDone: isDoneMock } = await import('./agentTools');
 
-    // Make every turn return a tool call so the loop never self-terminates
-    (parseMock as ReturnType<typeof vi.fn>).mockReturnValue([
-      { name: 'read_file', params: { path: 'src/App.tsx' } },
-    ]);
-    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    // Run tool calls for 35 iterations, then signal done
+    let callCount = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      if (callCount > 35) return [];
+      return [{ name: 'read_file', params: { path: 'src/App.tsx' } }];
+    });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callCount > 35);
 
-    // Set up 31 stream simulations (MAX_ITERATIONS = 30 + 1 safety)
-    for (let i = 0; i < 31; i++) {
-      simulateStream('<tool_call><name>read_file</name></tool_call>');
+    for (let i = 0; i < 40; i++) {
+      simulateStream('iteration output');
     }
 
     const callbacks = makeCallbacks();
     runAgentLoop(makeOptions({ callbacks }));
 
-    await vi.waitFor(() => expect(callbacks.onError).toHaveBeenCalled(), { timeout: 15000 });
-    expect(callbacks.onError).toHaveBeenCalledWith(
-      expect.stringContaining('maximum iteration limit'),
-    );
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 15000 });
+    // Should NOT have errored — no iteration limit
+    expect(callbacks.onError).not.toHaveBeenCalled();
+    expect(callCount).toBeGreaterThan(30);
   }, 20000);
 
   it('recovers from a streaming error via onError callback', async () => {
@@ -190,26 +192,29 @@ describe('agentLoop', () => {
     expect(contentCalls).toBeLessThanOrEqual(3);
   });
 
-  it('MAX_ITERATIONS is capped at 30', async () => {
+  it('agent runs until done signal (no iteration cap for Ollama)', async () => {
     const { runAgentLoop } = await import('./agentLoop');
     const { parseToolCalls: parseMock, isDone: isDoneMock } = await import('./agentTools');
 
-    (parseMock as ReturnType<typeof vi.fn>).mockReturnValue([
-      { name: 'list_files', params: {} },
-    ]);
-    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    // Return tool calls for a few iterations, then signal done
+    let callCount = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callCount++;
+      if (callCount > 5) return [];
+      return [{ name: 'list_files', params: {} }];
+    });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callCount > 5);
 
-    for (let i = 0; i < 31; i++) {
-      simulateStream('tool iteration');
+    for (let i = 0; i < 10; i++) {
+      simulateStream('iteration output');
     }
 
     const callbacks = makeCallbacks();
     runAgentLoop(makeOptions({ callbacks }));
 
-    await vi.waitFor(() => expect(callbacks.onError).toHaveBeenCalled(), { timeout: 15000 });
-    expect(callbacks.onError).toHaveBeenCalledWith(
-      expect.stringContaining('30'),
-    );
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 15000 });
+    // Should NOT have called onError — no iteration limit
+    expect(callbacks.onError).not.toHaveBeenCalled();
   }, 20000);
 
   it('streams content tokens to onContent callback', async () => {

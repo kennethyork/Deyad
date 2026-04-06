@@ -98,6 +98,12 @@ async function executeToolRaw(
         if (Object.keys(fileMap).length === 0) {
           return { tool: call.name, success: false, output: 'No files specified.' };
         }
+        // Block path traversal attempts
+        for (const fp of Object.keys(fileMap)) {
+          if (fp.includes('..') || fp.startsWith('/') || fp.startsWith('\\')) {
+            return { tool: call.name, success: false, output: `Blocked: path "${fp}" contains traversal or is absolute.` };
+          }
+        }
         await window.deyad.writeFiles(appId, fileMap);
         return {
           tool: call.name,
@@ -109,6 +115,20 @@ async function executeToolRaw(
       case 'run_command': {
         const cmd = call.params.command;
         if (!cmd) return { tool: call.name, success: false, output: 'Missing "command" parameter.' };
+        // Block dangerous commands that could damage the host system
+        const BLOCKED_PATTERNS = [
+          /\brm\s+(-[a-z]*f|-[a-z]*r).*\//i,  // rm -rf / or rm -f /
+          /\bsudo\b/i,
+          /\bmkfs\b/i,
+          /\bdd\s+.*of=\/dev\//i,
+          /\b(shutdown|reboot|halt|poweroff)\b/i,
+          />\s*\/dev\/(sda|nvme|disk)/i,
+          /\bcurl\b.*\|\s*(ba)?sh/i,             // curl pipe to shell
+          /\bwget\b.*\|\s*(ba)?sh/i,
+        ];
+        if (BLOCKED_PATTERNS.some(p => p.test(cmd))) {
+          return { tool: call.name, success: false, output: 'Command blocked: potentially destructive operation.' };
+        }
         return await executeCommand(appId, cmd);
       }
 
@@ -243,6 +263,16 @@ async function executeToolRaw(
         if (!/^https?:\/\//i.test(url)) {
           return { tool: call.name, success: false, output: 'Only http:// and https:// URLs are allowed.' };
         }
+        // Block private/internal IPs (SSRF protection)
+        try {
+          const parsed = new URL(url);
+          const host = parsed.hostname;
+          if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|localhost|::1|\[::1\]|metadata\.google|169\.254\.)/i.test(host)) {
+            return { tool: call.name, success: false, output: 'Blocked: private/internal addresses are not allowed.' };
+          }
+        } catch {
+          return { tool: call.name, success: false, output: 'Invalid URL format.' };
+        }
         try {
           const resp = await fetch(url, {
             headers: { 'User-Agent': 'Deyad-Agent/1.0' },
@@ -272,6 +302,10 @@ async function executeToolRaw(
       case 'install_package': {
         const pkg = call.params.package;
         if (!pkg) return { tool: call.name, success: false, output: 'Missing "package" parameter.' };
+        // Validate package name to prevent command injection
+        if (!/^[@a-zA-Z0-9._\-/]+$/.test(pkg)) {
+          return { tool: call.name, success: false, output: 'Invalid package name: only alphanumeric, @, ., _, -, / characters are allowed.' };
+        }
         const isDev = call.params.dev === 'true';
         const manager = call.params.manager || 'npm'; // npm | pip | go
         if (manager === 'npm') {

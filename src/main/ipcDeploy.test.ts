@@ -46,6 +46,20 @@ describe('ipcDeploy handler registration', () => {
     expect(handlers.has('apps:deploy-fullstack')).toBe(true);
   });
 
+  it('deploy-check returns an object with provider availability', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    registerDeployHandlers((_id: string) => tmpDir);
+
+    const handler = handlers.get('apps:deploy-check')!;
+    const result = await handler({});
+    expect(typeof result).toBe('object');
+    expect(typeof result.netlify).toBe('boolean');
+    expect(typeof result.vercel).toBe('boolean');
+    expect(typeof result.surge).toBe('boolean');
+    expect(typeof result.railway).toBe('boolean');
+    expect(typeof result.flyio).toBe('boolean');
+  });
+
   it('deploy returns error when app dir does not exist', async () => {
     const { registerDeployHandlers } = await import('./ipcDeploy');
     registerDeployHandlers((_id: string) => path.join(tmpDir, 'nonexistent'));

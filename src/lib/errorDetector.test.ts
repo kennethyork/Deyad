@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectErrors, buildErrorFixPrompt } from './errorDetector';
+import { detectErrors, buildErrorFixPrompt, getErrorHint } from './errorDetector';
 import type { DetectedError } from './errorDetector';
 
 describe('detectErrors', () => {
@@ -138,5 +138,103 @@ describe('buildErrorFixPrompt', () => {
     ];
     const prompt = buildErrorFixPrompt(errors);
     expect(prompt).toContain('(in src/App.tsx:10)');
+  });
+});
+
+describe('getErrorHint', () => {
+  it('suggests npm install for missing module', () => {
+    const hint = getErrorHint({ type: 'module', message: "Can't resolve 'lodash'", raw: '' });
+    expect(hint).toContain('npm install lodash');
+  });
+
+  it('returns generic import hint for module errors without package name', () => {
+    const hint = getErrorHint({ type: 'module', message: 'Module not found', raw: '' });
+    expect(hint).toContain('import path');
+  });
+
+  it('detects Cannot find module pattern', () => {
+    const hint = getErrorHint({ type: 'runtime', message: "Cannot find module 'express'", raw: '' });
+    expect(hint).toContain('npm install express');
+  });
+
+  it('hints about port in use for EADDRINUSE', () => {
+    const hint = getErrorHint({ type: 'runtime', message: 'Error: listen EADDRINUSE: address already in use :::3000', raw: '' });
+    expect(hint).toContain('Port is already in use');
+  });
+
+  it('hints about brackets for syntax errors', () => {
+    const hint = getErrorHint({ type: 'syntax', message: 'Unexpected token }', raw: '' });
+    expect(hint).toContain('brackets');
+  });
+
+  it('hints about Unexpected token even for non-syntax type', () => {
+    const hint = getErrorHint({ type: 'build', message: 'Unexpected token ;', raw: '' });
+    expect(hint).toContain('brackets');
+  });
+
+  it('hints about type mismatch for TS assignability errors', () => {
+    const hint = getErrorHint({ type: 'typescript', message: "Type 'string' is not assignable to type 'number'", raw: '' });
+    expect(hint).toContain('Type mismatch');
+  });
+
+  it('hints about property for TS property errors', () => {
+    const hint = getErrorHint({ type: 'typescript', message: "Property 'foo' does not exist on type 'Bar'", raw: '' });
+    expect(hint).toContain('property');
+  });
+
+  it('hints about undefined name for TS Cannot find name', () => {
+    const hint = getErrorHint({ type: 'typescript', message: "Cannot find name 'useState'", raw: '' });
+    expect(hint).toContain("'useState'");
+    expect(hint).toContain('Import it');
+  });
+
+  it('hints about exports for TS has no exported member', () => {
+    const hint = getErrorHint({ type: 'typescript', message: "has no exported member 'Foo'", raw: '' });
+    expect(hint).toContain('export');
+  });
+
+  it('returns generic TS hint for other TS errors', () => {
+    const hint = getErrorHint({ type: 'typescript', message: 'TS9999: some obscure error', raw: '' });
+    expect(hint).toContain('TypeScript type error');
+  });
+
+  it('hints about scope for ReferenceError', () => {
+    const hint = getErrorHint({ type: 'runtime', message: 'ReferenceError: x is not defined', raw: '' });
+    expect(hint).toContain('scope');
+  });
+
+  it('hints about null check for TypeError undefined', () => {
+    const hint = getErrorHint({ type: 'runtime', message: "TypeError: Cannot read properties of undefined", raw: '' });
+    expect(hint).toContain('null check');
+  });
+
+  it('hints about initialization for TypeError null', () => {
+    const hint = getErrorHint({ type: 'runtime', message: "TypeError: Cannot read properties of null", raw: '' });
+    expect(hint).toContain('initialized');
+  });
+
+  it('hints about range for RangeError', () => {
+    const hint = getErrorHint({ type: 'runtime', message: 'RangeError: Maximum call stack size exceeded', raw: '' });
+    expect(hint).toContain('range');
+  });
+
+  it('hints about file path for ENOENT', () => {
+    const hint = getErrorHint({ type: 'runtime', message: "ENOENT: no such file or directory, open '/tmp/missing'", raw: '' });
+    expect(hint).toContain('not found');
+  });
+
+  it('hints about permissions for EACCES', () => {
+    const hint = getErrorHint({ type: 'runtime', message: 'Error: EACCES: permission denied', raw: '' });
+    expect(hint).toContain('Permission');
+  });
+
+  it('hints about permissions for EPERM', () => {
+    const hint = getErrorHint({ type: 'runtime', message: 'Error: EPERM: operation not permitted', raw: '' });
+    expect(hint).toContain('Permission');
+  });
+
+  it('returns null for unrecognized errors', () => {
+    const hint = getErrorHint({ type: 'build', message: 'Something unusual happened', raw: '' });
+    expect(hint).toBeNull();
   });
 });

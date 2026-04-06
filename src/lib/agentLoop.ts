@@ -11,8 +11,7 @@ import type { ToolResult } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
 
-/** Maximum autonomous iterations before forcing a stop. */
-const MAX_ITERATIONS = 30;
+
 
 /** Approximate character budget for the full conversation (≈ 32k tokens at ~4 chars/token). */
 const MAX_CONVERSATION_CHARS = 128_000;
@@ -269,8 +268,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
       const allChangedFiles = new Set<string>();
       const allCommands: string[] = [];
 
-      // Agent loop
-      while (iteration < MAX_ITERATIONS && !aborted) {
+      // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
+      while (!aborted) {
         iteration++;
 
         // Compact conversation if it's getting too large for the context window
@@ -527,13 +526,6 @@ export function runAgentLoop(options: AgentOptions): () => void {
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';
         callbacks.onContent(fullOutput);
-      }
-
-      if (iteration >= MAX_ITERATIONS && !aborted) {
-        fullOutput += '\n\n*Agent stopped after reaching the maximum iteration limit.*';
-        callbacks.onContent(fullOutput);
-        callbacks.onError(`Agent stopped after reaching the maximum iteration limit (${MAX_ITERATIONS}). You can continue the conversation to pick up where it left off.`);
-        return;
       }
 
       callbacks.onDone();
