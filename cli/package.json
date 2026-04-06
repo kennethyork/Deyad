@@ -1,6 +1,6 @@
 {
   "name": "deyad-cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local AI coding agent powered by Ollama — like Claude Code, but fully offline",
   "bin": {
     "deyad": "./dist/bin/deyad.js"
