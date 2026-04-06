@@ -326,4 +326,96 @@ describe('ipcApps handler registration', () => {
     const result = handler({}, { appId: 'app1', query: 'a[b' });
     expect(result.length).toBe(1);
   });
+
+  it('apps:read-files skips files over 512KB', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'small.txt'), 'hello');
+    // Create a file > 512KB
+    fs.writeFileSync(path.join(appSubdir, 'large.bin'), Buffer.alloc(513 * 1024, 'x'));
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:read-files')!;
+    const result = await handler({}, 'app1');
+    expect(result).toHaveProperty('small.txt');
+    expect(result).not.toHaveProperty('large.bin');
+  });
+
+  it('apps:read-files skips node_modules and .git dirs', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(path.join(appSubdir, 'node_modules', 'pkg'), { recursive: true });
+    fs.mkdirSync(path.join(appSubdir, '.git'), { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'index.ts'), 'export default 1');
+    fs.writeFileSync(path.join(appSubdir, 'node_modules', 'pkg', 'index.js'), 'module.exports = 1');
+    fs.writeFileSync(path.join(appSubdir, '.git', 'HEAD'), 'ref: refs/heads/main');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:read-files')!;
+    const result = await handler({}, 'app1');
+    expect(result).toHaveProperty('index.ts');
+    expect(Object.keys(result).some(k => k.includes('node_modules'))).toBe(false);
+    expect(Object.keys(result).some(k => k.includes('.git'))).toBe(false);
+  });
+
+  it('apps:export returns error when app dir does not exist', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:export')!;
+    const result = await handler({}, { appId: 'nonexistent', format: 'zip' });
+    expect(result).toEqual({ success: false, error: 'App directory not found' });
+  });
+
+  it('apps:dev-stop returns success for unknown process', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:dev-stop')!;
+    const event = { sender: { send: vi.fn() } };
+    const result = await handler(event, 'nonexistent');
+    expect(result).toEqual({ success: true });
+    expect(event.sender.send).toHaveBeenCalledWith('apps:dev-status', { appId: 'nonexistent', status: 'stopped' });
+  });
+
+  it('apps:duplicate returns null for missing app', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:duplicate')!;
+    const result = await handler({}, 'nonexistent');
+    expect(result).toBeNull();
+  });
+
+  it('apps:write-files rejects path traversal attempts', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'app1');
+    fs.mkdirSync(appSubdir, { recursive: true });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:write-files')!;
+    await expect(
+      handler({}, { appId: 'app1', files: { '../../../etc/passwd': 'hacked' } })
+    ).rejects.toThrow('Invalid file path');
+  });
+
+  it('apps:dev-status returns stopped for unknown process', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:dev-status')!;
+    const result = handler({}, 'nonexistent');
+    expect(result).toEqual({ status: 'stopped' });
+  });
 });

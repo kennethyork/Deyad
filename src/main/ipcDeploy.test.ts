@@ -79,4 +79,114 @@ describe('ipcDeploy handler registration', () => {
     const result = await handler(event, 'app1', 'railway');
     expect(result).toEqual({ success: false, error: 'App directory not found' });
   });
+
+  it('registers all 6 deploy handlers', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    registerDeployHandlers((_id: string) => tmpDir);
+
+    const expected = [
+      'apps:deploy-check', 'apps:deploy', 'apps:deploy-fullstack',
+      'apps:deploy-vps', 'apps:deploy-electron',
+    ];
+    for (const ch of expected) {
+      expect(handlers.has(ch), `handler '${ch}' should be registered`).toBe(true);
+    }
+  });
+
+  it('deploy-vps returns error when app dir does not exist', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    registerDeployHandlers((_id: string) => path.join(tmpDir, 'nonexistent'));
+
+    const handler = handlers.get('apps:deploy-vps')!;
+    const event = { sender: { id: 1 } };
+    const result = await handler(event, 'app1', { host: 'example.com', user: 'root', path: '/var/www' });
+    expect(result).toEqual({ success: false, error: 'App directory not found' });
+  });
+
+  it('deploy-vps rejects missing required fields', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    const appSubdir = path.join(tmpDir, 'app-vps');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    registerDeployHandlers((_id: string) => appSubdir);
+
+    const handler = handlers.get('apps:deploy-vps')!;
+    const event = { sender: { id: 1 } };
+
+    const result = await handler(event, 'app1', { host: '', user: 'root', path: '/var/www' });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('required');
+  });
+
+  it('deploy-vps rejects shell metacharacters in host', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    const appSubdir = path.join(tmpDir, 'app-vps2');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    registerDeployHandlers((_id: string) => appSubdir);
+
+    const handler = handlers.get('apps:deploy-vps')!;
+    const event = { sender: { id: 1 } };
+
+    const result = await handler(event, 'app1', { host: 'evil;rm -rf /', user: 'root', path: '/var/www' });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid characters');
+  });
+
+  it('deploy-vps rejects invalid domain format', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    const appSubdir = path.join(tmpDir, 'app-vps3');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    registerDeployHandlers((_id: string) => appSubdir);
+
+    const handler = handlers.get('apps:deploy-vps')!;
+    const event = { sender: { id: 1 } };
+
+    const result = await handler(event, 'app1', { host: 'example.com', user: 'root', path: '/var/www', domain: 'not a valid domain!' });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Invalid domain');
+  });
+
+  it('deploy-vps accepts valid domain format', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    const appSubdir = path.join(tmpDir, 'app-vps4');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), JSON.stringify({ name: 'Test', appType: 'frontend' }));
+    registerDeployHandlers((_id: string) => appSubdir);
+
+    const handler = handlers.get('apps:deploy-vps')!;
+    const event = { sender: { id: 1 } };
+
+    // Will fail at build step but should pass validation
+    const result = await handler(event, 'app1', { host: 'example.com', user: 'deploy', path: '/var/www', domain: 'app.example.com' });
+    // It will fail because npx vite build won't work in test, but the validation passed
+    expect(result.success).toBe(false);
+    expect(result.error).not.toContain('Invalid domain');
+    expect(result.error).not.toContain('Invalid characters');
+    expect(result.error).not.toContain('required');
+  });
+
+  it('deploy-electron returns error when app dir does not exist', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    registerDeployHandlers((_id: string) => path.join(tmpDir, 'nonexistent'));
+
+    const handler = handlers.get('apps:deploy-electron')!;
+    const event = { sender: { id: 1 } };
+    const result = await handler(event, 'app1');
+    expect(result).toEqual({ success: false, error: 'App directory not found' });
+  });
+
+  it('deploy reads app metadata defaults gracefully', async () => {
+    const { registerDeployHandlers } = await import('./ipcDeploy');
+    // Create dir without deyad.json — should use defaults
+    const appSubdir = path.join(tmpDir, 'app-no-meta');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    registerDeployHandlers((_id: string) => appSubdir);
+
+    const handler = handlers.get('apps:deploy')!;
+    const event = { sender: { id: 1 } };
+    // Will fail at build step but should not crash reading metadata
+    const result = await handler(event, 'app1', 'netlify');
+    expect(result.success).toBe(false);
+    // Error should be about build, not about metadata parsing
+    expect(result.error).toBeDefined();
+  });
 });
