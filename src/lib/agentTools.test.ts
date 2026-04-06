@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseToolCalls, isDone, stripToolMarkup } from './agentTools';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { parseToolCalls, isDone, stripToolMarkup, executeTool } from './agentTools';
 
 describe('parseToolCalls', () => {
   it('returns empty array when no tool calls present', () => {
@@ -202,5 +202,123 @@ Complete. <done/>`;
 </tool_call>
 <done/>`;
     expect(stripToolMarkup(text)).toBe('');
+  });
+});
+
+describe('executeTool (integration)', () => {
+  const appId = 'test-app-123';
+  let savedWindow: unknown;
+
+  beforeEach(() => {
+    savedWindow = (globalThis as Record<string, unknown>).window;
+    (globalThis as Record<string, unknown>).window = {
+      deyad: {
+        readFiles: vi.fn().mockResolvedValue({
+          'src/index.ts': 'console.log("hello");',
+          'package.json': '{"name":"test"}',
+        }),
+        writeFiles: vi.fn().mockResolvedValue(undefined),
+        terminalExec: vi.fn(),
+        onTerminalData: vi.fn().mockReturnValue(vi.fn()),
+        onTerminalExit: vi.fn().mockReturnValue(vi.fn()),
+      },
+    };
+  });
+
+  afterEach(() => {
+    (globalThis as Record<string, unknown>).window = savedWindow;
+  });
+
+  it('list_files returns sorted file list', async () => {
+    const result = await executeTool({ name: 'list_files', params: {} }, appId);
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('package.json');
+    expect(result.output).toContain('src/index.ts');
+  });
+
+  it('read_file returns file content', async () => {
+    const result = await executeTool(
+      { name: 'read_file', params: { path: 'src/index.ts' } },
+      appId,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toBe('console.log("hello");');
+  });
+
+  it('read_file fails for missing path param', async () => {
+    const result = await executeTool({ name: 'read_file', params: {} }, appId);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Missing');
+  });
+
+  it('read_file fails for nonexistent file', async () => {
+    const result = await executeTool(
+      { name: 'read_file', params: { path: 'nope.ts' } },
+      appId,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('not found');
+  });
+
+  it('write_files writes a single file', async () => {
+    const result = await executeTool(
+      { name: 'write_files', params: { path: 'out.ts', content: 'code()' } },
+      appId,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Wrote 1 file');
+    expect((window as any).deyad.writeFiles).toHaveBeenCalledWith(appId, { 'out.ts': 'code()' });
+  });
+
+  it('write_files writes indexed files', async () => {
+    const result = await executeTool(
+      {
+        name: 'write_files',
+        params: {
+          file_0_path: 'a.ts',
+          file_0_content: 'aaa',
+          file_1_path: 'b.ts',
+          file_1_content: 'bbb',
+        },
+      },
+      appId,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('Wrote 2 file');
+  });
+
+  it('search_files finds matches', async () => {
+    const result = await executeTool(
+      { name: 'search_files', params: { query: 'hello' } },
+      appId,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('src/index.ts');
+  });
+
+  it('search_files reports no matches', async () => {
+    const result = await executeTool(
+      { name: 'search_files', params: { query: 'zzzznotfound' } },
+      appId,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toContain('No matches');
+  });
+
+  it('unknown tool returns failure', async () => {
+    const result = await executeTool({ name: 'nonexistent', params: {} }, appId);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain('Unknown tool');
+  });
+
+  it('audit log is emitted via console.info', async () => {
+    const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    await executeTool({ name: 'list_files', params: {} }, appId);
+    expect(spy).toHaveBeenCalledWith('[deyad:audit]', expect.any(String));
+    const entry = JSON.parse(spy.mock.calls[0][1] as string);
+    expect(entry.tool).toBe('list_files');
+    expect(entry.appId).toBe(appId);
+    expect(entry.success).toBe(true);
+    spy.mockRestore();
   });
 });

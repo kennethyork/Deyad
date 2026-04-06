@@ -47,11 +47,12 @@ export default function ChatPanel({
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [models, setModels] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [modelState, setModelState] = useState({ models: [] as string[], selectedModel: '' });
+  const { models, selectedModel } = modelState;
   const [error, setError] = useState<string | null>(null);
-  const [planningMode, setPlanningMode] = useState(false);
-  const [agentMode, setAgentMode] = useState(false);
+  const [mode, setMode] = useState<'chat' | 'planning' | 'agent'>('chat');
+  const planningMode = mode === 'planning';
+  const agentMode = mode === 'agent';
   const [agentSteps, setAgentSteps] = useState<Array<{ type: 'tool' | 'result'; text: string }>>([]);
   const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [imageAttachment, setImageAttachment] = useState<string | null>(null); // base64 data URI
@@ -98,7 +99,7 @@ export default function ChatPanel({
   // Reset auto-fix counter when agent mode is toggled
   useEffect(() => {
     autoFixAttemptsRef.current = 0;
-  }, [agentMode]);
+  }, [mode]);
 
   // Auto-verify: in agent mode, automatically send detected errors to AI for fixing
   useEffect(() => {
@@ -125,7 +126,7 @@ export default function ChatPanel({
   const tokenCount = useMemo(() => {
     let chars = 0;
     for (const m of messages) chars += m.content.length;
-    return Math.round(chars / 3.5);
+    return Math.round(chars / 4);
   }, [messages]);
 
   // Auto-scroll to bottom when messages change
@@ -168,14 +169,11 @@ export default function ChatPanel({
       try {
         const { models: list } = await window.deyad.listModels();
         const names = list.map((m) => m.name);
-        setModels(names);
-        // Try to use saved default model
         const settings = await window.deyad.getSettings();
-        if (settings.defaultModel && names.includes(settings.defaultModel)) {
-          setSelectedModel(settings.defaultModel);
-        } else if (names.length > 0) {
-          setSelectedModel(names[0]);
-        }
+        const model = (settings.defaultModel && names.includes(settings.defaultModel))
+          ? settings.defaultModel
+          : names[0] ?? '';
+        setModelState({ models: names, selectedModel: model });
         if (settings.embedModel) {
           embedModelRef.current = settings.embedModel;
         }
@@ -608,14 +606,14 @@ User's instructions: ${text}`;
           )}
           <button
             className={`btn-plan-mode ${planningMode ? 'active' : ''}`}
-            onClick={() => { setPlanningMode((v) => !v); if (agentMode) setAgentMode(false); }}
+            onClick={() => setMode(m => m === 'planning' ? 'chat' : 'planning')}
             title="Toggle planning mode"
           >
             {planningMode ? 'Plan ON' : 'Plan'}
           </button>
           <button
             className={`btn-agent-mode ${agentMode ? 'active' : ''}`}
-            onClick={() => { setAgentMode((v) => !v); if (planningMode) setPlanningMode(false); }}
+            onClick={() => setMode(m => m === 'agent' ? 'chat' : 'agent')}
             title="Toggle autonomous agent mode"
           >
             {agentMode ? 'Agent ON' : 'Agent'}
@@ -629,7 +627,7 @@ User's instructions: ${text}`;
             <select
               className="model-select"
               value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
+              onChange={(e) => setModelState(s => ({ ...s, selectedModel: e.target.value }))}
               disabled={streaming}
             >
               {models.map((m) => (

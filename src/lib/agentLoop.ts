@@ -14,8 +14,8 @@ import { embedChunks } from './codebaseIndexer';
 /** Maximum autonomous iterations before forcing a stop. */
 const MAX_ITERATIONS = 30;
 
-/** Approximate character budget for the full conversation (≈ 32k tokens at ~3.5 chars/token). */
-const MAX_CONVERSATION_CHARS = 112_000;
+/** Approximate character budget for the full conversation (≈ 32k tokens at ~4 chars/token). */
+const MAX_CONVERSATION_CHARS = 128_000;
 
 /**
  * Compact the conversation when it exceeds the character budget.
@@ -438,16 +438,22 @@ export function runAgentLoop(options: AgentOptions): () => void {
               for (const m of countMatches) {
                 const varName = m[1];
                 const declaredCount = parseInt(m[2], 10);
-                // Look for an array that references this variable in a bounds check or is sized by it
+                const lowerName = varName.toLowerCase();
+                if (!(lowerName.includes('total') || lowerName.includes('count') || lowerName.includes('steps'))) continue;
                 const arrayPattern = new RegExp(`\\[([^\\]]{20,})\\]`, 'g');
                 for (const arrMatch of content.matchAll(arrayPattern)) {
                   const arrContent = arrMatch[0];
-                  // Count top-level elements (rough: count <Component or { at depth 0)
-                  const elementCount = (arrContent.match(/(?:^\[|,)\s*(?:<|\{|['"`])/g) || []).length;
-                  if (elementCount > 0 && Math.abs(elementCount - declaredCount) === 1 && varName.toLowerCase().includes('total') || varName.toLowerCase().includes('count') || varName.toLowerCase().includes('steps')) {
-                    if (elementCount !== declaredCount) {
-                      issues.push(`${filePath}: ${varName} = ${declaredCount} but the associated array appears to have ${elementCount} elements (off-by-one?)`);
-                    }
+                  // Count top-level elements by tracking bracket/paren depth
+                  let depth = 0;
+                  let commas = 0;
+                  for (const ch of arrContent) {
+                    if (ch === '[' || ch === '(' || ch === '{') depth++;
+                    else if (ch === ']' || ch === ')' || ch === '}') depth--;
+                    else if (ch === ',' && depth === 1) commas++;
+                  }
+                  const elementCount = commas > 0 ? commas + 1 : 0;
+                  if (elementCount > 0 && Math.abs(elementCount - declaredCount) === 1) {
+                    issues.push(`${filePath}: ${varName} = ${declaredCount} but the associated array appears to have ${elementCount} elements (off-by-one?)`);
                   }
                 }
               }
@@ -475,8 +481,13 @@ export function runAgentLoop(options: AgentOptions): () => void {
             if (devStatus.status === 'running') {
               // Collect dev server output for a few seconds to catch compilation/runtime errors
               const logChunks: string[] = [];
+              let logBytes = 0;
+              const MAX_LOG_BYTES = 512 * 1024; // 512KB cap
               const unsub = window.deyad.onAppDevLog(({ appId: logAppId, data }) => {
-                if (logAppId === appId) logChunks.push(data);
+                if (logAppId === appId && logBytes < MAX_LOG_BYTES) {
+                  logChunks.push(data);
+                  logBytes += data.length;
+                }
               });
               await new Promise(resolve => setTimeout(resolve, 3000));
               unsub();

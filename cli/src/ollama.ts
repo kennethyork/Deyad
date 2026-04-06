@@ -28,10 +28,10 @@ export interface StreamChatResult {
   usage: OllamaUsage;
 }
 
-/** Chars-per-token ratio matching the GUI (3.5 chars ≈ 1 token). */
-export const CHARS_PER_TOKEN = 3.5;
+/** Chars-per-token ratio — 4.0 is the standard approximation for English text with code. */
+export const CHARS_PER_TOKEN = 4.0;
 
-/** Estimate token count from character length. */
+/** Estimate token count from character length (fallback when Ollama doesn't report counts). */
 export function estimateTokens(chars: number): number {
   return Math.round(chars / CHARS_PER_TOKEN);
 }

@@ -59,7 +59,7 @@ export function stripToolMarkup(text: string): string {
  *
  * appId is required so all file/terminal operations are scoped to the project.
  */
-export async function executeTool(
+async function executeToolRaw(
   call: ToolCall,
   appId: string,
 ): Promise<ToolResult> {
@@ -352,6 +352,33 @@ export async function executeTool(
       output: `Error: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
+}
+
+/** Best-effort structured audit log for tool executions. */
+function auditLog(appId: string, tool: string, params: Record<string, string>, result: ToolResult): void {
+  try {
+    const entry = {
+      ts: new Date().toISOString(),
+      appId,
+      tool,
+      params: Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, v.length > 200 ? v.slice(0, 200) + '\u2026' : v]),
+      ),
+      success: result.success,
+      outputLen: result.output.length,
+    };
+    console.info('[deyad:audit]', JSON.stringify(entry));
+  } catch { /* best-effort */ }
+}
+
+/** Execute a tool call with audit logging. */
+export async function executeTool(
+  call: ToolCall,
+  appId: string,
+): Promise<ToolResult> {
+  const result = await executeToolRaw(call, appId);
+  auditLog(appId, call.name, call.params, result);
+  return result;
 }
 
 /**

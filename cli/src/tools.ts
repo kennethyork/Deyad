@@ -168,7 +168,7 @@ export function globFiles(pattern: string, cwd: string): string[] {
 }
 
 /** Execute a tool call against the local filesystem. */
-export async function executeTool(
+async function executeToolRaw(
   call: ToolCall,
   cwd: string,
   cb?: ToolCallbacks,
@@ -394,6 +394,34 @@ export async function executeTool(
   } catch (err: unknown) {
     return { tool: call.name, success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
   }
+}
+
+/** Best-effort structured audit log for tool executions. */
+function auditLog(tool: string, params: Record<string, string>, result: ToolResult, cwd: string): void {
+  try {
+    const entry = {
+      ts: new Date().toISOString(),
+      tool,
+      params: Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, v.length > 200 ? v.slice(0, 200) + '\u2026' : v]),
+      ),
+      success: result.success,
+      outputLen: result.output.length,
+    };
+    const logPath = path.join(cwd, '.deyad-audit.jsonl');
+    fs.appendFileSync(logPath, JSON.stringify(entry) + '\n');
+  } catch { /* best-effort */ }
+}
+
+/** Execute a tool call with audit logging. */
+export async function executeTool(
+  call: ToolCall,
+  cwd: string,
+  cb?: ToolCallbacks,
+): Promise<ToolResult> {
+  const result = await executeToolRaw(call, cwd, cb);
+  auditLog(call.name, call.params, result, cwd);
+  return result;
 }
 
 /** Run a shell command and return stdout/stderr. */

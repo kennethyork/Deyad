@@ -11,7 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const MAX_ITERATIONS = 30;
-const MAX_CONVERSATION_CHARS = 112_000;
+const MAX_CONVERSATION_CHARS = 128_000;
 
 export interface TokenStats {
   promptTokens: number;
