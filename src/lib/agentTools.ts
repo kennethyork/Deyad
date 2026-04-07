@@ -567,3 +567,33 @@ After your tool calls, you will receive results in <tool_result> blocks.
 You can make multiple tool calls in a single response.
 When you are completely finished with the task, output <done/> at the end.
 `;
+
+/** Ollama-native tool definitions for all 21 desktop tools. */
+export function getDesktopOllamaTools(): Array<{
+  type: 'function';
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}> {
+  return [
+    { type: 'function', function: { name: 'list_files', description: 'List all files in the project', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'read_file', description: 'Read the contents of a file', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Relative path to the file' } }, required: ['path'] } } },
+    { type: 'function', function: { name: 'write_files', description: 'Write one or more files. Use file_0_path/file_0_content etc for multiple files', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path (single file)' }, content: { type: 'string', description: 'File content (single file)' }, file_0_path: { type: 'string' }, file_0_content: { type: 'string' }, file_1_path: { type: 'string' }, file_1_content: { type: 'string' }, file_2_path: { type: 'string' }, file_2_content: { type: 'string' } }, required: [] } } },
+    { type: 'function', function: { name: 'edit_file', description: 'Surgical edit: replace an exact string match in a file', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path' }, old_string: { type: 'string', description: 'Exact text to find (must appear exactly once)' }, new_string: { type: 'string', description: 'Replacement text' } }, required: ['path', 'old_string', 'new_string'] } } },
+    { type: 'function', function: { name: 'multi_edit', description: 'Apply multiple surgical edits across files. Use edit_0_path/edit_0_old_string/edit_0_new_string etc', parameters: { type: 'object', properties: { edit_0_path: { type: 'string' }, edit_0_old_string: { type: 'string' }, edit_0_new_string: { type: 'string' }, edit_1_path: { type: 'string' }, edit_1_old_string: { type: 'string' }, edit_1_new_string: { type: 'string' } }, required: [] } } },
+    { type: 'function', function: { name: 'delete_file', description: 'Delete a file from the project', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path to delete' } }, required: ['path'] } } },
+    { type: 'function', function: { name: 'run_command', description: 'Run a shell command in the project directory', parameters: { type: 'object', properties: { command: { type: 'string', description: 'Shell command to run' } }, required: ['command'] } } },
+    { type: 'function', function: { name: 'search_files', description: 'Search for files containing a query string', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search term' } }, required: ['query'] } } },
+    { type: 'function', function: { name: 'db_schema', description: 'Get the current database schema (Prisma models)', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_status', description: 'Show current git status', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_commit', description: 'Stage all changes and commit', parameters: { type: 'object', properties: { message: { type: 'string', description: 'Commit message' } }, required: ['message'] } } },
+    { type: 'function', function: { name: 'git_remote_get', description: 'Get the current remote origin URL', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_remote_set', description: 'Set the remote origin URL', parameters: { type: 'object', properties: { url: { type: 'string', description: 'Remote URL' } }, required: ['url'] } } },
+    { type: 'function', function: { name: 'git_push', description: 'Push commits to remote', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_pull', description: 'Pull latest changes from remote', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_branch', description: 'List all branches and show current', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'git_branch_create', description: 'Create a new branch and switch to it', parameters: { type: 'object', properties: { name: { type: 'string', description: 'Branch name' } }, required: ['name'] } } },
+    { type: 'function', function: { name: 'git_branch_switch', description: 'Switch to an existing branch', parameters: { type: 'object', properties: { name: { type: 'string', description: 'Branch name' } }, required: ['name'] } } },
+    { type: 'function', function: { name: 'git_log', description: 'Show recent commit history', parameters: { type: 'object', properties: {}, required: [] } } },
+    { type: 'function', function: { name: 'fetch_url', description: 'Fetch contents of a URL (webpage, API, etc.)', parameters: { type: 'object', properties: { url: { type: 'string', description: 'URL to fetch' } }, required: ['url'] } } },
+    { type: 'function', function: { name: 'install_package', description: 'Install a package using npm, pip, or go', parameters: { type: 'object', properties: { package: { type: 'string', description: 'Package name' }, manager: { type: 'string', description: 'Package manager (npm|pip|go)', enum: ['npm', 'pip', 'go'] }, dev: { type: 'string', description: 'Install as devDependency (npm only)' } }, required: ['package'] } } },
+  ];
+}

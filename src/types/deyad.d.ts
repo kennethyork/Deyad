@@ -31,8 +31,10 @@ interface OllamaModel {
 }
 
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>;
+  tool_name?: string;
 }
 
 type DbProvider = 'sqlite';
@@ -94,12 +96,13 @@ export interface PluginManifest {
 interface DeyadAPI {
   // AI (Ollama)
   listModels(): Promise<{ models: OllamaModel[] }>;
-  chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }): Promise<void>;
+  chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }, tools?: unknown[]): Promise<void>;
   fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
   embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
   onStreamToken(requestId: string, cb: (token: string) => void): () => void;
   onStreamDone(requestId: string, cb: () => void): () => void;
   onStreamError(requestId: string, cb: (err: string) => void): () => void;
+  onStreamToolCalls(requestId: string, cb: (toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => void): () => void;
 
   // App projects
   listApps(): Promise<AppProject[]>;

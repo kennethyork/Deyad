@@ -9,6 +9,7 @@ vi.mock('./agentTools', () => ({
   isDone: vi.fn(() => false),
   stripToolMarkup: vi.fn((s: string) => s),
   AGENT_TOOLS_DESCRIPTION: 'mock tools',
+  getDesktopOllamaTools: vi.fn(() => []),
 }));
 
 vi.mock('./contextBuilder', () => ({
@@ -25,6 +26,7 @@ vi.mock('./codebaseIndexer', () => ({
 let streamTokenCb: ((token: string) => void) | null = null;
 let streamDoneCb: (() => void) | null = null;
 let streamErrorCb: ((err: string) => void) | null = null;
+let streamToolCallsCb: ((toolCalls: unknown[]) => void) | null = null;
 
 const fakeWindow = {
   deyad: {
@@ -34,6 +36,7 @@ const fakeWindow = {
     onStreamToken: vi.fn((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; }),
     onStreamDone: vi.fn((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; }),
     onStreamError: vi.fn((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; }),
+    onStreamToolCalls: vi.fn((_requestId: string, cb: (tc: unknown[]) => void) => { streamToolCallsCb = cb; return () => { streamToolCallsCb = null; }; }),
   },
 };
 
@@ -47,6 +50,7 @@ function resetWindowMocks() {
   fakeWindow.deyad.onStreamToken.mockImplementation((_requestId: string, cb: (t: string) => void) => { streamTokenCb = cb; return () => { streamTokenCb = null; }; });
   fakeWindow.deyad.onStreamDone.mockImplementation((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
   fakeWindow.deyad.onStreamError.mockImplementation((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
+  fakeWindow.deyad.onStreamToolCalls.mockImplementation((_requestId: string, cb: (tc: unknown[]) => void) => { streamToolCallsCb = cb; return () => { streamToolCallsCb = null; }; });
 }
 
 // Simulate a streaming turn: emit tokens then call done
@@ -111,6 +115,7 @@ describe('agentLoop', () => {
     streamTokenCb = null;
     streamDoneCb = null;
     streamErrorCb = null;
+    streamToolCallsCb = null;
     resetWindowMocks();
     await resetToolMocks();
   });

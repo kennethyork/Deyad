@@ -6,8 +6,8 @@
  * the task is complete.
  */
 
-import { parseToolCalls, executeTool, isDone, stripToolMarkup, AGENT_TOOLS_DESCRIPTION } from './agentTools';
-import type { ToolResult } from './agentTools';
+import { parseToolCalls, executeTool, isDone, stripToolMarkup, AGENT_TOOLS_DESCRIPTION, getDesktopOllamaTools } from './agentTools';
+import type { ToolResult, ToolCall } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
 
@@ -22,7 +22,7 @@ const MAX_CONVERSATION_CHARS = 128_000;
  * older assistant+tool_result pairs into a single summary message.
  */
 function compactConversation(
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+  messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
 ): void {
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
   if (totalChars <= MAX_CONVERSATION_CHARS) return;
@@ -150,30 +150,36 @@ When writing files with write_files, put the raw file content directly in the co
 }
 
 /**
- * Streams a single Ollama turn and returns the full response text.
+ * Streams a single Ollama turn and returns the full response text + any native tool calls.
  * Accepts an abortSignal callback; when it returns true, the stream is abandoned.
  */
 function streamOllamaTurn(
   model: string,
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+  messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
   onToken: (token: string) => void,
   isAborted: () => boolean,
   modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number },
-): Promise<string> {
+  tools?: unknown[],
+): Promise<{ text: string; nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> }> {
   return new Promise((resolve, reject) => {
     let buf = '';
+    const nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> = [];
     let cleaned = false;
     const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
-      if (isAborted()) { cleanup(); resolve(buf); return; }
+      if (isAborted()) { cleanup(); resolve({ text: buf, nativeToolCalls }); return; }
       buf += token;
       onToken(token);
     });
 
+    const unsubToolCalls = window.deyad.onStreamToolCalls(requestId, (toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => {
+      for (const tc of toolCalls) nativeToolCalls.push(tc);
+    });
+
     const unsubDone = window.deyad.onStreamDone(requestId, () => {
       cleanup();
-      resolve(buf);
+      resolve({ text: buf, nativeToolCalls });
     });
 
     const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
@@ -185,11 +191,12 @@ function streamOllamaTurn(
       if (cleaned) return;
       cleaned = true;
       unsubToken();
+      unsubToolCalls();
       unsubDone();
       unsubError();
     }
 
-    window.deyad.chatStream(model, messages, requestId, modelOptions).catch((err) => {
+    window.deyad.chatStream(model, messages as Parameters<typeof window.deyad.chatStream>[1], requestId, modelOptions, tools).catch((err) => {
       cleanup();
       reject(err);
     });
@@ -231,7 +238,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
           });
 
       // Assemble conversation
-      const messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [
+      const messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }> = [
         { role: 'system', content: getAgentSystemPrompt(appType, dbProvider) },
       ];
 
@@ -267,21 +274,37 @@ export function runAgentLoop(options: AgentOptions): () => void {
       const allChangedFiles = new Set<string>();
       const allCommands: string[] = [];
 
+      // Get Ollama-native tool definitions
+      const ollamaTools = getDesktopOllamaTools();
+
       // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
       while (!aborted) {
         // Compact conversation if it's getting too large for the context window
         compactConversation(messages);
 
-        // Stream one turn from Ollama
-        const turnResponse = await streamOllamaTurn(model, messages, (token) => {
+        // Stream one turn from Ollama (with native tools)
+        const { text: turnResponse, nativeToolCalls } = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        }, () => aborted, modelOptions);
+        }, () => aborted, modelOptions, ollamaTools);
 
         if (aborted) break;
 
-        // Check for tool calls
-        const toolCalls = parseToolCalls(turnResponse);
+        // Determine tool calls: native tool calls take priority, fall back to XML parsing
+        let toolCalls: ToolCall[];
+        let usedNativePath = false;
+
+        if (nativeToolCalls.length > 0) {
+          usedNativePath = true;
+          toolCalls = nativeToolCalls.map((tc) => ({
+            name: tc.function.name,
+            params: Object.fromEntries(
+              Object.entries(tc.function.arguments || {}).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)])
+            ),
+          }));
+        } else {
+          toolCalls = parseToolCalls(turnResponse);
+        }
 
         if (toolCalls.length === 0 || isDone(turnResponse)) {
           // If the visible content is too short, append an auto-generated summary
@@ -517,8 +540,26 @@ export function runAgentLoop(options: AgentOptions): () => void {
         }
 
         // Add assistant response and tool results to conversation
-        messages.push({ role: 'assistant', content: turnResponse });
-        messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText + runtimeErrorText });
+        messages.push({ role: 'assistant', content: turnResponse, ...(usedNativePath ? { tool_calls: nativeToolCalls } : {}) });
+
+        if (usedNativePath) {
+          // Native path: send each tool result as a separate role:'tool' message
+          for (const r of results) {
+            messages.push({
+              role: 'tool',
+              content: `${r.success ? 'success' : 'error'}: ${r.output}`,
+              tool_name: r.tool,
+            });
+          }
+          // Append auto-lint/review/runtime errors as a user message if any exist
+          const autoFeedback = autoLintText + autoReviewText + runtimeErrorText;
+          if (autoFeedback) {
+            messages.push({ role: 'user', content: autoFeedback.trim() });
+          }
+        } else {
+          // XML fallback: send results as a user message with XML formatting
+          messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText + runtimeErrorText });
+        }
 
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';

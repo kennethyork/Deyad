@@ -14,8 +14,10 @@ export interface OllamaModel {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
+  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>;
+  tool_name?: string;
 }
 
 export type DbProvider = 'sqlite';
@@ -42,8 +44,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listModels: (): Promise<{ models: OllamaModel[] }> =>
     ipcRenderer.invoke('ollama:list-models'),
 
-  chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>): Promise<void> =>
-    ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options }),
+  chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>, tools?: unknown[]): Promise<void> =>
+    ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options, tools }),
 
   fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
     ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
@@ -79,6 +81,14 @@ contextBridge.exposeInMainWorld('deyad', {
     };
     ipcRenderer.on('ollama:stream-error', handler);
     return () => ipcRenderer.removeListener('ollama:stream-error', handler);
+  },
+
+  onStreamToolCalls: (requestId: string, cb: (toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, rid: string, toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => {
+      if (rid === requestId) cb(toolCalls);
+    };
+    ipcRenderer.on('ollama:stream-tool-calls', handler);
+    return () => ipcRenderer.removeListener('ollama:stream-tool-calls', handler);
   },
 
   // ── App Projects ────────────────────────────────────────────────────────
