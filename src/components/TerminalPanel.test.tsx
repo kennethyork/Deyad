@@ -5,7 +5,7 @@ import TerminalPanel from './TerminalPanel';
 
 describe('TerminalPanel', () => {
   beforeEach(() => {
-    (window as any).deyad = {
+    window.deyad = {
       createTerminal: vi.fn().mockResolvedValue('term1'),
       terminalWrite: vi.fn(),
       terminalResize: vi.fn(),
@@ -14,7 +14,7 @@ describe('TerminalPanel', () => {
       onTerminalClear: vi.fn().mockReturnValue(() => {}),
       showContextMenu: vi.fn().mockResolvedValue(undefined),
       terminalKill: vi.fn().mockResolvedValue(undefined),
-    };
+    } as unknown as DeyadAPI;
   });
 
   it('renders terminal panel and tab bar', async () => {

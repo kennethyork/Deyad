@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import GitPanel from './GitPanel';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     gitRemoteGet: vi.fn().mockResolvedValue('https://github.com/user/repo.git'),
     gitRemoteSet: vi.fn().mockResolvedValue({ success: true }),
     gitBranch: vi.fn().mockResolvedValue({ current: 'main', branches: ['main', 'develop'] }),
@@ -15,7 +15,7 @@ beforeEach(() => {
     createTerminal: vi.fn().mockResolvedValue('term-1'),
     terminalWrite: vi.fn().mockResolvedValue(undefined),
     terminalKill: vi.fn().mockResolvedValue(undefined),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {
@@ -65,7 +65,7 @@ describe('GitPanel', () => {
   });
 
   it('shows error when pushing without remote', async () => {
-    (window as any).deyad.gitRemoteGet = vi.fn().mockResolvedValue(null);
+    Object.assign(window.deyad, { gitRemoteGet: vi.fn().mockResolvedValue(null) });
     render(<GitPanel appId="app1" />);
     await waitFor(() => expect(window.deyad.gitRemoteGet).toHaveBeenCalled());
     // Push button should be disabled when no remote, but let's check the message flow

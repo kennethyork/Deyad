@@ -3,7 +3,7 @@
  */
 
 // Electron <webview> tag support in React JSX
-declare namespace React {
+declare namespace React { // eslint-disable-line @typescript-eslint/no-unused-vars -- global augmentation
   namespace JSX {
     interface IntrinsicElements {
       webview: React.DetailedHTMLProps<

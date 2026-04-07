@@ -19,7 +19,7 @@ vi.mock('./ipcApps', () => ({
   getViteRoot: vi.fn(() => null),
 }));
 
-const handlers = new Map<string, Function>();
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
 import { ipcMain } from 'electron';
 
@@ -27,9 +27,9 @@ let tmpDir: string;
 
 beforeEach(() => {
   handlers.clear();
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
     handlers.set(channel, handler);
-    return undefined as any;
+    return undefined as ReturnType<typeof ipcMain.handle>;
   });
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-settings-test-'));
 });

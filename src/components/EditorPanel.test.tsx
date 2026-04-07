@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Mock @monaco-editor/react before importing component
 vi.mock('@monaco-editor/react', () => ({
   __esModule: true,
-  default: (props: any) => (
+  default: (props: { language?: string; value?: string; onChange?: (v: string | undefined) => void }) => (
     <div data-testid="mock-editor" data-language={props.language}>
       {props.value}
     </div>
@@ -21,10 +21,10 @@ const sampleFiles: Record<string, string> = {
 };
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     openAppFolder: vi.fn(),
     chatAutocomplete: vi.fn().mockResolvedValue(''),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(cleanup);

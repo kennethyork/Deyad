@@ -267,7 +267,7 @@ describe('executeTool (integration)', () => {
     );
     expect(result.success).toBe(true);
     expect(result.output).toContain('Wrote 1 file');
-    expect((window as any).deyad.writeFiles).toHaveBeenCalledWith(appId, { 'out.ts': 'code()' });
+    expect(window.deyad.writeFiles).toHaveBeenCalledWith(appId, { 'out.ts': 'code()' });
   });
 
   it('write_files writes indexed files', async () => {
@@ -329,7 +329,7 @@ describe('executeTool (integration)', () => {
     );
     expect(result.success).toBe(true);
     expect(result.output).toContain('Edited src/index.ts');
-    expect((window as any).deyad.writeFiles).toHaveBeenCalledWith(
+    expect(window.deyad.writeFiles).toHaveBeenCalledWith(
       appId,
       { 'src/index.ts': 'console.log("world");' },
     );
@@ -345,7 +345,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('edit_file fails when old_string has multiple occurrences', async () => {
-    (window as any).deyad.readFiles.mockResolvedValue({ 'dup.ts': 'aaa aaa' });
+    vi.mocked(window.deyad.readFiles).mockResolvedValue({ 'dup.ts': 'aaa aaa' });
     const result = await executeTool(
       { name: 'edit_file', params: { path: 'dup.ts', old_string: 'aaa', new_string: 'bbb' } },
       appId,
@@ -370,7 +370,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('delete_file deletes a file', async () => {
-    (window as any).deyad.deleteFiles = vi.fn().mockResolvedValue(undefined);
+    Object.assign(window.deyad, { deleteFiles: vi.fn().mockResolvedValue(undefined) });
     const result = await executeTool({ name: 'delete_file', params: { path: 'src/index.ts' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('Deleted');
@@ -383,16 +383,16 @@ describe('executeTool (integration)', () => {
   });
 
   it('delete_file handles errors gracefully', async () => {
-    (window as any).deyad.deleteFiles = vi.fn().mockRejectedValue(new Error('permission denied'));
+    Object.assign(window.deyad, { deleteFiles: vi.fn().mockRejectedValue(new Error('permission denied')) });
     const result = await executeTool({ name: 'delete_file', params: { path: 'x.ts' } }, appId);
     expect(result.success).toBe(false);
     expect(result.output).toContain('permission denied');
   });
 
   it('db_schema returns table info', async () => {
-    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({
+    Object.assign(window.deyad, { dbDescribe: vi.fn().mockResolvedValue({
       tables: [{ name: 'users', columns: ['id', 'name', 'email'] }],
-    });
+    }) });
     const result = await executeTool({ name: 'db_schema', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('users');
@@ -400,17 +400,17 @@ describe('executeTool (integration)', () => {
   });
 
   it('db_schema handles empty schema', async () => {
-    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [] });
+    Object.assign(window.deyad, { dbDescribe: vi.fn().mockResolvedValue({ tables: [] }) });
     const result = await executeTool({ name: 'db_schema', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('No tables');
   });
 
   it('git_commit calls gitCommitAgent', async () => {
-    (window as any).deyad.gitCommitAgent = vi.fn().mockResolvedValue({ success: true, output: 'committed' });
+    Object.assign(window.deyad, { gitCommitAgent: vi.fn().mockResolvedValue({ success: true, output: 'committed' }) });
     const result = await executeTool({ name: 'git_commit', params: { message: 'test commit' } }, appId);
     expect(result.success).toBe(true);
-    expect((window as any).deyad.gitCommitAgent).toHaveBeenCalledWith(appId, 'test commit');
+    expect(window.deyad.gitCommitAgent).toHaveBeenCalledWith(appId, 'test commit');
   });
 
   it('git_remote_set requires url', async () => {
@@ -420,47 +420,47 @@ describe('executeTool (integration)', () => {
   });
 
   it('git_remote_set sets remote', async () => {
-    (window as any).deyad.gitRemoteSet = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { gitRemoteSet: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'git_remote_set', params: { url: 'https://github.com/test/repo' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('Remote origin set');
   });
 
   it('git_remote_get returns remote', async () => {
-    (window as any).deyad.gitRemoteGet = vi.fn().mockResolvedValue('https://github.com/test/repo');
+    Object.assign(window.deyad, { gitRemoteGet: vi.fn().mockResolvedValue('https://github.com/test/repo') });
     const result = await executeTool({ name: 'git_remote_get', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('https://github.com/test/repo');
   });
 
   it('git_remote_get handles no remote', async () => {
-    (window as any).deyad.gitRemoteGet = vi.fn().mockResolvedValue('');
+    Object.assign(window.deyad, { gitRemoteGet: vi.fn().mockResolvedValue('') });
     const result = await executeTool({ name: 'git_remote_get', params: {} }, appId);
     expect(result.output).toContain('No remote');
   });
 
   it('git_push returns success', async () => {
-    (window as any).deyad.gitPush = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { gitPush: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'git_push', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('Pushed');
   });
 
   it('git_push handles failure', async () => {
-    (window as any).deyad.gitPush = vi.fn().mockResolvedValue({ success: false, error: 'no remote' });
+    Object.assign(window.deyad, { gitPush: vi.fn().mockResolvedValue({ success: false, error: 'no remote' }) });
     const result = await executeTool({ name: 'git_push', params: {} }, appId);
     expect(result.success).toBe(false);
     expect(result.output).toContain('no remote');
   });
 
   it('git_pull returns success', async () => {
-    (window as any).deyad.gitPull = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { gitPull: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'git_pull', params: {} }, appId);
     expect(result.success).toBe(true);
   });
 
   it('git_branch lists branches', async () => {
-    (window as any).deyad.gitBranch = vi.fn().mockResolvedValue({ current: 'main', branches: ['main', 'dev'] });
+    Object.assign(window.deyad, { gitBranch: vi.fn().mockResolvedValue({ current: 'main', branches: ['main', 'dev'] }) });
     const result = await executeTool({ name: 'git_branch', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('* main');
@@ -473,7 +473,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('git_branch_create creates branch', async () => {
-    (window as any).deyad.gitBranchCreate = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { gitBranchCreate: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'git_branch_create', params: { name: 'feature-x' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('feature-x');
@@ -485,17 +485,17 @@ describe('executeTool (integration)', () => {
   });
 
   it('git_branch_switch switches branch', async () => {
-    (window as any).deyad.gitBranchSwitch = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { gitBranchSwitch: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'git_branch_switch', params: { name: 'dev' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('dev');
   });
 
   it('git_log returns log entries', async () => {
-    (window as any).deyad.gitLog = vi.fn().mockResolvedValue([
+    Object.assign(window.deyad, { gitLog: vi.fn().mockResolvedValue([
       { hash: 'abc1234567', message: 'init', date: '2024-01-01' },
       { hash: 'def7890123', message: 'add stuff', date: '2024-01-02' },
-    ]);
+    ]) });
     const result = await executeTool({ name: 'git_log', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('abc1234');
@@ -503,7 +503,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('git_log handles empty log', async () => {
-    (window as any).deyad.gitLog = vi.fn().mockResolvedValue([]);
+    Object.assign(window.deyad, { gitLog: vi.fn().mockResolvedValue([]) });
     const result = await executeTool({ name: 'git_log', params: {} }, appId);
     expect(result.output).toContain('No commits');
   });
@@ -527,22 +527,22 @@ describe('executeTool (integration)', () => {
   });
 
   it('install_package calls npmInstall', async () => {
-    (window as any).deyad.npmInstall = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { npmInstall: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'install_package', params: { package: 'lodash' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('Installed lodash');
   });
 
   it('install_package passes dev flag', async () => {
-    (window as any).deyad.npmInstall = vi.fn().mockResolvedValue({ success: true });
+    Object.assign(window.deyad, { npmInstall: vi.fn().mockResolvedValue({ success: true }) });
     const result = await executeTool({ name: 'install_package', params: { package: 'vitest', dev: 'true' } }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('(dev)');
-    expect((window as any).deyad.npmInstall).toHaveBeenCalledWith(appId, 'vitest', true);
+    expect(window.deyad.npmInstall).toHaveBeenCalledWith(appId, 'vitest', true);
   });
 
   it('multi_edit applies batch edits', async () => {
-    (window as any).deyad.readFiles.mockResolvedValue({
+    vi.mocked(window.deyad.readFiles).mockResolvedValue({
       'a.ts': 'const x = 1;',
       'b.ts': 'const y = 2;',
     });
@@ -564,7 +564,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('multi_edit reports partial failure', async () => {
-    (window as any).deyad.readFiles.mockResolvedValue({ 'a.ts': 'const x = 1;' });
+    vi.mocked(window.deyad.readFiles).mockResolvedValue({ 'a.ts': 'const x = 1;' });
     const result = await executeTool({
       name: 'multi_edit',
       params: {
@@ -591,17 +591,17 @@ describe('executeTool (integration)', () => {
 
   it('git_status calls executeCommand via createTerminal', async () => {
     const termId = 'test-term-1';
-    (window as any).deyad.createTerminal = vi.fn().mockResolvedValue(termId);
-    (window as any).deyad.terminalWrite = vi.fn().mockResolvedValue(undefined);
-    (window as any).deyad.terminalKill = vi.fn().mockResolvedValue(undefined);
-    (window as any).deyad.onTerminalData = vi.fn().mockImplementation((cb: (e: { id: string; data: string }) => void) => {
+    Object.assign(window.deyad, { createTerminal: vi.fn().mockResolvedValue(termId) });
+    Object.assign(window.deyad, { terminalWrite: vi.fn().mockResolvedValue(undefined) });
+    Object.assign(window.deyad, { terminalKill: vi.fn().mockResolvedValue(undefined) });
+    Object.assign(window.deyad, { onTerminalData: vi.fn().mockImplementation((cb: (e: { id: string; data: string }) => void) => {
       setTimeout(() => cb({ id: termId, data: 'On branch main\nnothing to commit\n' }), 10);
       return () => {};
-    });
-    (window as any).deyad.onTerminalExit = vi.fn().mockImplementation((cb: (e: { id: string }) => void) => {
+    }) });
+    Object.assign(window.deyad, { onTerminalExit: vi.fn().mockImplementation((cb: (e: { id: string }) => void) => {
       setTimeout(() => cb({ id: termId }), 50);
       return () => {};
-    });
+    }) });
     const result = await executeTool({ name: 'git_status', params: {} }, appId);
     expect(result.success).toBe(true);
     expect(result.output).toContain('branch main');
@@ -621,7 +621,7 @@ describe('executeTool (integration)', () => {
 
   it('run_command blocks rm -rf /', async () => {
     const termId = 'sec-term';
-    (window as any).deyad.createTerminal = vi.fn().mockResolvedValue(termId);
+    Object.assign(window.deyad, { createTerminal: vi.fn().mockResolvedValue(termId) });
     const result = await executeTool({ name: 'run_command', params: { command: 'rm -rf /' } }, appId);
     expect(result.success).toBe(false);
     expect(result.output).toContain('blocked');
@@ -641,17 +641,17 @@ describe('executeTool (integration)', () => {
 
   it('run_command allows safe commands', async () => {
     const termId = 'safe-term';
-    (window as any).deyad.createTerminal = vi.fn().mockResolvedValue(termId);
-    (window as any).deyad.terminalWrite = vi.fn().mockResolvedValue(undefined);
-    (window as any).deyad.terminalKill = vi.fn().mockResolvedValue(undefined);
-    (window as any).deyad.onTerminalData = vi.fn().mockImplementation((cb: Function) => {
+    Object.assign(window.deyad, { createTerminal: vi.fn().mockResolvedValue(termId) });
+    Object.assign(window.deyad, { terminalWrite: vi.fn().mockResolvedValue(undefined) });
+    Object.assign(window.deyad, { terminalKill: vi.fn().mockResolvedValue(undefined) });
+    Object.assign(window.deyad, { onTerminalData: vi.fn().mockImplementation((cb: (e: { id: string; data: string }) => void) => {
       setTimeout(() => cb({ id: termId, data: 'ok\n' }), 5);
       return () => {};
-    });
-    (window as any).deyad.onTerminalExit = vi.fn().mockImplementation((cb: Function) => {
+    }) });
+    Object.assign(window.deyad, { onTerminalExit: vi.fn().mockImplementation((cb: (e: { id: string }) => void) => {
       setTimeout(() => cb({ id: termId }), 10);
       return () => {};
-    });
+    }) });
     const result = await executeTool({ name: 'run_command', params: { command: 'ls -la' } }, appId);
     expect(result.success).toBe(true);
   }, 10000);

@@ -9,7 +9,7 @@ const mockCommits = [
 ];
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     gitLog: vi.fn().mockResolvedValue(mockCommits),
     gitDiffStat: vi.fn().mockResolvedValue([
       { status: 'M', path: 'src/App.tsx' },
@@ -17,7 +17,7 @@ beforeEach(() => {
     ]),
     gitShow: vi.fn().mockResolvedValue('const x = 1;'),
     gitCheckout: vi.fn().mockResolvedValue({ success: true }),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {
@@ -62,7 +62,7 @@ describe('VersionHistoryPanel', () => {
   });
 
   it('handles empty commit history', async () => {
-    (window as any).deyad.gitLog = vi.fn().mockResolvedValue([]);
+    Object.assign(window.deyad, { gitLog: vi.fn().mockResolvedValue([]) });
     const { container } = render(
       <VersionHistoryPanel appId="app1" onClose={() => {}} onRestore={() => {}} />,
     );

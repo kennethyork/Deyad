@@ -4,12 +4,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import EnvVarsPanel from './EnvVarsPanel';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     envRead: vi.fn().mockResolvedValue({
       '.env': { DATABASE_URL: 'postgres://localhost', API_KEY: 'secret123' },
     }),
     envWrite: vi.fn().mockResolvedValue({ success: true }),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {
@@ -34,10 +34,10 @@ describe('EnvVarsPanel', () => {
   });
 
   it('shows file tabs for multiple env files', async () => {
-    (window as any).deyad.envRead = vi.fn().mockResolvedValue({
+    Object.assign(window.deyad, { envRead: vi.fn().mockResolvedValue({
       '.env': { KEY1: 'val1' },
       '.env.local': { KEY2: 'val2' },
-    });
+    }) });
     render(<EnvVarsPanel appId="app1" />);
     await waitFor(() => {
       expect(screen.getByText('.env')).toBeTruthy();
@@ -64,7 +64,7 @@ describe('EnvVarsPanel', () => {
   });
 
   it('shows empty state gracefully', async () => {
-    (window as any).deyad.envRead = vi.fn().mockResolvedValue({});
+    Object.assign(window.deyad, { envRead: vi.fn().mockResolvedValue({}) });
     const { container } = render(<EnvVarsPanel appId="app1" />);
     await waitFor(() => {
       expect(window.deyad.envRead).toHaveBeenCalled();

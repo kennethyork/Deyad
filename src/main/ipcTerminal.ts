@@ -9,7 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _pty: { spawn: (...args: any[]) => any } | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   _pty = require('node-pty');
 } catch {
   _pty = null;

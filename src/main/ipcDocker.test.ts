@@ -24,15 +24,15 @@ vi.mock('node:net', () => ({
   createConnection: vi.fn(),
 }));
 
-const handlers = new Map<string, Function>();
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
 import { ipcMain } from 'electron';
 
 beforeEach(() => {
   handlers.clear();
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
     handlers.set(channel, handler);
-    return undefined as any;
+    return undefined as ReturnType<typeof ipcMain.handle>;
   });
 });
 

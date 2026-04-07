@@ -200,7 +200,7 @@ export function registerAppHandlers(
     } catch (err) { console.debug('Handled error:', err); return []; }
   });
 
-  ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider }: { name: string; description: string; appType: string; dbProvider?: string }) => {
+  ipcMain.handle('apps:create', async (_event, { name, description, appType, dbProvider: _dbProvider }: { name: string; description: string; appType: string; dbProvider?: string }) => {
     const id = `${Date.now()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
     const dir = path.join(APPS_DIR, id);
     fs.mkdirSync(dir, { recursive: true });

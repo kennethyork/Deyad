@@ -22,10 +22,10 @@ const simpleSchema = {
 
 describe('DatabasePanel', () => {
   beforeEach(() => {
-    (window as any).deyad = {
+    window.deyad = {
       dbDescribe: vi.fn().mockResolvedValue(simpleSchema),
       portCheck: vi.fn().mockResolvedValue(true),
-    };
+    } as unknown as DeyadAPI;
   });
 
   afterEach(() => {
@@ -53,7 +53,7 @@ describe('DatabasePanel', () => {
   });
 
   it('shows starting placeholder when port not ready', () => {
-    (window as any).deyad.portCheck = vi.fn().mockResolvedValue(false);
+    Object.assign(window.deyad, { portCheck: vi.fn().mockResolvedValue(false) });
     render(<DatabasePanel app={fullApp} dbStatus="running" onDbToggle={vi.fn()} />);
     expect(screen.getByText(/starting prisma studio/i)).toBeTruthy();
   });

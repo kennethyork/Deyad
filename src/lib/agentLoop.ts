@@ -264,14 +264,11 @@ export function runAgentLoop(options: AgentOptions): () => void {
       messages.push({ role: 'user', content: userMessage });
 
       let fullOutput = '';
-      let iteration = 0;
       const allChangedFiles = new Set<string>();
       const allCommands: string[] = [];
 
       // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
       while (!aborted) {
-        iteration++;
-
         // Compact conversation if it's getting too large for the context window
         compactConversation(messages);
 

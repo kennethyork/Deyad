@@ -5,9 +5,9 @@ import SearchPanel from './SearchPanel';
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
-  (window as any).deyad = {
+  window.deyad = {
     searchFiles: vi.fn().mockResolvedValue([]),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {
@@ -24,7 +24,7 @@ describe('SearchPanel', () => {
 
   it('debounces search input by 300ms', async () => {
     const searchFn = vi.fn().mockResolvedValue([]);
-    (window as any).deyad.searchFiles = searchFn;
+    Object.assign(window.deyad, { searchFiles: searchFn });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -45,7 +45,7 @@ describe('SearchPanel', () => {
 
   it('searches immediately on Enter', async () => {
     const searchFn = vi.fn().mockResolvedValue([{ file: 'a.ts', line: 1, text: 'hello' }]);
-    (window as any).deyad.searchFiles = searchFn;
+    Object.assign(window.deyad, { searchFiles: searchFn });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -66,7 +66,7 @@ describe('SearchPanel', () => {
       { file: 'src/a.ts', line: 10, text: 'const y = 2' },
       { file: 'src/b.ts', line: 1, text: 'import z' },
     ]);
-    (window as any).deyad.searchFiles = searchFn;
+    Object.assign(window.deyad, { searchFiles: searchFn });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -86,7 +86,7 @@ describe('SearchPanel', () => {
 
   it('shows "No results found" when search returns empty', async () => {
     const searchFn = vi.fn().mockResolvedValue([]);
-    (window as any).deyad.searchFiles = searchFn;
+    Object.assign(window.deyad, { searchFiles: searchFn });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -107,7 +107,7 @@ describe('SearchPanel', () => {
       line: 1,
       text: `match ${i}`,
     }));
-    (window as any).deyad.searchFiles = vi.fn().mockResolvedValue(results);
+    Object.assign(window.deyad, { searchFiles: vi.fn().mockResolvedValue(results) });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -125,9 +125,9 @@ describe('SearchPanel', () => {
 
   it('calls onSelectFile when clicking a result', async () => {
     const onSelectFile = vi.fn();
-    (window as any).deyad.searchFiles = vi.fn().mockResolvedValue([
+    Object.assign(window.deyad, { searchFiles: vi.fn().mockResolvedValue([
       { file: 'src/index.ts', line: 3, text: 'found it' },
-    ]);
+    ]) });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={onSelectFile} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -147,9 +147,9 @@ describe('SearchPanel', () => {
   });
 
   it('clears results when query is emptied', async () => {
-    (window as any).deyad.searchFiles = vi.fn().mockResolvedValue([
+    Object.assign(window.deyad, { searchFiles: vi.fn().mockResolvedValue([
       { file: 'a.ts', line: 1, text: 'match' },
-    ]);
+    ]) });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -174,7 +174,7 @@ describe('SearchPanel', () => {
   });
 
   it('handles search errors gracefully', async () => {
-    (window as any).deyad.searchFiles = vi.fn().mockRejectedValue(new Error('Network error'));
+    Object.assign(window.deyad, { searchFiles: vi.fn().mockRejectedValue(new Error('Network error')) });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;
@@ -191,10 +191,10 @@ describe('SearchPanel', () => {
   });
 
   it('shows "Searching..." indicator while loading', async () => {
-    let resolveSearch: (v: any) => void;
-    (window as any).deyad.searchFiles = vi.fn().mockImplementation(
+    let resolveSearch: (v: Array<{ file: string; line: number; text: string }>) => void;
+    Object.assign(window.deyad, { searchFiles: vi.fn().mockImplementation(
       () => new Promise((resolve) => { resolveSearch = resolve; }),
-    );
+    ) });
 
     const { container } = render(<SearchPanel appId="app1" onSelectFile={vi.fn()} />);
     const input = container.querySelector('.search-input') as HTMLInputElement;

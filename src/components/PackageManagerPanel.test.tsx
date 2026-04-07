@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PackageManagerPanel from './PackageManagerPanel';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     npmList: vi.fn().mockResolvedValue({
       dependencies: { react: '18.2.0', 'react-dom': '18.2.0' },
       devDependencies: { vitest: '1.0.0' },
     }),
     npmInstall: vi.fn().mockResolvedValue({ success: true }),
     npmUninstall: vi.fn().mockResolvedValue({ success: true }),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(cleanup);

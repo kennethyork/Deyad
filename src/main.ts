@@ -34,7 +34,7 @@ import { registerSettingsHandlers } from './main/ipcSettings';
 
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+   
   const mod = require('update-electron-app');
   const updateElectronApp = mod.updateElectronApp ?? mod.default ?? mod;
   updateElectronApp({ updateInterval: '1 hour' });

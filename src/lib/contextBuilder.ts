@@ -11,7 +11,7 @@
 import { getOrBuildIndex, rankFilesByQuery, retrieveChunks } from './codebaseIndexer';
 
 /** Approximate tokens per character (conservative estimate for code). */
-const CHARS_PER_TOKEN = 3.5;
+const _CHARS_PER_TOKEN = 3.5;
 
 /** Maximum total characters to include as context (≈ 8k tokens). */
 const MAX_CONTEXT_CHARS = 60_000;
@@ -129,7 +129,7 @@ function extractKeywords(message: string): string[] {
  * and providing summaries for the rest.
  */
 export function buildSmartContext(options: ContextOptions): string {
-  const { files, selectedFile, userMessage, appId, embedModel } = options;
+  const { files, selectedFile, userMessage, appId, embedModel: _embedModel } = options;
   const entries = Object.entries(files);
 
   if (entries.length === 0) return '';

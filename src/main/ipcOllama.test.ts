@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Build a mock net.request that can simulate responses
-const mockResponseHandlers = new Map<string, Function>();
+const mockResponseHandlers = new Map<string, (...args: unknown[]) => void>();
 const mockResponse = {
-  on: vi.fn((event: string, cb: Function) => {
+  on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
     mockResponseHandlers.set(event, cb);
   }),
 };
 const mockRequest = {
-  on: vi.fn((event: string, cb: Function) => {
+  on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
     if (event === 'response') {
       // Simulate calling response callback
       setTimeout(() => cb(mockResponse), 0);
@@ -26,16 +26,16 @@ vi.mock('electron', () => ({
   },
 }));
 
-const handlers = new Map<string, Function>();
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
 import { ipcMain } from 'electron';
 
 beforeEach(() => {
   handlers.clear();
   mockResponseHandlers.clear();
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
     handlers.set(channel, handler);
-    return undefined as any;
+    return undefined as ReturnType<typeof ipcMain.handle>;
   });
 });
 

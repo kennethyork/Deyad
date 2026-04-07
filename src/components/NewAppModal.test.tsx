@@ -5,7 +5,7 @@ import NewAppModal from './NewAppModal';
 
 describe('NewAppModal', () => {
   beforeEach(() => {
-    (window as any).deyad = {
+    window.deyad = {
       checkDocker: vi.fn().mockResolvedValue(true),
       listPlugins: vi.fn().mockResolvedValue([
         {
@@ -21,7 +21,7 @@ describe('NewAppModal', () => {
           ]
         }
       ]),
-    };
+    } as unknown as DeyadAPI;
   });
 
   it('shows plugin templates and uses prompt', async () => {

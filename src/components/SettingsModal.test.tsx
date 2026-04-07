@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SettingsModal from './SettingsModal';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     getSettings: vi.fn().mockResolvedValue({
       ollamaHost: 'http://localhost:11434',
       defaultModel: 'llama3',
@@ -15,7 +15,7 @@ beforeEach(() => {
     }),
     setSettings: vi.fn().mockResolvedValue(undefined),
     listModels: vi.fn().mockResolvedValue({ models: [{ name: 'llama3' }, { name: 'codellama' }] }),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {

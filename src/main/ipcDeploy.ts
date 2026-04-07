@@ -51,11 +51,11 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
     if (!fs.existsSync(dir)) return { success: false, error: 'App directory not found' };
 
     let appType = 'frontend';
-    let appName = 'deyad-app';
+    let _appName = 'deyad-app';
     try {
       const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
       appType = meta.appType || appType;
-      appName = (meta.name || appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
+      _appName = (meta.name || _appName).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
     } catch (err) { console.debug('use defaults:', err); }
 
     const webDir = appType === 'fullstack' ? path.join(dir, 'frontend') : dir;
@@ -248,7 +248,7 @@ CMD ["node", "backend/src/index.js"]
       // 3. Set up nginx + SSL if domain provided
       if (opts.domain) {
         sendLog(`\nConfiguring nginx for ${opts.domain}…\n`);
-        const sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=accept-new ${opts.user}@${opts.host}`;
+        const _sshCmd = `ssh -p ${sshPort} -o StrictHostKeyChecking=accept-new ${opts.user}@${opts.host}`;
 
         const nginxConf = [
           `server {`,

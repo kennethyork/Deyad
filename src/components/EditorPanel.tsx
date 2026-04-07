@@ -210,6 +210,7 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
 
     // Configure TypeScript/JavaScript to not show false errors
     // Monaco 0.55+ marks languages.typescript as deprecated in types but it still works at runtime
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Monaco dropped TS types but runtime API exists
     const ts = (monaco.languages as any).typescript;
     const tsDefaults = ts.typescriptDefaults;
     const jsDefaults = ts.javascriptDefaults;

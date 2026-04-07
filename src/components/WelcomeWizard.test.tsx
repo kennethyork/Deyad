@@ -4,10 +4,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import WelcomeWizard from './WelcomeWizard';
 
 beforeEach(() => {
-  (window as any).deyad = {
+  window.deyad = {
     listModels: vi.fn().mockResolvedValue({ models: [{ name: 'llama3', details: { parameter_size: '8B' } }] }),
     setSettings: vi.fn().mockResolvedValue(undefined),
-  };
+  } as unknown as DeyadAPI;
 });
 
 afterEach(() => {

@@ -26,9 +26,10 @@ import { runAgentLoop } from './agentLoop';
 const mockRunAgentLoop = vi.mocked(runAgentLoop);
 
 // Setup window.deyad mock
+const _global = globalThis as unknown as { window: { deyad: Record<string, unknown> } };
 function setupDeyadMock() {
-  (globalThis as any).window = (globalThis as any).window || {};
-  (globalThis as any).window.deyad = {
+  _global.window = _global.window || {};
+  _global.window.deyad = {
     readFiles: vi.fn().mockResolvedValue({ 'src/App.tsx': 'export default function App() {}' }),
   };
 }

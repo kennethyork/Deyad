@@ -80,8 +80,8 @@ function AppInner() {
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [showTaskQueue, setShowTaskQueue] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [showEnvEditor, setShowEnvEditor] = useState(false);
-  const [showPackageManager, setShowPackageManager] = useState(false);
+  const [_showEnvEditor, _setShowEnvEditor] = useState(false);
+  const [_showPackageManager, _setShowPackageManager] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [activeTasks, setActiveTasks] = useState(0);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getOrBuildIndex, rankFilesByQuery, embedChunks, retrieveChunks, rankFilesBySemantic, clearIndex } from './codebaseIndexer';
 
+// Helper for setting up window.deyad in a Node test environment
+const _global = globalThis as unknown as { window: { deyad: Record<string, unknown> } };
+
 const sampleFiles: Record<string, string> = {
   'src/App.tsx': `import React from 'react';
 export default function App() {
@@ -131,8 +134,8 @@ describe('rankFilesByQuery', () => {
 
 describe('embedChunks', () => {
   beforeEach(() => {
-    (globalThis as any).window = (globalThis as any).window || {};
-    (globalThis as any).window.deyad = {
+    _global.window = _global.window || {};
+    _global.window.deyad = {
       embed: vi.fn().mockResolvedValue({ embeddings: [] }),
     };
   });
@@ -141,7 +144,7 @@ describe('embedChunks', () => {
     const embedMock = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
       embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
     }));
-    (globalThis as any).window.deyad.embed = embedMock;
+    _global.window.deyad.embed = embedMock;
 
     const id = 'test-embed-call-' + Date.now();
     await embedChunks(id, sampleFiles, 'nomic-embed-text');
@@ -149,7 +152,7 @@ describe('embedChunks', () => {
   });
 
   it('sets embeddingsReady after successful embed', async () => {
-    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
+    _global.window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
       embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
     }));
 
@@ -160,7 +163,7 @@ describe('embedChunks', () => {
   });
 
   it('handles embed API failure gracefully', async () => {
-    (globalThis as any).window.deyad.embed = vi.fn().mockRejectedValue(new Error('Ollama down'));
+    _global.window.deyad.embed = vi.fn().mockRejectedValue(new Error('Ollama down'));
 
     const id = 'test-embed-fail-' + Date.now();
     await expect(embedChunks(id, sampleFiles, 'nomic-embed-text')).resolves.not.toThrow();
@@ -170,7 +173,7 @@ describe('embedChunks', () => {
     const embedMock = vi.fn().mockImplementation((_m: string, inputs: string[]) => ({
       embeddings: inputs.map(() => [0.1, 0.2, 0.3]),
     }));
-    (globalThis as any).window.deyad.embed = embedMock;
+    _global.window.deyad.embed = embedMock;
 
     const id = 'test-embed-skip-' + Date.now();
     await embedChunks(id, sampleFiles, 'nomic-embed-text');
@@ -182,8 +185,8 @@ describe('embedChunks', () => {
 
 describe('retrieveChunks', () => {
   beforeEach(() => {
-    (globalThis as any).window = (globalThis as any).window || {};
-    (globalThis as any).window.deyad = {
+    _global.window = _global.window || {};
+    _global.window.deyad = {
       embed: vi.fn().mockResolvedValue({ embeddings: [] }),
     };
   });
@@ -196,9 +199,9 @@ describe('retrieveChunks', () => {
 
   it('retrieves relevant chunks after embedding', async () => {
     // Mock embed to return simple vectors
-    let callCount = 0;
-    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
-      callCount++;
+    let _callCount = 0;
+    _global.window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+      _callCount++;
       if (Array.isArray(inputs)) {
         return { embeddings: inputs.map((_: string, i: number) => [i * 0.1, 0.5, 0.3]) };
       }
@@ -218,7 +221,7 @@ describe('retrieveChunks', () => {
   });
 
   it('respects topK limit', async () => {
-    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+    _global.window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
       if (Array.isArray(inputs)) {
         return { embeddings: inputs.map(() => [0.9, 0.8, 0.7]) };
       }
@@ -234,8 +237,8 @@ describe('retrieveChunks', () => {
 
 describe('rankFilesBySemantic', () => {
   beforeEach(() => {
-    (globalThis as any).window = (globalThis as any).window || {};
-    (globalThis as any).window.deyad = {
+    _global.window = _global.window || {};
+    _global.window.deyad = {
       embed: vi.fn().mockResolvedValue({ embeddings: [] }),
     };
   });
@@ -247,7 +250,7 @@ describe('rankFilesBySemantic', () => {
   });
 
   it('returns normalized scores after embedding', async () => {
-    (globalThis as any).window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
+    _global.window.deyad.embed = vi.fn().mockImplementation((_m: string, inputs: string | string[]) => {
       if (Array.isArray(inputs)) {
         return { embeddings: inputs.map(() => [0.9, 0.8, 0.7]) };
       }

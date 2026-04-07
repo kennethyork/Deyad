@@ -98,15 +98,15 @@ describeGit('gitCommit', () => {
 // ── Handler registration tests ────────────────────────────────────────────
 
 // Capture handlers registered via ipcMain.handle
-const handlers = new Map<string, Function>();
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
 import { ipcMain } from 'electron';
 
 describeGit('registerGitHandlers', () => {
   beforeEach(async () => {
     handlers.clear();
-    vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+    vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
       handlers.set(channel, handler);
-      return undefined as any;
+      return undefined as ReturnType<typeof ipcMain.handle>;
     });
     const { registerGitHandlers } = await import('./ipcGit');
     registerGitHandlers(fakeAppDir);

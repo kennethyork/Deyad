@@ -22,7 +22,7 @@ vi.mock('node-pty', () => ({
   spawn: mockSpawn,
 }));
 
-const handlers = new Map<string, Function>();
+const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
 import { ipcMain } from 'electron';
 
@@ -30,9 +30,9 @@ beforeEach(async () => {
   handlers.clear();
   const { _setPtyForTest } = await import('./ipcTerminal');
   _setPtyForTest({ spawn: mockSpawn });
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: Function) => {
+  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
     handlers.set(channel, handler);
-    return undefined as any;
+    return undefined as ReturnType<typeof ipcMain.handle>;
   });
 });
 

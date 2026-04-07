@@ -6,7 +6,7 @@ import ChatPanel from './ChatPanel';
 const dummyApp = { id:'a',name:'Test',description:'',createdAt:new Date().toISOString(),appType:'frontend' as const };
 
 beforeEach(()=>{
-  (window as any).deyad={
+  window.deyad ={
     getSettings: vi.fn().mockResolvedValue({ollamaHost:'',defaultModel:''}),
     listModels: vi.fn().mockResolvedValue({models:[{name:'m1',modified_at:'',size:0}]}),
     chatStream: vi.fn().mockResolvedValue(undefined),
@@ -16,7 +16,7 @@ beforeEach(()=>{
     onAppDevLog: vi.fn().mockReturnValue(()=>{}),
     loadMessages: vi.fn().mockResolvedValue([]),
     saveMessages: vi.fn().mockResolvedValue(true),
-  };
+  } as unknown as DeyadAPI;
 });
 
 describe('ChatPanel',()=>{
@@ -79,7 +79,7 @@ describe('ChatPanel',()=>{
   });
 
   it('shows error banner with retry button',async()=>{
-    (window as any).deyad.listModels = vi.fn().mockRejectedValue(new Error('Connection refused'));
+    Object.assign(window.deyad, { listModels: vi.fn().mockRejectedValue(new Error('Connection refused')) });
     const {container} = render(<ChatPanel app={dummyApp} appFiles={{}} dbStatus="none" onFilesUpdated={vi.fn()} onDbToggle={vi.fn()} onRevert={vi.fn()} canRevert={false} />);
     // loadModels retries 3 times with 1500ms delays — wait long enough
     await waitFor(()=>{
@@ -113,7 +113,7 @@ describe('ChatPanel',()=>{
   });
 
   it('shows "No models" when list is empty',async()=>{
-    (window as any).deyad.listModels = vi.fn().mockResolvedValue({models:[]});
+    Object.assign(window.deyad, { listModels: vi.fn().mockResolvedValue({models:[]}) });
     const {container} = render(<ChatPanel app={dummyApp} appFiles={{}} dbStatus="none" onFilesUpdated={vi.fn()} onDbToggle={vi.fn()} onRevert={vi.fn()} canRevert={false} />);
     await waitFor(()=>{
       const noModels = container.querySelector('.no-models');

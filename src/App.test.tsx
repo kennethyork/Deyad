@@ -30,7 +30,7 @@ describe('App component', () => {
     // clear any persisted widths
     localStorage.clear();
     // provide a minimal deyad API stub to avoid undefined errors
-    (window as any).deyad = {
+    window.deyad = {
       listApps: vi.fn().mockResolvedValue([]),
       createApp: vi.fn(),
       readFiles: vi.fn().mockResolvedValue({}),
@@ -53,7 +53,7 @@ describe('App component', () => {
       onTerminalClear: vi.fn().mockReturnValue(() => {}),
       terminalKill: vi.fn().mockResolvedValue(undefined),
       // other stubs may be needed but App won't call them in tests
-    } as any;
+    } as unknown as DeyadAPI;
   });
 
   it('initializes sidebar and right panel widths from localStorage', () => {
@@ -117,7 +117,7 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
 
     const { container } = render(<App />);
 
@@ -142,8 +142,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'fullstack' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.dbDescribe = vi.fn().mockResolvedValue({ tables: [{ name: 'Things', columns: ['a','b'] }] });
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+    Object.assign(window.deyad, { dbDescribe: vi.fn().mockResolvedValue({ tables: [{ name: 'Things', columns: ['a','b'] }] }) });
 
     const { container } = render(<App />);
     await screen.findByText('DB Test App');
@@ -167,8 +167,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/mobile' });
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+    Object.assign(window.deyad, { exportApp: vi.fn().mockResolvedValue({ success: true, path: '/tmp/mobile' }) });
 
     render(<App />);
     // wait for sidebar entry to appear
@@ -190,8 +190,8 @@ describe('App component', () => {
       createdAt: new Date().toISOString(),
       appType: 'frontend' as const,
     };
-    (window as any).deyad.listApps = vi.fn().mockResolvedValue([app]);
-    (window as any).deyad.exportApp = vi.fn().mockResolvedValue({ success: true, path: '/tmp/zip' });
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+    Object.assign(window.deyad, { exportApp: vi.fn().mockResolvedValue({ success: true, path: '/tmp/zip' }) });
 
     render(<App />);
     await screen.findByText('Export Test 2');
