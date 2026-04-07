@@ -87,6 +87,7 @@ WORKFLOW:
 RULES:
 - ALWAYS follow the user's instructions and constraints exactly. If the user says "only modify X", or any other constraint, obey it literally.
 - NEVER just describe what you would do — actually DO it by calling tools. If the user asks you to run something, use run_command immediately. If they ask to create a file, use write_files immediately. Do not respond with "I'll do X" and then stop — call the tool in the same response.
+- If the user asks you to execute or run a command, your next response MUST be a <tool_call> for run_command only. Do not output plain English instead of the tool call.
 - Only modify files and components that are directly relevant to the user's request. Do NOT change unrelated code unless explicitly asked.
 - Always explore the project structure before making changes.
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
@@ -225,13 +226,15 @@ export async function runAgentLoop(
       const toolCalls = parseToolCalls(turnResponse);
 
       if (toolCalls.length === 0 || isDone(turnResponse)) {
-        // Nudge: if this is the first turn and the response looks like a plan
-        // rather than a final answer, push the model to actually use tools.
+        // Nudge: if the assistant is describing actions instead of performing them,
+        // require tool usage before finishing. Allow a second retry if needed.
         const stripped = stripToolMarkup(turnResponse).trim();
-        const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to)\b/i.test(stripped);
-        if (iteration === 0 && looksLikePlan && stripped.length < 300) {
+        const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to|I'll run|I will run|Let's run|Let's start|Running|Starting)\b/i.test(stripped);
+        const userRequest = messages[messages.length - 1]?.content || '';
+        const isExecutionRequest = /\b(run|execute|start|launch|open|build|test|deploy|compile|install)\b/i.test(userRequest);
+        if (iteration < 3 && (looksLikePlan || isExecutionRequest) && stripped.length < 500) {
           messages.push({ role: 'assistant', content: turnResponse });
-          messages.push({ role: 'user', content: 'You described what you would do but didn\'t actually do it. Please call the appropriate tools now to carry out the task. Do not just describe — act.' });
+          messages.push({ role: 'user', content: 'This is not enough. You must now call a tool instead of describing what you would do. Use run_command with the exact shell command. Example: <tool_call><name>run_command</name><param name="command">npm run dev</param></tool_call>. Do not respond with prose.' });
           iteration++;
           continue;
         }
