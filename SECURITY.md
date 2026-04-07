@@ -16,9 +16,10 @@ Instead, please report them privately through one of these channels:
 1. **GitHub Security Advisories** (preferred):
    [Create a new advisory](https://github.com/kennethyork/Deyad/security/advisories/new)
 
-2. **Email**: maintainer@deyad.app
+2. **Email**: <maintainer@deyad.app>
 
 Include as much detail as possible:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact
@@ -35,12 +36,14 @@ Include as much detail as possible:
 Deyad is designed with a **local-first** security model:
 
 ### Desktop App
+
 - All AI inference runs locally via Ollama — no data leaves your machine
 - Electron context isolation and sandboxed preload bridge
 - IPC channel allowlisting — only declared channels are exposed
 - No telemetry, no analytics, no cloud dependencies
 
 ### CLI Agent
+
 - **SSRF protection**: `fetch_url` blocks private/internal IP ranges (127.x, 10.x, 192.168.x, 172.16-31.x, metadata endpoints)
 - **Command blocking**: `run_command` blocks destructive commands (rm -rf /, sudo, mkfs, dd, curl|sh, shutdown)
 - **Path traversal protection**: All file operations validate resolved paths stay within the project directory
@@ -52,6 +55,7 @@ Deyad is designed with a **local-first** security model:
 ## Scope
 
 The following are in scope for security reports:
+
 - Remote code execution
 - Path traversal / directory escape
 - SSRF (Server-Side Request Forgery)
@@ -60,6 +64,7 @@ The following are in scope for security reports:
 - Data exfiltration
 
 The following are **out of scope**:
+
 - Vulnerabilities in Ollama itself (report to [ollama/ollama](https://github.com/ollama/ollama))
 - Vulnerabilities in Electron (report to [electron/electron](https://github.com/electron/electron))
 - Social engineering attacks

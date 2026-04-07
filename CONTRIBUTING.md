@@ -18,7 +18,7 @@ npm start
 ### Desktop (Electron)
 
 | Command | Description |
-|---|---|
+| --- | --- |
 | `npm start` | Run in dev mode (Electron + Vite) |
 | `npm test` | Run all tests (Vitest) |
 | `npm run lint` | Lint with ESLint |
@@ -29,7 +29,7 @@ npm start
 ### CLI
 
 | Command | Description |
-|---|---|
+| --- | --- |
 | `cd cli && npm install` | Install CLI dependencies |
 | `cd cli && npm run build` | Build the CLI |
 | `cd cli && npm test` | Run CLI tests |
@@ -37,7 +37,7 @@ npm start
 
 ## Project Structure
 
-```
+```text
 src/
   main.ts              # Electron main process
   preload.ts           # Context bridge (IPC)
@@ -98,7 +98,7 @@ cli/
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 feat(cli): add web search tool
 fix(desktop): resolve preview panel crash
 docs: update README with CLI comparison
