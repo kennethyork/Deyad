@@ -37,8 +37,38 @@ const SESSION_FILE = '.deyad-session.json';
 const MEMORY_FILE = 'DEYAD.md';
 
 function isRunRequest(message: string): boolean {
-  return /\b(run|execute|start|launch|open|serve|build|deploy|compile)\b/i.test(message)
-    && /\b(deyad|project|app|application|dev|server|cli)\b/i.test(message);
+  return /\b(run|execute|start|launch|open|serve|build|deploy|compile|install|create|write|append|make)\b/i.test(message)
+    && /\b(deyad|project|app|application|dev|server|cli|file|package|test|build)\b/i.test(message);
+}
+
+function inferFallbackShellCommand(message: string, cwd: string): string | null {
+  const normalize = (s: string) => s.trim();
+  const createFile = /create (?:a )?file (?:named |called )?"?([^"\s]+)"?(?: with content| containing| and content)?\s*"?([\s\S]+?)"?$/i;
+  const writeFile = /write (?:a )?file (?:named |called )?"?([^"\s]+)"?(?: with content| containing| and content)?\s*"?([\s\S]+?)"?$/i;
+  const createMatch = message.match(createFile) || message.match(writeFile);
+  if (createMatch) {
+    const filename = normalize(createMatch[1]);
+    const content = createMatch[2].replace(/"?$/,'').trim();
+    const marker = 'EOF';
+    return `cat > "${filename}" <<'${marker}'\n${content}\n${marker}`;
+  }
+
+  const installMatch = message.match(/install (?:the )?package ([^\s]+)/i);
+  if (installMatch) {
+    const pkg = normalize(installMatch[1]);
+    return `npm install ${pkg}`;
+  }
+
+  if (/\bdev\b|\bstart\b|\brun\b.*\bdev\b/i.test(message)) {
+    return 'npm run dev';
+  }
+  if (/\bbuild\b/i.test(message) && fs.existsSync(path.join(cwd, 'package.json'))) {
+    return 'npm run build';
+  }
+  if (/\btest\b/i.test(message) && fs.existsSync(path.join(cwd, 'package.json'))) {
+    return 'npm test';
+  }
+  return null;
 }
 
 function findFallbackRunCommand(cwd: string): string | null {
@@ -644,12 +674,20 @@ async function runOnce(
   }, history, undefined, mcpManager);
 
   if (!toolStarted && isRunRequest(message)) {
-    const fallbackCommand = findFallbackRunCommand(cwd);
-    if (fallbackCommand) {
-      console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to direct command: ${fallbackCommand}\n`));
-      const toolResult = startBackgroundCommand(fallbackCommand, cwd);
+    const inferredCommand = inferFallbackShellCommand(message, cwd);
+    if (inferredCommand) {
+      console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to inferred command: ${inferredCommand}\n`));
+      const toolResult = startBackgroundCommand(inferredCommand, cwd);
       console.log(formatToolResult(toolResult.tool, toolResult.success, toolResult.output));
       console.log('');
+    } else {
+      const fallbackCommand = findFallbackRunCommand(cwd);
+      if (fallbackCommand) {
+        console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to direct command: ${fallbackCommand}\n`));
+        const toolResult = startBackgroundCommand(fallbackCommand, cwd);
+        console.log(formatToolResult(toolResult.tool, toolResult.success, toolResult.output));
+        console.log('');
+      }
     }
   }
 

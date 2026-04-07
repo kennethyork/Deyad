@@ -230,8 +230,8 @@ export async function runAgentLoop(
         // require tool usage before finishing. Allow a second retry if needed.
         const stripped = stripToolMarkup(turnResponse).trim();
         const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to|I'll run|I will run|Let's run|Let's start|Running|Starting)\b/i.test(stripped);
-        const userRequest = messages[messages.length - 1]?.content || '';
-        const isExecutionRequest = /\b(run|execute|start|launch|open|build|test|deploy|compile|install)\b/i.test(userRequest);
+        const originalUserRequest = userMessage;
+        const isExecutionRequest = /\b(run|execute|start|launch|open|build|test|deploy|compile|install|create|write|append|make)\b/i.test(originalUserRequest);
         if (iteration < 3 && (looksLikePlan || isExecutionRequest) && stripped.length < 500) {
           messages.push({ role: 'assistant', content: turnResponse });
           messages.push({ role: 'user', content: 'This is not enough. You must now call a tool instead of describing what you would do. Use run_command with the exact shell command. Example: <tool_call><name>run_command</name><param name="command">npm run dev</param></tool_call>. Do not respond with prose.' });
