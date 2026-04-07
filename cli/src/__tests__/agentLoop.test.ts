@@ -210,11 +210,12 @@ describe('runAgentLoop', () => {
 
     // Check that the second call to streamChat includes the tool result in correct format
     const secondCall = mockedStreamChat.mock.calls[1];
-    const messages = secondCall[1]; // messages array
-    const lastUserMsg = messages.filter((m: { role: string }) => m.role === 'user').pop();
-    expect(lastUserMsg).toBeDefined();
-    expect(lastUserMsg!.content).toContain('<tool_result>');
-    expect(lastUserMsg!.content).toContain('<status>success</status>');
-    expect(lastUserMsg!.content).toContain('<name>list_files</name>');
+    const messages = secondCall[1] as Array<{ role: string; content: string }>; // messages array
+    const userMessages = messages.filter(m => m.role === 'user');
+    expect(userMessages.length).toBeGreaterThan(0);
+    const lastUserContent = userMessages[userMessages.length - 1]!.content;
+    expect(lastUserContent).toContain('<tool_result>');
+    expect(lastUserContent).toContain('<status>success</status>');
+    expect(lastUserContent).toContain('<name>list_files</name>');
   });
 });
