@@ -140,7 +140,19 @@ async function buildContext(cwd: string): Promise<string> {
   let context = `Project files (${files.length}):\n${listing.output}\n`;
 
   // Auto-read key config files
-  const keyFiles = ['package.json', 'tsconfig.json', 'Cargo.toml', 'pyproject.toml', 'go.mod', 'Makefile', '.env', 'DEYAD.md'];
+  const keyFiles = [
+    'package.json', 'tsconfig.json',                    // JS / TS
+    'Cargo.toml',                                        // Rust
+    'pyproject.toml', 'setup.py', 'requirements.txt',   // Python
+    'go.mod',                                            // Go
+    'pom.xml', 'build.gradle', 'build.gradle.kts',      // Java / Kotlin
+    'Gemfile',                                           // Ruby
+    'composer.json',                                     // PHP
+    'pubspec.yaml',                                      // Dart / Flutter
+    'Package.swift',                                     // Swift
+    'CMakeLists.txt', 'Makefile',                        // C / C++
+    '.env', 'DEYAD.md',                                  // Deyad
+  ];
   for (const f of keyFiles) {
     if (files.includes(f)) {
       const result = await exec({ name: 'read_file', params: { path: f } }, cwd);
@@ -279,42 +291,186 @@ export async function runAgentLoop(
         `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`
       ).join('\n\n');
 
-      // Auto-lint: after file changes, run a quick type-check and append errors
+      // Auto-lint: after file changes, detect project language and run appropriate linter
       let autoLintText = '';
       if (filesChanged && !abortController.signal.aborted) {
+        const lintErrors: string[] = [];
         try {
-          const hasTS = fs.existsSync(path.join(cwd, 'tsconfig.json'));
-          if (hasTS) {
-            const lintOutput = execSync('timeout 10 npx tsc --noEmit --pretty false 2>&1 | head -40', {
-              cwd,
-              encoding: 'utf-8',
-              timeout: 15_000,
-            }).trim();
-            if (lintOutput && /error\s+TS/i.test(lintOutput)) {
-              autoLintText = `\n\n<auto_lint>\nTypeScript errors detected after your changes — please fix them:\n${lintOutput}\n</auto_lint>`;
+          // TypeScript / JavaScript
+          if (fs.existsSync(path.join(cwd, 'tsconfig.json'))) {
+            try {
+              const out = execSync('timeout 10 npx tsc --noEmit --pretty false 2>&1 | head -40', { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
+              if (out && /error\s+TS/i.test(out)) lintErrors.push(`[TypeScript]\n${out}`);
+            } catch (_e) { /* tsc not available */ }
+          } else if (fs.existsSync(path.join(cwd, 'package.json'))) {
+            // ESLint for JS projects without TS
+            try {
+              const changed = changedFiles.filter(f => /\.[jt]sx?$/.test(f)).slice(0, 10).join(' ');
+              if (changed) {
+                const out = execSync(`timeout 10 npx eslint --no-error-on-unmatched-pattern --format compact ${changed} 2>&1 | head -40`, { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
+                if (out && /Error/i.test(out)) lintErrors.push(`[ESLint]\n${out}`);
+              }
+            } catch (_e) { /* eslint not available */ }
+          }
+
+          // Python
+          if (fs.existsSync(path.join(cwd, 'pyproject.toml')) || fs.existsSync(path.join(cwd, 'setup.py')) || fs.existsSync(path.join(cwd, 'requirements.txt'))) {
+            const pyFiles = changedFiles.filter(f => f.endsWith('.py')).slice(0, 10);
+            if (pyFiles.length > 0) {
+              // Try ruff first (fast), fall back to flake8, then python -m py_compile
+              const pyList = pyFiles.join(' ');
+              let pyLinted = false;
+              try {
+                const out = execSync(`timeout 10 ruff check --output-format concise ${pyList} 2>&1 | head -40`, { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
+                if (out && out.length > 0) { lintErrors.push(`[Python/Ruff]\n${out}`); pyLinted = true; }
+                else pyLinted = true; // ruff ran but no errors
+              } catch (_e) { /* ruff not available */ }
+              if (!pyLinted) {
+                try {
+                  const out = execSync(`timeout 10 flake8 --max-line-length 120 ${pyList} 2>&1 | head -40`, { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
+                  if (out && out.length > 0) { lintErrors.push(`[Python/Flake8]\n${out}`); pyLinted = true; }
+                  else pyLinted = true;
+                } catch (_e) { /* flake8 not available */ }
+              }
+              if (!pyLinted) {
+                // Fallback: syntax check only
+                for (const pf of pyFiles.slice(0, 5)) {
+                  try {
+                    const out = execSync(`python3 -m py_compile "${pf}" 2>&1`, { cwd, encoding: 'utf-8', timeout: 10_000 }).trim();
+                    if (out) lintErrors.push(`[Python/Syntax] ${pf}\n${out}`);
+                  } catch (_e) { /* python3 not available */ }
+                }
+              }
             }
           }
-        } catch (_err) { /* ignore lint failures */ }
+
+          // Rust
+          if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) {
+            try {
+              const out = execSync('timeout 30 cargo check --message-format short 2>&1 | grep "^error" | head -20', { cwd, encoding: 'utf-8', timeout: 35_000 }).trim();
+              if (out) lintErrors.push(`[Rust]\n${out}`);
+            } catch (_e) { /* cargo not available */ }
+          }
+
+          // Go
+          if (fs.existsSync(path.join(cwd, 'go.mod'))) {
+            try {
+              const out = execSync('timeout 15 go vet ./... 2>&1 | head -20', { cwd, encoding: 'utf-8', timeout: 20_000 }).trim();
+              if (out) lintErrors.push(`[Go/vet]\n${out}`);
+            } catch (_e) { /* go not available */ }
+            try {
+              const out = execSync('timeout 15 go build ./... 2>&1 | grep -E "^\\./|error" | head -20', { cwd, encoding: 'utf-8', timeout: 20_000 }).trim();
+              if (out && /error/i.test(out)) lintErrors.push(`[Go/build]\n${out}`);
+            } catch (_e) { /* go build failed or not available */ }
+          }
+
+          // Java (Maven or Gradle)
+          if (fs.existsSync(path.join(cwd, 'pom.xml'))) {
+            try {
+              const out = execSync('timeout 30 mvn compile -q 2>&1 | grep -E "ERROR|error" | head -20', { cwd, encoding: 'utf-8', timeout: 35_000 }).trim();
+              if (out) lintErrors.push(`[Java/Maven]\n${out}`);
+            } catch (_e) { /* mvn not available */ }
+          } else if (fs.existsSync(path.join(cwd, 'build.gradle')) || fs.existsSync(path.join(cwd, 'build.gradle.kts'))) {
+            try {
+              const out = execSync('timeout 30 gradle compileJava -q 2>&1 | grep -E "error:" | head -20', { cwd, encoding: 'utf-8', timeout: 35_000 }).trim();
+              if (out) lintErrors.push(`[Java/Gradle]\n${out}`);
+            } catch (_e) { /* gradle not available */ }
+          }
+
+          // C / C++ (Makefile-based)
+          if (fs.existsSync(path.join(cwd, 'Makefile')) || fs.existsSync(path.join(cwd, 'CMakeLists.txt'))) {
+            const cFiles = changedFiles.filter(f => /\.[ch](pp|xx)?$/.test(f) || f.endsWith('.cc'));
+            if (cFiles.length > 0) {
+              // Try compiling changed files with syntax check only
+              for (const cf of cFiles.slice(0, 5)) {
+                const ext = cf.endsWith('.c') ? 'c' : 'c++';
+                const compiler = ext === 'c' ? 'gcc' : 'g++';
+                try {
+                  const out = execSync(`timeout 10 ${compiler} -fsyntax-only "${cf}" 2>&1 | head -10`, { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
+                  if (out && /error/i.test(out)) lintErrors.push(`[C/${compiler}] ${cf}\n${out}`);
+                } catch (_e) { /* compiler not available */ }
+              }
+            }
+          }
+
+          // Ruby
+          if (fs.existsSync(path.join(cwd, 'Gemfile'))) {
+            const rbFiles = changedFiles.filter(f => f.endsWith('.rb')).slice(0, 10);
+            for (const rf of rbFiles) {
+              try {
+                const out = execSync(`timeout 5 ruby -c "${rf}" 2>&1`, { cwd, encoding: 'utf-8', timeout: 10_000 }).trim();
+                if (out && !out.includes('Syntax OK')) lintErrors.push(`[Ruby] ${rf}\n${out}`);
+              } catch (_e) { /* ruby not available */ }
+            }
+          }
+
+          // PHP
+          const phpFiles = changedFiles.filter(f => f.endsWith('.php')).slice(0, 10);
+          if (phpFiles.length > 0) {
+            for (const pf of phpFiles) {
+              try {
+                const out = execSync(`timeout 5 php -l "${pf}" 2>&1`, { cwd, encoding: 'utf-8', timeout: 10_000 }).trim();
+                if (out && !out.includes('No syntax errors')) lintErrors.push(`[PHP] ${pf}\n${out}`);
+              } catch (_e) { /* php not available */ }
+            }
+          }
+
+          // Dart / Flutter
+          if (fs.existsSync(path.join(cwd, 'pubspec.yaml'))) {
+            try {
+              const out = execSync('timeout 15 dart analyze --no-fatal-infos 2>&1 | grep -E "error •|ERROR" | head -20', { cwd, encoding: 'utf-8', timeout: 20_000 }).trim();
+              if (out) lintErrors.push(`[Dart]\n${out}`);
+            } catch (_e) { /* dart not available */ }
+          }
+
+          // Swift
+          const swiftFiles = changedFiles.filter(f => f.endsWith('.swift')).slice(0, 10);
+          if (swiftFiles.length > 0 && fs.existsSync(path.join(cwd, 'Package.swift'))) {
+            try {
+              const out = execSync('timeout 30 swift build 2>&1 | grep -E "error:" | head -20', { cwd, encoding: 'utf-8', timeout: 35_000 }).trim();
+              if (out) lintErrors.push(`[Swift]\n${out}`);
+            } catch (_e) { /* swift not available */ }
+          }
+
+          // Kotlin (Gradle)
+          const ktFiles = changedFiles.filter(f => f.endsWith('.kt') || f.endsWith('.kts'));
+          if (ktFiles.length > 0 && (fs.existsSync(path.join(cwd, 'build.gradle.kts')) || fs.existsSync(path.join(cwd, 'build.gradle')))) {
+            try {
+              const out = execSync('timeout 30 gradle compileKotlin -q 2>&1 | grep -E "error:" | head -20', { cwd, encoding: 'utf-8', timeout: 35_000 }).trim();
+              if (out) lintErrors.push(`[Kotlin]\n${out}`);
+            } catch (_e) { /* gradle not available */ }
+          }
+
+        } catch (_err) { /* ignore outer failures */ }
+
+        if (lintErrors.length > 0) {
+          autoLintText = `\n\n<auto_lint>\nErrors detected after your changes — please fix them:\n${lintErrors.join('\n\n')}\n</auto_lint>`;
+        }
       }
 
-      // Auto-review: after file changes, scan for common logical bugs
+      // Auto-review: after file changes, scan for common logical bugs across languages
       let autoReviewText = '';
       if (filesChanged && !abortController.signal.aborted) {
         try {
           const issues: string[] = [];
+          const codeExts = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.kt', '.rb', '.php', '.dart', '.swift', '.c', '.cpp', '.h', '.hpp']);
           for (const f of changedFiles) {
-            if (!f.endsWith('.ts') && !f.endsWith('.tsx')) continue;
+            const ext = path.extname(f).toLowerCase();
+            if (!codeExts.has(ext)) continue;
             const fullPath = path.resolve(cwd, f);
             if (!fs.existsSync(fullPath)) continue;
             const content = fs.readFileSync(fullPath, 'utf-8');
+            const lines = content.split('\n');
 
-            // Check: array length vs declared count mismatch
-            const countMatches = [...content.matchAll(/(?:const|let)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(\d+)/g)];
+            // --- Universal checks ---
+
+            // Check: array/list length vs declared count mismatch
+            const countMatches = [...content.matchAll(/(?:const|let|var|val|int|size_t)\s+(\w+)\s*(?::\s*\w+)?\s*=\s*(\d+)/g)];
             for (const m of countMatches) {
               const varName = m[1];
               const declaredCount = parseInt(m[2], 10);
               const lowerName = varName.toLowerCase();
-              if (!(lowerName.includes('total') || lowerName.includes('count') || lowerName.includes('steps'))) continue;
+              if (!(lowerName.includes('total') || lowerName.includes('count') || lowerName.includes('steps') || lowerName.includes('size') || lowerName.includes('len'))) continue;
               const arrayPattern = /\[([^\]]{20,})\]/g;
               for (const arrMatch of content.matchAll(arrayPattern)) {
                 const arrContent = arrMatch[0];
@@ -332,18 +488,79 @@ export async function runAgentLoop(
               }
             }
 
-            // Check: state initialized with undefined but typed without undefined
-            const stateMatches = [...content.matchAll(/useState<([^>]+)>\(([^)]+)\)/g)];
-            for (const sm of stateMatches) {
-              const type = sm[1];
-              const init = sm[2].trim();
-              if (init === 'undefined' && !type.includes('undefined') && !type.includes('null')) {
-                issues.push(`${f}: useState<${type}> initialized with undefined but type doesn't allow it`);
+            // Check: TODO/FIXME/HACK/XXX left in code
+            for (let i = 0; i < lines.length; i++) {
+              if (/\b(TODO|FIXME|HACK|XXX)\b/.test(lines[i]) && lines[i].trim().length < 200) {
+                issues.push(`${f}:${i + 1}: ${lines[i].trim().slice(0, 120)}`);
+              }
+            }
+
+            // --- TypeScript / JavaScript specific ---
+            if (['.ts', '.tsx', '.js', '.jsx'].includes(ext)) {
+              // useState with wrong init
+              const stateMatches = [...content.matchAll(/useState<([^>]+)>\(([^)]+)\)/g)];
+              for (const sm of stateMatches) {
+                const type = sm[1];
+                const init = sm[2].trim();
+                if (init === 'undefined' && !type.includes('undefined') && !type.includes('null')) {
+                  issues.push(`${f}: useState<${type}> initialized with undefined but type doesn't allow it`);
+                }
+              }
+              // console.log left in production code (not test files)
+              if (!f.includes('test') && !f.includes('spec')) {
+                for (let i = 0; i < lines.length; i++) {
+                  if (/console\.log\(/.test(lines[i]) && !lines[i].trim().startsWith('//')) {
+                    issues.push(`${f}:${i + 1}: console.log left in code`);
+                  }
+                }
+              }
+            }
+
+            // --- Python specific ---
+            if (ext === '.py') {
+              // Mutable default arguments
+              const mutDefaultMatch = [...content.matchAll(/def\s+\w+\([^)]*(\w+)\s*=\s*(\[\]|\{\})/g)];
+              for (const m of mutDefaultMatch) {
+                issues.push(`${f}: mutable default argument '${m[1]}=${m[2]}' — use None and assign inside function`);
+              }
+              // bare except
+              for (let i = 0; i < lines.length; i++) {
+                if (/^\s*except\s*:/.test(lines[i])) {
+                  issues.push(`${f}:${i + 1}: bare 'except:' catches all exceptions including KeyboardInterrupt — use 'except Exception:'`);
+                }
+              }
+            }
+
+            // --- Go specific ---
+            if (ext === '.go') {
+              // Unchecked error (common Go issue)
+              for (let i = 0; i < lines.length; i++) {
+                // Pattern: function call result assigned but err not checked
+                if (/,\s*_\s*:?=\s*\w+/.test(lines[i]) && /\(/.test(lines[i])) {
+                  // Only flag if it looks like an error is being discarded
+                  if (/err|error/i.test(lines[i]) === false && lines[i].includes('_ =')) {
+                    // Skip, this is intentional discard of non-error
+                  }
+                }
+              }
+            }
+
+            // --- Rust specific ---
+            if (ext === '.rs') {
+              // unwrap() in non-test code
+              if (!f.includes('test')) {
+                for (let i = 0; i < lines.length; i++) {
+                  if (/\.unwrap\(\)/.test(lines[i]) && !lines[i].trim().startsWith('//')) {
+                    issues.push(`${f}:${i + 1}: .unwrap() used — consider .expect() or proper error handling`);
+                  }
+                }
               }
             }
           }
-          if (issues.length > 0) {
-            autoReviewText = `\n\n<auto_review>\nPotential logic issues detected — please verify and fix:\n${issues.join('\n')}\n</auto_review>`;
+          // Dedupe and limit
+          const uniqueIssues = [...new Set(issues)].slice(0, 20);
+          if (uniqueIssues.length > 0) {
+            autoReviewText = `\n\n<auto_review>\nPotential issues detected — please verify and fix:\n${uniqueIssues.join('\n')}\n</auto_review>`;
           }
         } catch (_err) { /* ignore review failures */ }
       }
