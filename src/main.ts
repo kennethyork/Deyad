@@ -5,6 +5,16 @@ import fixPath from 'fix-path';
 // when the app is launched from a desktop shortcut instead of a terminal.
 fixPath();
 
+// Prevent Electron main crashes when stdout/stderr are closed (EPIPE)
+process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => {
+  if (err?.code === 'EPIPE') return;
+  throw err;
+});
+process.stderr?.on?.('error', (err: NodeJS.ErrnoException) => {
+  if (err?.code === 'EPIPE') return;
+  throw err;
+});
+
 // Suppress GLib-GObject signal handler warnings on Linux (harmless Chromium/GTK noise)
 app.commandLine.appendSwitch('log-level', '3');
 
