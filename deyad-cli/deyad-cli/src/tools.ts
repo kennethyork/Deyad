@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { execSync, spawn } from 'node:child_process';
 import { minimatch } from 'minimatch';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
+import type { OllamaTool } from './ollama.js';
 
 export interface ToolCall {
   name: string;
@@ -541,4 +542,29 @@ export async function executeTool(
   } catch (error) {
     return { tool: call.name, success: false, output: String(error) };
   }
+}
+
+export function getOllamaTools(): OllamaTool[] {
+  return [
+    { type: 'function', function: { name: 'list_files', description: 'List all project files recursively', parameters: { type: 'object', properties: {} } } },
+    { type: 'function', function: { name: 'read_file', description: 'Read a text file', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path relative to project root' } }, required: ['path'] } } },
+    { type: 'function', function: { name: 'write_files', description: 'Create or overwrite a file', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path' }, content: { type: 'string', description: 'Full file content' } }, required: ['path', 'content'] } } },
+    { type: 'function', function: { name: 'edit_file', description: 'Replace a unique substring in a file (include 3+ lines of context in old_string)', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path' }, old_string: { type: 'string', description: 'Exact text to find (must match uniquely)' }, new_string: { type: 'string', description: 'Replacement text' } }, required: ['path', 'old_string', 'new_string'] } } },
+    { type: 'function', function: { name: 'delete_file', description: 'Delete a file', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path' } }, required: ['path'] } } },
+    { type: 'function', function: { name: 'glob_files', description: 'Find files by glob pattern', parameters: { type: 'object', properties: { pattern: { type: 'string', description: 'Glob pattern (e.g. "src/**/*.ts")' } }, required: ['pattern'] } } },
+    { type: 'function', function: { name: 'search_files', description: 'Search file contents with regex or text', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Search query' }, pattern: { type: 'string', description: 'Glob pattern to filter files' }, is_regex: { type: 'string', description: '"true" for regex' } }, required: ['query'] } } },
+    { type: 'function', function: { name: 'run_command', description: 'Execute a shell command', parameters: { type: 'object', properties: { command: { type: 'string', description: 'Shell command to run' }, timeout: { type: 'string', description: 'Timeout in ms' } }, required: ['command'] } } },
+    { type: 'function', function: { name: 'git_status', description: 'Show git working tree status', parameters: { type: 'object', properties: {} } } },
+    { type: 'function', function: { name: 'git_log', description: 'Show recent commits', parameters: { type: 'object', properties: { count: { type: 'string', description: 'Number of commits (default 10)' } } } } },
+    { type: 'function', function: { name: 'git_diff', description: 'Show unstaged changes', parameters: { type: 'object', properties: { path: { type: 'string', description: 'File path' } } } } },
+    { type: 'function', function: { name: 'git_branch', description: 'List branches', parameters: { type: 'object', properties: {} } } },
+    { type: 'function', function: { name: 'git_add', description: 'Stage files', parameters: { type: 'object', properties: { path: { type: 'string', description: 'Path to stage (default ".")' } } } } },
+    { type: 'function', function: { name: 'git_commit', description: 'Commit staged changes', parameters: { type: 'object', properties: { message: { type: 'string', description: 'Commit message' } }, required: ['message'] } } },
+    { type: 'function', function: { name: 'git_stash', description: 'Stash or pop changes', parameters: { type: 'object', properties: { action: { type: 'string', description: '"push" or "pop"' } }, required: ['action'] } } },
+    { type: 'function', function: { name: 'fetch_url', description: 'Fetch a URL and return text content', parameters: { type: 'object', properties: { url: { type: 'string', description: 'URL to fetch' } }, required: ['url'] } } },
+    { type: 'function', function: { name: 'memory_read', description: 'Read a persistent note', parameters: { type: 'object', properties: { key: { type: 'string', description: 'Memory key' } }, required: ['key'] } } },
+    { type: 'function', function: { name: 'memory_write', description: 'Save a persistent note', parameters: { type: 'object', properties: { key: { type: 'string', description: 'Memory key' }, value: { type: 'string', description: 'Value to store' } }, required: ['key', 'value'] } } },
+    { type: 'function', function: { name: 'memory_list', description: 'List all memory keys', parameters: { type: 'object', properties: {} } } },
+    { type: 'function', function: { name: 'memory_delete', description: 'Delete a memory note', parameters: { type: 'object', properties: { key: { type: 'string', description: 'Memory key' } }, required: ['key'] } } },
+  ];
 }

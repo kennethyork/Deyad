@@ -3,10 +3,32 @@
  * No external dependencies, uses native fetch.
  */
 
+export interface OllamaToolCall {
+  function: {
+    name: string;
+    arguments: Record<string, unknown>;
+  };
+}
+
+export interface OllamaTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: 'object';
+      properties: Record<string, { type: string; description?: string; enum?: string[] }>;
+      required?: string[];
+    };
+  };
+}
+
 export interface OllamaMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   images?: string[];
+  tool_calls?: OllamaToolCall[];
+  tool_name?: string;
 }
 
 export interface OllamaOptions {
@@ -23,6 +45,8 @@ export interface OllamaUsage {
 
 export interface StreamChatResult {
   content: string;
+  thinking: string;
+  toolCalls: OllamaToolCall[];
   usage: OllamaUsage;
 }
 
@@ -38,6 +62,8 @@ export async function streamChat(
   onToken: (token: string) => void,
   options: OllamaOptions = {},
   signal?: AbortSignal,
+  onThinkingToken?: (token: string) => void,
+  tools?: OllamaTool[],
 ): Promise<StreamChatResult> {
   const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
   const body = {
@@ -50,6 +76,7 @@ export async function streamChat(
       repeat_penalty: options.repeat_penalty ?? 1.1,
       ...(options.num_ctx ? { num_ctx: options.num_ctx } : {}),
     },
+    ...(tools && tools.length > 0 ? { tools } : {}),
   };
 
   const resp = await fetch(`${baseUrl}/api/chat`, {
@@ -70,6 +97,8 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buf = '';
   let full = '';
+  let thinking = '';
+  let toolCalls: OllamaToolCall[] = [];
   let usage: OllamaUsage = { promptTokens: 0, completionTokens: 0 };
 
   while (true) {
@@ -84,6 +113,14 @@ export async function streamChat(
       if (!line.trim()) continue;
       try {
         const json = JSON.parse(line);
+        // Qwen3.5+ reasoning models emit a "thinking" field during chain-of-thought
+        if (json.message?.thinking) {
+          thinking += json.message.thinking;
+          if (onThinkingToken) onThinkingToken(json.message.thinking);
+        }
+        if (json.message?.tool_calls) {
+          toolCalls.push(...json.message.tool_calls);
+        }
         if (json.message?.content) {
           full += json.message.content;
           onToken(json.message.content);
@@ -101,6 +138,13 @@ export async function streamChat(
   if (buf.trim()) {
     try {
       const json = JSON.parse(buf);
+      if (json.message?.thinking) {
+        thinking += json.message.thinking;
+        if (onThinkingToken) onThinkingToken(json.message.thinking);
+      }
+      if (json.message?.tool_calls) {
+        toolCalls.push(...json.message.tool_calls);
+      }
       if (json.message?.content) {
         full += json.message.content;
         onToken(json.message.content);
@@ -114,15 +158,18 @@ export async function streamChat(
     }
   }
 
+  // Reasoning models (qwen3.5, etc.) put tool calls and real content in the thinking block.
+  // Return thinking separately so the agent can decide how to use it.
+
   if (usage.promptTokens === 0) {
     const promptChars = messages.reduce((s, m) => s + m.content.length, 0);
     usage.promptTokens = estimateTokens(promptChars);
   }
   if (usage.completionTokens === 0) {
-    usage.completionTokens = estimateTokens(full.length);
+    usage.completionTokens = estimateTokens(full.length + thinking.length);
   }
 
-  return { content: full, usage };
+  return { content: full, thinking, toolCalls, usage };
 }
 
 // Model families that are embedding-only and do not support chat.

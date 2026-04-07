@@ -3,9 +3,10 @@
  */
 
 import { streamChat } from './ollama.js';
-import type { OllamaMessage, OllamaOptions } from './ollama.js';
-import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION } from './tools.js';
+import type { OllamaMessage, OllamaOptions, OllamaToolCall } from './ollama.js';
+import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION, getOllamaTools } from './tools.js';
 import type { ToolResult, ToolCallbacks } from './tools.js';
+import type { ToolCall } from './tools.js';
 import type { McpManager } from './mcp.js';
 const MAX_CONVERSATION_CHARS = 128_000;
 
@@ -27,6 +28,7 @@ export interface TokenStats {
 
 export interface AgentCallbacks {
   onToken: (token: string) => void;
+  onThinkingToken?: (token: string) => void;
   onToolStart: (toolName: string, params: Record<string, string>) => void;
   onToolResult: (result: ToolResult) => void;
   onDiff: (filePath: string, diff: string) => void;
@@ -62,6 +64,8 @@ function compactConversation(messages: OllamaMessage[]): void {
     if (msg.role === 'assistant') {
       const prose = stripToolMarkup(msg.content).slice(0, 200);
       if (prose) summaryParts.push(`Agent: ${prose}`);
+    } else if (msg.role === 'tool') {
+      summaryParts.push(`Tool: ${msg.tool_name ?? 'unknown'} result`);
     } else if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
       const toolNames = [...msg.content.matchAll(/<name>([^<]+)<\/name>/g)].map((m) => m[1]);
       if (toolNames.length) summaryParts.push(`Tools: ${toolNames.join(', ')}`);
@@ -193,6 +197,7 @@ export async function runAgentLoop(
         break;
       }
       compactConversation(messages);
+      const nativeTools = getOllamaTools();
       let result;
       try {
         result = await streamChat(
@@ -201,6 +206,8 @@ export async function runAgentLoop(
           callbacks.onToken,
           ollamaOptions,
           abortController.signal,
+          callbacks.onThinkingToken,
+          nativeTools,
         );
       } catch (err: unknown) {
         const errMsg = String((err as Error).message || err);
@@ -215,31 +222,58 @@ export async function runAgentLoop(
       if (abortController.signal.aborted) break;
 
       const turnResponse = result.content;
+      const turnThinking = result.thinking || '';
+      const nativeToolCalls = result.toolCalls || [];
       stats.promptTokens += result.usage.promptTokens;
       stats.completionTokens += result.usage.completionTokens;
       stats.totalTokens = stats.promptTokens + stats.completionTokens;
 
-      const toolCalls = parseToolCalls(turnResponse);
+      // Native tool calls take priority over XML text-based parsing
+      let toolCalls: ToolCall[];
+      let usedNativeTools = false;
+      if (nativeToolCalls.length > 0) {
+        toolCalls = nativeToolCalls.map(tc => ({
+          name: tc.function.name,
+          params: Object.fromEntries(
+            Object.entries(tc.function.arguments).map(([k, v]) => [k, String(v)])
+          ),
+        }));
+        usedNativeTools = true;
+      } else {
+        // Fallback: parse XML / Qwen-format tool calls from content + thinking
+        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        toolCalls = parseToolCalls(combinedForParsing);
+      }
 
       if (toolCalls.length === 0) {
         // If the model just narrated without acting, nudge it to use tools (up to 2 retries)
         const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
         if (isActionableRequest(userMessageText) && !hasPerformedAction && iteration < 2) {
-          messages.push({ role: 'assistant', content: turnResponse });
+          const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+          messages.push({ role: 'assistant', content: assistantContent });
           messages.push({
             role: 'user',
-            content: 'Your response did not contain any tool calls. You MUST respond with tool_call XML to take action. Start by reading relevant files. Example:\n<tool_call>\n<name>list_files</name>\n</tool_call>\n\nDo not describe what you would do — actually do it with tools NOW.',
+            content: 'Your response did not contain any tool calls. You MUST use tools to take action. Start by reading relevant files.',
           });
           iteration++;
           continue;
         }
-        const summary = stripToolMarkup(turnResponse);
+        // Strip tool markup and thinking from the visible summary
+        const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
         callbacks.onDone(summary);
-        messages.push({ role: 'assistant', content: turnResponse });
+        const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        messages.push({ role: 'assistant', content: assistantContent });
         return { history: messages, changedFiles, stats };
       }
 
-      messages.push({ role: 'assistant', content: turnResponse });
+      // Push assistant message to history (format depends on native vs XML tool calling)
+      if (usedNativeTools) {
+        messages.push({ role: 'assistant', content: turnResponse, tool_calls: nativeToolCalls });
+      } else {
+        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        messages.push({ role: 'assistant', content: combinedForParsing });
+      }
+
       const toolCb: ToolCallbacks = { confirm: callbacks.confirm, onDiff: callbacks.onDiff };
       const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'git_status', 'git_log', 'git_diff', 'git_branch']);
       const writeTools = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit', 'run_command', 'git_add', 'git_commit', 'git_stash']);
@@ -250,31 +284,31 @@ export async function runAgentLoop(
       if (allReadOnly && toolCalls.length > 1) {
         for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
         results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));
-        for (const result of results) {
-          callbacks.onToolResult(result);
-          if (result.changedFiles) {
-            for (const f of result.changedFiles) {
+        for (const r of results) {
+          callbacks.onToolResult(r);
+          if (r.changedFiles) {
+            for (const f of r.changedFiles) {
               if (!changedFiles.includes(f)) changedFiles.push(f);
             }
           }
         }
-        if (toolCalls.length > 0) hasPerformedAction = true;
+        hasPerformedAction = true;
       } else {
         results = [];
         for (const call of toolCalls) {
           if (abortController.signal.aborted) break;
           callbacks.onToolStart(call.name, call.params);
-          const result = await executeTool(call, cwd, toolCb);
-          results.push(result);
-          callbacks.onToolResult(result);
-          if (result.changedFiles) {
-            for (const f of result.changedFiles) {
+          const r = await executeTool(call, cwd, toolCb);
+          results.push(r);
+          callbacks.onToolResult(r);
+          if (r.changedFiles) {
+            for (const f of r.changedFiles) {
               if (!changedFiles.includes(f)) changedFiles.push(f);
             }
           }
-          if (writeTools.has(call.name) && result.success) filesChanged = true;
+          if (writeTools.has(call.name) && r.success) filesChanged = true;
         }
-        if (toolCalls.length > 0) hasPerformedAction = true;
+        hasPerformedAction = true;
       }
 
       if (filesChanged) {
@@ -289,18 +323,34 @@ export async function runAgentLoop(
         }
       }
 
-      const resultsText = results.map((r) =>
-        `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`,
-      ).join('\n\n');
+      // Send tool results back in the appropriate format
+      if (usedNativeTools) {
+        // Native tool calling: each result as a 'tool' role message
+        for (const r of results) {
+          messages.push({
+            role: 'tool' as const,
+            content: `[${r.success ? 'success' : 'error'}] ${r.output}`,
+            tool_name: r.tool,
+          });
+        }
+      } else {
+        // XML fallback: results as user message with XML markup
+        const resultsText = results.map((r) =>
+          `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`,
+        ).join('\n\n');
 
-      if (isDone(turnResponse)) {
-        const summary = stripToolMarkup(turnResponse);
-        callbacks.onDone(summary);
+        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        if (isDone(combinedForParsing)) {
+          const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
+          callbacks.onDone(summary);
+          messages.push({ role: 'user', content: resultsText });
+          return { history: messages, changedFiles, stats };
+        }
+
         messages.push({ role: 'user', content: resultsText });
-        return { history: messages, changedFiles, stats };
       }
 
-      messages.push({ role: 'user', content: resultsText });
+      iteration++;
     }
 
     return { history: messages, changedFiles, stats };
