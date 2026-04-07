@@ -5,6 +5,24 @@
   "bin": {
     "deyad": "./dist/bin/deyad.js"
   },
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennethyork/Deyad.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/kennethyork/Deyad#deyad-cli",
+  "bugs": {
+    "url": "https://github.com/kennethyork/Deyad/issues"
+  },
+  "author": {
+    "name": "Deyad",
+    "email": "maintainer@deyad.app"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

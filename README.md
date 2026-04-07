@@ -13,7 +13,7 @@ Describe what you want. Get a working app. No cloud. No API keys. No subscriptio
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-[Download](https://github.com/kennethyork/Deyad/releases/latest) · [CLI](#deyad-cli) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
+[Download](https://github.com/kennethyork/Deyad/releases/latest) · [CLI](#deyad-cli) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Comparison](COMPARISON.md) · [Architecture](ARCHITECTURE.md)
 
 </div>
 
@@ -212,7 +212,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | DB Admin | Prisma Studio |
 | Version control | Git |
 | Packaging | Electron Builder |
-| Tests | Vitest (427 passing) |
+| Tests | Vitest (578 passing — 476 desktop + 102 CLI) |
 
 ---
 
@@ -273,7 +273,7 @@ deyad init                         # Create DEYAD.md memory file
 | `/mcp` | Show connected MCP servers and tools |
 | `/quit` | Exit |
 
-### CLI Tools (15 built-in + MCP)
+### CLI Tools (26 built-in + MCP)
 
 The agent has autonomous access to:
 
@@ -294,6 +294,17 @@ The agent has autonomous access to:
 | `git_commit` | Stage all and commit |
 | `git_log` | View recent commits |
 | `git_diff` | Show uncommitted changes |
+| `git_push` | Push to remote |
+| `git_pull` | Pull from remote |
+| `git_branch` | List branches |
+| `git_branch_create` | Create and switch to a new branch |
+| `git_branch_switch` | Switch to an existing branch |
+| `git_remote_get` | Get remote origin URL |
+| `git_remote_set` | Set remote origin URL |
+| `multi_edit` | Batch edits across multiple files |
+| `install_package` | Install packages (npm, pip, go) |
+| `web_search` | Search the web via DuckDuckGo |
+| `analyze_image` | Analyze images with Ollama vision models |
 | `mcp_*` | Any tool from connected MCP servers (auto-discovered) |
 
 ### Highlights
@@ -479,4 +490,4 @@ All security checks are covered by automated tests.
 
 ## License
 
-MIT
+[MIT](LICENSE)
