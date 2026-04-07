@@ -2,8 +2,8 @@
  * CLI agent loop — multi-turn conversation with Ollama + tool execution.
  */
 
-import { streamChat, estimateTokens } from './ollama.js';
-import type { OllamaMessage, OllamaOptions, OllamaUsage } from './ollama.js';
+import { streamChat } from './ollama.js';
+import type { OllamaMessage, OllamaOptions } from './ollama.js';
 import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION } from './tools.js';
 import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { McpManager } from './mcp.js';
@@ -310,7 +310,7 @@ export async function runAgentLoop(
                 const out = execSync(`timeout 10 npx eslint --no-error-on-unmatched-pattern --format compact ${changed} 2>&1 | head -40`, { cwd, encoding: 'utf-8', timeout: 15_000 }).trim();
                 if (out && /Error/i.test(out)) lintErrors.push(`[ESLint]\n${out}`);
               }
-            } catch (_e) { /* eslint not available */ }
+            } catch (_e) { /* lint unavailable */ }
           }
 
           // Python

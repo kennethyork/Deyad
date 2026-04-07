@@ -80,7 +80,7 @@ describe('TaskQueue', () => {
     });
     // runAgentLoop is called asynchronously via processNext
     // Give it a tick
-    expect(mockRunAgentLoop).toHaveBeenCalled || true; // may be async
+    expect(mockRunAgentLoop).toBeDefined();
   });
 
   it('cancel sets task status to error', () => {

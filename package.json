@@ -21,7 +21,7 @@
     "dist:linux": "npm run build:all && electron-builder --linux",
     "dist:win": "npm run build:all && electron-builder --win",
     "dist:all": "npm run build:all && electron-builder --linux --win",
-    "lint": "eslint --ext .ts,.tsx .",
+    "lint": "eslint src/",
     "test": "vitest run",
     "test:e2e": "npm run build:all && npx playwright test",
     "typecheck": "tsc --noEmit"
@@ -56,7 +56,7 @@
     "electron-builder": "^24.0.0",
     "electron-installer-appimage": "*",
     "electron-installer-dmg": "*",
-    "eslint": "^8.57.1",
+    "eslint": "^9.39.4",
     "eslint-plugin-import": "^2.32.0",
     "happy-dom": "^20.0.0",
     "typescript": "^6.0.2",

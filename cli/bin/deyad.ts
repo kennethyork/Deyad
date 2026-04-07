@@ -29,9 +29,8 @@ import {
   formatToolStart,
   formatToolResult,
   formatDiff,
-  renderMarkdown,
   Spinner,
-  c, bold, red, green, yellow, cyan, dim, gray,
+  c, bold, red, green, cyan, dim,
 } from '../src/ui.js';
 
 const SESSION_FILE = '.deyad-session.json';
@@ -255,7 +254,7 @@ async function main() {
   // ── --print headless mode ─────────────────────────────────────
   if (args.print) {
     const confirmFn = args.autoConfirm ? async (_q: string) => true : async (question: string) => uiConfirm(rl, question);
-    const result = await runOnce(model, args.print, cwd, history, confirmFn, [], true, undefined, mcpManager);
+    await runOnce(model, args.print, cwd, history, confirmFn, [], true, undefined, mcpManager);
     await mcpManager.disconnect();
     rl.close();
     process.exit(0);
@@ -524,7 +523,6 @@ async function runOnce(
   let currentLine = '';
   let inToolBlock = false;
   let inThinkBlock = false;
-  let fullResponse = '';
 
   // Build the user message with optional images
   const userMsg: OllamaMessage = { role: 'user', content: message };
@@ -535,7 +533,6 @@ async function runOnce(
   const result = await runAgentLoop(model, message, cwd, {
     onToken: (token: string) => {
       currentLine += token;
-      fullResponse += token;
 
       // Show <think> blocks in dimmed style
       if (currentLine.includes('<think>')) {
@@ -580,7 +577,7 @@ async function runOnce(
     onDiff: (filePath, diff) => {
       console.log(formatDiff(filePath, diff));
     },
-    onDone: (summary) => {
+    onDone: (_summary) => {
       if (headless) {
         console.log(''); // newline after streamed output
       } else {

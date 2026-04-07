@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import type { AgentCallbacks, AgentResult } from '../agent.js';
+import type { AgentCallbacks } from '../agent.js';
 
 // We mock the ollama module so no actual server is needed
 vi.mock('../ollama.js', () => ({

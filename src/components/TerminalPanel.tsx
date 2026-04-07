@@ -104,7 +104,7 @@ export default function TerminalPanel({ appId }: Props) {
     if (tabs.length === 0) {
       createTab();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line -- intentional empty deps
   }, []);
 
   // show/hide terminal DOM wrappers + fit when active tab changes

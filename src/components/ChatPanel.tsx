@@ -162,7 +162,7 @@ export default function ChatPanel({
         sendMessage(initialPrompt);
       }, 100);
     }
-  }, [initialPrompt]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialPrompt]);
 
   const loadModels = async (retries = 3) => {
     for (let attempt = 0; attempt < retries; attempt++) {
