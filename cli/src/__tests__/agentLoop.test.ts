@@ -212,8 +212,9 @@ describe('runAgentLoop', () => {
     const secondCall = mockedStreamChat.mock.calls[1];
     const messages = secondCall[1]; // messages array
     const lastUserMsg = messages.filter((m: { role: string }) => m.role === 'user').pop();
-    expect(lastUserMsg.content).toContain('<tool_result>');
-    expect(lastUserMsg.content).toContain('<status>success</status>');
-    expect(lastUserMsg.content).toContain('<name>list_files</name>');
+    expect(lastUserMsg).toBeDefined();
+    expect(lastUserMsg!.content).toContain('<tool_result>');
+    expect(lastUserMsg!.content).toContain('<status>success</status>');
+    expect(lastUserMsg!.content).toContain('<name>list_files</name>');
   });
 });
