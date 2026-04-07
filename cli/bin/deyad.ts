@@ -12,7 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { checkOllama, listModels, estimateTokens } from '../src/ollama.js';
 import type { OllamaMessage } from '../src/ollama.js';
 import { runAgentLoop } from '../src/agent.js';
@@ -35,6 +35,51 @@ import {
 
 const SESSION_FILE = '.deyad-session.json';
 const MEMORY_FILE = 'DEYAD.md';
+
+function isRunRequest(message: string): boolean {
+  return /\b(run|execute|start|launch|open|serve|build|deploy|compile)\b/i.test(message)
+    && /\b(deyad|project|app|application|dev|server|cli)\b/i.test(message);
+}
+
+function findFallbackRunCommand(cwd: string): string | null {
+  const pkgPath = path.join(cwd, 'package.json');
+  if (!fs.existsSync(pkgPath)) return null;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { scripts?: Record<string, string> };
+    if (pkg.scripts?.dev) return 'npm run dev';
+    if (pkg.scripts?.start) return 'npm start';
+    if (pkg.scripts?.serve) return 'npm run serve';
+    if (pkg.scripts?.build) return 'npm run build';
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function startBackgroundCommand(command: string, cwd: string) {
+  try {
+    const child = spawn(command, {
+      cwd,
+      shell: true,
+      detached: true,
+      stdio: 'ignore',
+    });
+    child.unref();
+    return {
+      tool: 'run_command',
+      success: true,
+      output: `Started '${command}' in the background.`,
+      changedFiles: undefined,
+    };
+  } catch (err) {
+    return {
+      tool: 'run_command',
+      success: false,
+      output: `Failed to start '${command}': ${err instanceof Error ? err.message : String(err)}`,
+      changedFiles: undefined,
+    };
+  }
+}
 
 // ── Parse args ──────────────────────────────────────────────────────
 interface CliArgs {
@@ -531,6 +576,7 @@ async function runOnce(
     userMsg.images = images;
   }
 
+  let toolStarted = false;
   const result = await runAgentLoop(model, message, cwd, {
     onToken: (token: string) => {
       currentLine += token;
@@ -570,6 +616,7 @@ async function runOnce(
       }
     },
     onToolStart: (name, params) => {
+      toolStarted = true;
       console.log(`\n${formatToolStart(name, params)}`);
     },
     onToolResult: (result) => {
@@ -595,6 +642,16 @@ async function runOnce(
     },
     confirm: confirmFn,
   }, history, undefined, mcpManager);
+
+  if (!toolStarted && isRunRequest(message)) {
+    const fallbackCommand = findFallbackRunCommand(cwd);
+    if (fallbackCommand) {
+      console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to direct command: ${fallbackCommand}\n`));
+      const toolResult = startBackgroundCommand(fallbackCommand, cwd);
+      console.log(formatToolResult(toolResult.tool, toolResult.success, toolResult.output));
+      console.log('');
+    }
+  }
 
   return result;
 }
