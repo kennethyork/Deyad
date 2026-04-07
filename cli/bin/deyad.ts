@@ -16,7 +16,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { checkOllama, listModels, estimateTokens } from '../src/ollama.js';
 import type { OllamaMessage } from '../src/ollama.js';
 import { runAgentLoop } from '../src/agent.js';
@@ -88,31 +88,6 @@ function findFallbackRunCommand(cwd: string): string | null {
     return null;
   }
   return null;
-}
-
-function startBackgroundCommand(command: string, cwd: string) {
-  try {
-    const child = spawn(command, {
-      cwd,
-      shell: true,
-      detached: true,
-      stdio: 'ignore',
-    });
-    child.unref();
-    return {
-      tool: 'run_command',
-      success: true,
-      output: `Started '${command}' in the background.`,
-      changedFiles: undefined,
-    };
-  } catch (err) {
-    return {
-      tool: 'run_command',
-      success: false,
-      output: `Failed to start '${command}': ${err instanceof Error ? err.message : String(err)}`,
-      changedFiles: undefined,
-    };
-  }
 }
 
 // ── Parse args ──────────────────────────────────────────────────────
@@ -616,7 +591,7 @@ async function runOnce(
   }
 
   let toolStarted = false;
-  const result = await runAgentLoop(model, message, cwd, {
+  const result = await runAgentLoop(model, userMsg, cwd, {
     onToken: (token: string) => {
       currentLine += token;
 
@@ -684,19 +659,20 @@ async function runOnce(
 
   if (!toolStarted && isRunRequest(message)) {
     const inferredCommand = inferFallbackShellCommand(message, cwd);
+    const fallbackCommand = findFallbackRunCommand(cwd);
     if (inferredCommand) {
-      console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to inferred command: ${inferredCommand}\n`));
-      const toolResult = startBackgroundCommand(inferredCommand, cwd);
-      console.log(formatToolResult(toolResult.tool, toolResult.success, toolResult.output));
+      console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
+      console.log(dim(`Try rephrasing or run this command manually if appropriate:`));
+      console.log(cyan(inferredCommand));
+      console.log('');
+    } else if (fallbackCommand) {
+      console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
+      console.log(dim(`You can try this command manually instead:`));
+      console.log(cyan(fallbackCommand));
       console.log('');
     } else {
-      const fallbackCommand = findFallbackRunCommand(cwd);
-      if (fallbackCommand) {
-        console.log(dim(`\nNo tool call was produced by the agent for this run request. Falling back to direct command: ${fallbackCommand}\n`));
-        const toolResult = startBackgroundCommand(fallbackCommand, cwd);
-        console.log(formatToolResult(toolResult.tool, toolResult.success, toolResult.output));
-        console.log('');
-      }
+      console.log(dim(`\nNo Ollama tool call was produced for this request. Please rephrase or use /run if you want a shell command.`));
+      console.log('');
     }
   }
 

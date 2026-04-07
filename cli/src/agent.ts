@@ -81,7 +81,7 @@ You work directly in the user's project directory: ${cwd}
 
 ${TOOLS_DESCRIPTION}${mcpToolsDesc}
 
-IMPORTANT: For any request that modifies the project, runs a command, or performs a task, reply with tool_call XML only. Do not reply with prose descriptions when action is required. Only use plain language for general chat or final summaries after tools have executed.
+IMPORTANT: For any request that modifies the project, runs a command, or performs a task, reply with tool_call XML only. If you have not executed any tools yet, do not return <done/>. Only use plain language for general chat or final summaries after tools have executed.
 
 WORKFLOW:
 1. First, understand the request and explore the current project (list_files, read_file).
@@ -180,7 +180,7 @@ async function buildContext(cwd: string): Promise<string> {
  */
 export async function runAgentLoop(
   model: string,
-  userMessage: string,
+  userMessage: string | OllamaMessage,
   cwd: string,
   callbacks: AgentCallbacks,
   history: OllamaMessage[] = [],
@@ -203,11 +203,12 @@ export async function runAgentLoop(
       { role: 'system', content: getSystemPrompt(cwd, mcpToolsDesc) },
       { role: 'system', content: `Project context:\n\n${context}` },
       ...history,
-      { role: 'user', content: userMessage },
+      typeof userMessage === 'string' ? { role: 'user', content: userMessage } : userMessage,
     ];
 
     // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
     let iteration = 0;
+    let hasPerformedAction = false;
     while (!abortController.signal.aborted) {
       compactConversation(messages);
 
@@ -230,26 +231,21 @@ export async function runAgentLoop(
 
       // Parse tool calls
       const toolCalls = parseToolCalls(turnResponse);
-      const actionable = isActionableRequest(userMessage);
+      const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
+      const actionable = isActionableRequest(userMessageText);
 
       if (toolCalls.length === 0) {
-        if (isDone(turnResponse)) {
-          const summary = stripToolMarkup(turnResponse);
-          callbacks.onDone(summary);
-          messages.push({ role: 'assistant', content: turnResponse });
-          return { history: messages, changedFiles, stats };
-        }
-
-        // Nudge: if the assistant is describing actions instead of performing them,
-        // require tool usage before finishing. Allow a second retry if needed.
         const stripped = stripToolMarkup(turnResponse).trim();
         const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to|I'll run|I will run|Let's run|Let's start|Running|Starting)\b/i.test(stripped);
-        if (actionable && iteration < 3 && (looksLikePlan || stripped.length < 500)) {
+        const doneSignal = isDone(turnResponse);
+
+        if (actionable && !hasPerformedAction && iteration < 3 && (looksLikePlan || doneSignal || stripped.length < 500)) {
           messages.push({ role: 'assistant', content: turnResponse });
           messages.push({ role: 'user', content: 'This reply did not use any tools, but the request requires action. Respond with tool_call XML only — no prose descriptions. For shell tasks use run_command, for files use write_files/edit_file/multi_edit, for reading/search use read_file/search_files. If you are done after tools, you may return <done/>.' });
           iteration++;
           continue;
         }
+
         const summary = stripToolMarkup(turnResponse);
         callbacks.onDone(summary);
         messages.push({ role: 'assistant', content: turnResponse });
@@ -285,6 +281,9 @@ export async function runAgentLoop(
             }
           }
         }
+        if (toolCalls.length > 0) {
+          hasPerformedAction = true;
+        }
       } else {
         // Sequential execution (for writes or mixed)
         results = [];
@@ -300,6 +299,9 @@ export async function runAgentLoop(
             }
           }
           if (writeTools.has(call.name) && result.success) filesChanged = true;
+        }
+        if (toolCalls.length > 0) {
+          hasPerformedAction = true;
         }
       }
 
