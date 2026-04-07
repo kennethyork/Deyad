@@ -224,7 +224,7 @@ export function formatToolStart(name: string, params: Record<string, string>): s
   return [topLine, ...bodyLines].join('\n');
 }
 
-export function formatToolEnd(name: string, success: boolean, output: string): string {
+export function formatToolEnd(_name: string, success: boolean, output: string): string {
   const w = Math.min(getTermWidth(), 100);
   const innerW = w - 4;
 
@@ -313,7 +313,7 @@ export function formatStatus(model: string, taskCount: number, tokens: number, s
 // ── Help Display ──
 
 export function formatHelp(): string {
-  const sections = [
+  const sections: Array<{ title: string; items: [string, string][] }> = [
     {
       title: 'Commands',
       items: [
@@ -347,8 +347,8 @@ export function formatHelp(): string {
   const lines: string[] = [''];
   for (const section of sections) {
     lines.push(`  ${c.brandBold(section.title)}`);
-    for (const [cmd, desc] of section.items) {
-      lines.push(`    ${c.cyan(cmd.padEnd(20))} ${c.dim(desc)}`);
+    for (const item of section.items) {
+      lines.push(`    ${c.cyan(item[0].padEnd(20))} ${c.dim(item[1])}`);
     }
     lines.push('');
   }
