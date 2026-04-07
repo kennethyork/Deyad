@@ -23,6 +23,7 @@
     "dist:all": "npm run build:all && electron-builder --linux --win",
     "lint": "eslint --ext .ts,.tsx .",
     "test": "vitest run",
+    "test:e2e": "npm run build:all && npx playwright test",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -37,6 +38,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -45,8 +47,8 @@
     "@types/react": "^18.3.21",
     "@types/react-dom": "^18.3.7",
     "@types/uuid": "^10.0.0",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/coverage-v8": "^3.2.4",
     "concurrently": "^9.2.1",

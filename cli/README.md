@@ -20,6 +20,32 @@ deyad --print "explain this repo"  # Headless/CI mode
 deyad --resume                     # Resume last conversation
 ```
 
+## CLI Reference
+
+```text
+Deyad CLI — Local AI coding agent powered by Ollama
+
+Usage:
+  deyad                              Interactive mode
+  deyad "add a login page"           One-shot mode
+  deyad -m codestral "fix bugs"      Specify model
+  deyad --print "fix the bug"        Headless/CI mode (no REPL, exits after)
+  deyad --resume                     Resume last saved conversation
+  deyad init                         Create DEYAD.md memory file
+
+Options:
+  -m, --model <name>    Ollama model to use
+  -d, --dir <path>      Project directory (default: cwd)
+  -y, --yes             Auto-confirm all tool actions
+  -p, --print <prompt>  Headless mode: execute prompt and exit
+  --resume              Resume last saved conversation
+  -h, --help            Show this help
+
+Environment:
+  OLLAMA_HOST           Ollama API URL (default: http://127.0.0.1:11434)
+  DEYAD_MODEL           Default model name
+```
+
 ## Features
 
 - **26 built-in tools** — file I/O, shell, search, git, web search, image analysis
