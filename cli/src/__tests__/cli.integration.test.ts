@@ -4,7 +4,7 @@ import { resolve, join } from 'node:path';
 import { mkdtempSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
-// Vitest sets cwd to the project root (cli/)
+/* Vitest sets cwd to the project root (cli/) */
 const CLI_BIN = resolve(process.cwd(), 'dist/bin/deyad.js');
 
 describe('CLI binary integration', () => {
