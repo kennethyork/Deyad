@@ -10,7 +10,13 @@ import type { McpManager } from './mcp.js';
 const MAX_CONVERSATION_CHARS = 128_000;
 
 function isActionableRequest(message: string): boolean {
-  return /\b(create|write|edit|delete|install|run|execute|build|test|compile|deploy|generate|fix|update|add|remove|launch|open|serve|start|configure)\b/i.test(message);
+  // Almost every user message to a coding agent implies action.
+  // Only short greetings / "thanks" / pure questions with no imperative are non-actionable.
+  const nonActionable = /^\s*(hi|hello|hey|thanks|thank you|ok|okay|sure|yes|no|bye|goodbye)\s*[.!?]?\s*$/i;
+  if (nonActionable.test(message)) return false;
+  // If it's longer than a few words, assume it's actionable
+  if (message.split(/\s+/).length >= 4) return true;
+  return /\b(create|write|edit|delete|install|run|execute|build|test|compile|deploy|generate|fix|update|add|remove|launch|open|serve|start|configure|analyze|find|check|review|scan|debug|refactor|optimize|migrate|convert|setup|implement|show|list|explain|read|fetch|get|search|examine|inspect|look|improve|make|change|move|rename|copy|merge|revert|undo|reset|clean|lint|format|validate|verify|ensure|tell|describe|help|solve|resolve|diagnose|identify|detect|monitor|profile|benchmark|measure|count|compare|diff|patch)\b/i.test(message);
 }
 
 export interface TokenStats {
@@ -214,15 +220,15 @@ export async function runAgentLoop(
       stats.totalTokens = stats.promptTokens + stats.completionTokens;
 
       const toolCalls = parseToolCalls(turnResponse);
-      const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
-      const actionable = isActionableRequest(userMessageText);
 
       if (toolCalls.length === 0) {
-        if (actionable && !hasPerformedAction && iteration < 3) {
+        // If the model just narrated without acting, nudge it to use tools (up to 2 retries)
+        const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
+        if (isActionableRequest(userMessageText) && !hasPerformedAction && iteration < 2) {
           messages.push({ role: 'assistant', content: turnResponse });
           messages.push({
             role: 'user',
-            content: 'Your response did not contain any tool calls. You MUST respond with tool_call XML to take action. Example:\n<tool_call>\n<name>list_files</name>\n</tool_call>\n\nUse the tools to complete the task. Do not describe what you would do — actually do it.',
+            content: 'Your response did not contain any tool calls. You MUST respond with tool_call XML to take action. Start by reading relevant files. Example:\n<tool_call>\n<name>list_files</name>\n</tool_call>\n\nDo not describe what you would do — actually do it with tools NOW.',
           });
           iteration++;
           continue;

@@ -8,7 +8,7 @@ out/
 storybook-static/
 
 # ignore README for publishing
-deyad-cli/README.md
+deyad-cli/deyad-cli/*
 
 # editor
 .vscode/
