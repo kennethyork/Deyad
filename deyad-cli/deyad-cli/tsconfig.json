@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "rootDir": "src",
     "outDir": "dist",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -30,12 +31,6 @@
     "skipLibCheck": true
   },
   "include": [
-    "src/cli.tsx",
-    "src/agent.ts",
-    "src/ollama.ts",
-    "src/tools.ts",
-    "src/mcp.ts",
-    "src/minimatch.d.ts",
-    "src/components/chat/terminal-chat-past-rollout.tsx"
+    "src"
   ]
 }

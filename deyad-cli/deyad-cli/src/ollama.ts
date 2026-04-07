@@ -125,6 +125,14 @@ export async function streamChat(
   return { content: full, usage };
 }
 
+// Model families that are embedding-only and do not support chat.
+const EMBEDDING_MODEL_PREFIXES = ['nomic-embed', 'all-minilm', 'mxbai-embed', 'snowflake-arctic-embed', 'bge-'];
+
+function isEmbeddingModel(name: string): boolean {
+  const lower = name.toLowerCase();
+  return EMBEDDING_MODEL_PREFIXES.some((prefix) => lower.startsWith(prefix));
+}
+
 export async function listModels(): Promise<string[]> {
   const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
   const resp = await fetch(`${baseUrl}/api/tags`);
@@ -132,7 +140,8 @@ export async function listModels(): Promise<string[]> {
   const data = await resp.json() as { models?: Array<{ name?: string }> };
   return (data.models || [])
     .map((m) => m.name)
-    .filter((name): name is string => typeof name === 'string');
+    .filter((name): name is string => typeof name === 'string')
+    .filter((name) => !isEmbeddingModel(name));
 }
 
 export async function checkOllama(): Promise<boolean> {
