@@ -21,7 +21,7 @@ import { checkOllama, listModels, estimateTokens } from '../src/ollama.js';
 import type { OllamaMessage } from '../src/ollama.js';
 import { runAgentLoop } from '../src/agent.js';
 import type { AgentResult, TokenStats } from '../src/agent.js';
-import { runCommand } from '../src/tools.js';
+import { runCommand, stripToolMarkup } from '../src/tools.js';
 import { McpManager } from '../src/mcp.js';
 import {
   createInterface,
@@ -41,8 +41,7 @@ const SESSION_FILE = '.deyad-session.json';
 const MEMORY_FILE = 'DEYAD.md';
 
 function isRunRequest(message: string): boolean {
-  return /\b(run|execute|start|launch|open|serve|build|deploy|compile|install|create|write|append|make)\b/i.test(message)
-    && /\b(deyad|project|app|application|dev|server|cli|file|package|test|build)\b/i.test(message);
+  return /\b(run|execute|start|launch|open|serve|build|deploy|compile|install|create|write|append|make|generate|add|save)\b/i.test(message);
 }
 
 function inferFallbackShellCommand(message: string, cwd: string): string | null {
@@ -185,6 +184,53 @@ function loadSession(cwd: string): { model: string; history: OllamaMessage[]; st
   } catch { return null; }
 }
 
+function extractRequestedFilename(message: string): string | null {
+  const patterns = [
+    /(?:create|make|write|generate|add|save)\s+(?:a\s+)?(?:python\s+script\s+)?(?:file\s+)?(?:named|called)?\s*["']?([\w.\-/]+\.py)["']?/i,
+    /(?:create|make|write|generate|add|save)\s+(?:a\s+)?(?:python\s+script\s+)?(["']?[\w.\-/]+\.py["']?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match?.[1]) {
+      return match[1].replace(/^['"]|['"]$/g, '');
+    }
+  }
+  return null;
+}
+
+function extractPythonCode(text: string): string | null {
+  const codeBlock = text.match(/```(?:python|py)?\n([\s\S]+?)```/i);
+  if (codeBlock?.[1]) {
+    return codeBlock[1].trim();
+  }
+
+  const contentMatch = text.match(/(?:content|with content|containing)\s*[:=]\s*([\s\S]+)/i);
+  if (contentMatch?.[1]) {
+    const content = contentMatch[1].trim();
+    return content.replace(/^['"]|['"]$/g, '').trim();
+  }
+
+  const lines = text.split('\n').map((line) => line.trim());
+  const codeLines = lines.filter((line) => line !== '' && !/^\[.*\]$/.test(line));
+  if (codeLines.length > 0 && codeLines.every((line) => /^[\w\s\"'`#.:,+*/<>%\-_=;()\[\]{}]+$/.test(line))) {
+    return codeLines.join('\n');
+  }
+  return null;
+}
+
+function safeWriteFile(cwd: string, filePath: string, content: string): boolean {
+  const normalized = path.normalize(filePath);
+  if (path.isAbsolute(normalized) || normalized.startsWith('..')) return false;
+  const absPath = path.join(cwd, normalized);
+  try {
+    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+    fs.writeFileSync(absPath, content, 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ── Init command ────────────────────────────────────────────────────
 function initMemory(cwd: string) {
   const memPath = path.join(cwd, MEMORY_FILE);
@@ -287,7 +333,11 @@ async function main() {
   // Select model
   let model = args.model || process.env.DEYAD_MODEL || '';
   if (!model) {
-    if (models.length === 1 || args.print) {
+    if (models.includes('qwen2.5-coder:1.5b-base')) {
+      model = 'qwen2.5-coder:1.5b-base';
+    } else if (models.includes('qwen3.5:27b')) {
+      model = 'qwen3.5:27b';
+    } else if (models.length === 1 || args.print) {
       model = models[0];
     } else {
       model = await selectModel(rl, models);
@@ -583,6 +633,7 @@ async function runOnce(
   let inToolBlock = false;
   let inThinkBlock = false;
   let printedVisible = false;
+  let finalOutput = '';
 
   // Build the user message with optional images
   const userMsg: OllamaMessage = { role: 'user', content: message };
@@ -593,6 +644,7 @@ async function runOnce(
   let toolStarted = false;
   const result = await runAgentLoop(model, userMsg, cwd, {
     onToken: (token: string) => {
+      finalOutput += token;
       currentLine += token;
 
       // Show <think> blocks in dimmed style
@@ -658,26 +710,42 @@ async function runOnce(
   }, history, undefined, mcpManager);
 
   if (!toolStarted && isRunRequest(message)) {
-    const inferredCommand = inferFallbackShellCommand(message, cwd);
-    const fallbackCommand = findFallbackRunCommand(cwd);
-    if (inferredCommand) {
-      console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
-      console.log(dim(`Try rephrasing or run this command manually if appropriate:`));
-      console.log(cyan(inferredCommand));
-      console.log('');
-    } else if (fallbackCommand) {
-      console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
-      console.log(dim(`You can try this command manually instead:`));
-      console.log(cyan(fallbackCommand));
-      console.log('');
-    } else {
-      console.log(dim(`\nNo Ollama tool call was produced for this request. Please rephrase or use /run if you want a shell command.`));
-      console.log('');
-    }
-  }
+      const finalText = stripToolMarkup(finalOutput).trim();
+      const filename = extractRequestedFilename(message) || extractRequestedFilename(finalText);
+      const pythonCode = extractPythonCode(message) || extractPythonCode(finalText);
 
-  return result;
-}
+      if (filename && pythonCode) {
+        const written = safeWriteFile(cwd, filename, pythonCode);
+        if (written) {
+          console.log(green(`\n✓ Wrote ${filename} from model output.`));
+          console.log('');
+          if (!result.changedFiles.includes(filename)) result.changedFiles.push(filename);
+        } else {
+          console.log(red(`\n✗ Could not write ${filename}.`));
+          console.log('');
+        }
+      } else {
+        const inferredCommand = inferFallbackShellCommand(message, cwd);
+        const fallbackCommand = findFallbackRunCommand(cwd);
+        if (inferredCommand) {
+          console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
+          console.log(dim(`Try rephrasing or run this command manually if appropriate:`));
+          console.log(cyan(inferredCommand));
+          console.log('');
+        } else if (fallbackCommand) {
+          console.log(dim(`\nNo Ollama tool call was produced for this run request. The agent is Ollama-only, so it will not execute a guessed shell command.`));
+          console.log(dim(`You can try this command manually instead:`));
+          console.log(cyan(fallbackCommand));
+          console.log('');
+        } else {
+          console.log(dim(`\nNo Ollama tool call was produced for this request. Please rephrase or use /run if you want a shell command.`));
+          console.log('');
+        }
+      }
+    }
+
+    return result;
+  }
 
 main().catch((err: Error) => {
   console.error(red(`Fatal: ${err.message}`));
