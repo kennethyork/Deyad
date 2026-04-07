@@ -6,14 +6,9 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "sourceMap": true,
-    "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
     "outDir": "dist",
     "rootDir": "./src",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "jsx": "react-jsx",
     "strict": true
