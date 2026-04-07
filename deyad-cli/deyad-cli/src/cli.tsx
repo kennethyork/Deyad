@@ -104,6 +104,14 @@ async function runOnce(
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
       if (!silent) process.stdout.write(t);
     },
+    onThinkingToken: (_t) => {
+      // Show spinner while model is thinking (don't print thinking tokens)
+      if (!spinnerActive && !silent) {
+        spinner.update('Reasoning...');
+        spinner.start();
+        spinnerActive = true;
+      }
+    },
     onToolStart: (name, params) => {
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
       if (!silent) console.log('\n' + formatToolStart(name, params));
@@ -414,6 +422,9 @@ async function main(): Promise<void> {
 
       const callbacks: AgentCallbacks = {
         onToken: (t) => process.stdout.write(t),
+        onThinkingToken: () => {
+          // Reasoning models think silently — user sees streamed content tokens
+        },
         onToolStart: (name, params) => {
           console.log('');
           console.log(formatToolStart(name, params));
