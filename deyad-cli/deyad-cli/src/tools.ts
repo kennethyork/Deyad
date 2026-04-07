@@ -6,7 +6,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { execSync, spawn } from 'node:child_process';
 import { minimatch } from 'minimatch';
+import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 
 export interface ToolCall {
   name: string;
@@ -25,20 +27,49 @@ export interface ToolCallbacks {
   onDiff?: (filePath: string, diff: string) => void;
 }
 
-export const TOOLS_DESCRIPTION = `Available tools:
-- list_files: list project files
-- read_file: read a text file
-- write_files: create or overwrite files
-- edit_file: edit a file by replacing a unique substring
-- delete_file: delete a file
-- glob_files: find files by pattern
+export const TOOLS_DESCRIPTION = `Available tools (use <tool_call><name>TOOL</name><param name="KEY">VALUE</param></tool_call>):
+
+FILE OPERATIONS:
+- list_files: list all project files recursively
+- read_file: read a text file. Params: path
+- write_files: create or overwrite files. Params: path + content (single), or file_0_path + file_0_content, file_1_path + file_1_content, etc. (batch)
+- edit_file: replace a unique substring in a file. Params: path, old_string, new_string
+- multi_edit: make multiple edits to one or more files atomically. Params: edit_0_path + edit_0_old_string + edit_0_new_string, edit_1_path + ..., etc.
+- delete_file: delete a file. Params: path
+- glob_files: find files by glob pattern. Params: pattern
+
+SEARCH:
+- search_files: search file contents with regex or text. Params: query, pattern (optional glob), is_regex (optional, "true"/"false")
+
+SHELL:
+- run_command: execute a shell command. Params: command, timeout (optional, ms)
+
+GIT:
+- git_status: show working tree status
+- git_log: show recent commits. Params: count (optional, default 10)
+- git_diff: show unstaged changes. Params: path (optional)
+- git_branch: list branches
+- git_add: stage files. Params: path (default ".")
+- git_commit: commit staged changes. Params: message
+- git_stash: stash or pop changes. Params: action ("push" or "pop")
+
+WEB:
+- fetch_url: fetch a URL and return text content. Params: url
+
+MEMORY:
+- memory_read: read a persistent note. Params: key
+- memory_write: save a persistent note (survives restarts). Params: key, value
+- memory_list: list all saved memory keys
+- memory_delete: delete a memory note. Params: key
 `;
 
 export function parseToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
-  const pattern = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
+
+  // Format 1: <tool_call><name>...</name><param name="...">...</param></tool_call>
+  const pattern1 = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
   let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
+  while ((match = pattern1.exec(text)) !== null) {
     const name = match[1]!.trim();
     const body = match[2] ?? '';
     const params: Record<string, string> = {};
@@ -49,6 +80,37 @@ export function parseToolCalls(text: string): ToolCall[] {
     }
     calls.push({ name, params });
   }
+
+  // Format 2: <function=name><parameter=key>value</parameter></function>
+  // (used by qwen and some other models)
+  const pattern2 = /<function=([^>]+)>([\s\S]*?)<\/function>/g;
+  while ((match = pattern2.exec(text)) !== null) {
+    const name = match[1]!.trim();
+    const body = match[2] ?? '';
+    const params: Record<string, string> = {};
+    const paramPattern2 = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = paramPattern2.exec(body)) !== null) {
+      params[pm[1]!.trim()] = (pm[2] ?? '').trim();
+    }
+    calls.push({ name, params });
+  }
+
+  // Format 3: ```tool_call\n{"name":"...","parameters":{...}}\n``` (JSON in code block)
+  const pattern3 = /```tool_call\s*\n([\s\S]*?)\n\s*```/g;
+  while ((match = pattern3.exec(text)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]!.trim());
+      if (parsed.name) {
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed.parameters ?? parsed.params ?? {})) {
+          params[k] = String(v);
+        }
+        calls.push({ name: parsed.name, params });
+      }
+    } catch { /* ignore malformed JSON */ }
+  }
+
   return calls;
 }
 
@@ -60,6 +122,8 @@ export function stripToolMarkup(text: string): string {
   return text
     .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
     .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
+    .replace(/<function=[^>]*>[\s\S]*?<\/function>/g, '')
+    .replace(/```tool_call\s*\n[\s\S]*?\n\s*```/g, '')
     .replace(/<think>[\s\S]*?<\/think>/g, '')
     .replace(/<done\s*\/?>(?:\s*)/g, '')
     .trim();
@@ -252,6 +316,225 @@ export async function executeTool(
         fs.unlinkSync(absPath);
         return { tool: call.name, success: true, output: `Deleted ${filePath}`, changedFiles: [filePath] };
       }
+      case 'glob_files': {
+        const pattern = call.params['pattern'];
+        if (!pattern) return { tool: call.name, success: false, output: 'Missing "pattern" parameter.' };
+        const matched = globFiles(pattern, cwd);
+        return { tool: call.name, success: true, output: matched.length > 0 ? matched.join('\n') : '(no matches)' };
+      }
+      case 'search_files': {
+        const query = call.params['query'];
+        if (!query) return { tool: call.name, success: false, output: 'Missing "query" parameter.' };
+        const filePattern = call.params['pattern'] || '**/*';
+        const isRegex = call.params['is_regex'] === 'true';
+        const allFiles = globFiles(filePattern, cwd);
+        const results: string[] = [];
+        const MAX_RESULTS = 100;
+        let regex: RegExp | null = null;
+        if (isRegex) {
+          try { regex = new RegExp(query, 'gi'); } catch { return { tool: call.name, success: false, output: `Invalid regex: ${query}` }; }
+        }
+        for (const file of allFiles) {
+          if (results.length >= MAX_RESULTS) break;
+          try {
+            const absPath = path.resolve(cwd, file);
+            const content = fs.readFileSync(absPath, 'utf-8');
+            const lines = content.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+              if (results.length >= MAX_RESULTS) break;
+              const line = lines[i]!;
+              const match = regex ? regex.test(line) : line.toLowerCase().includes(query.toLowerCase());
+              if (regex) regex.lastIndex = 0;
+              if (match) {
+                results.push(`${file}:${i + 1}: ${line.slice(0, 200)}`);
+              }
+            }
+          } catch { /* skip unreadable files */ }
+        }
+        return { tool: call.name, success: true, output: results.length > 0 ? results.join('\n') : '(no matches)' };
+      }
+      case 'run_command': {
+        const command = call.params['command'];
+        if (!command) return { tool: call.name, success: false, output: 'Missing "command" parameter.' };
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Run command: ${command}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        const timeoutMs = parseInt(call.params['timeout'] || '30000', 10);
+        try {
+          const output = execSync(command, {
+            cwd,
+            encoding: 'utf-8',
+            timeout: timeoutMs,
+            maxBuffer: 1024 * 1024,
+            stdio: ['pipe', 'pipe', 'pipe'],
+            env: { ...process.env, FORCE_COLOR: '0' },
+          });
+          const truncated = output.length > 10000 ? output.slice(0, 10000) + '\n... (truncated)' : output;
+          return { tool: call.name, success: true, output: truncated || '(no output)' };
+        } catch (err: unknown) {
+          const e = err as { stdout?: string; stderr?: string; status?: number; message?: string };
+          const stdout = (e.stdout || '').slice(0, 5000);
+          const stderr = (e.stderr || '').slice(0, 5000);
+          const exitCode = e.status ?? 'unknown';
+          return { tool: call.name, success: false, output: `Exit code: ${exitCode}\nstdout: ${stdout}\nstderr: ${stderr}`.trim() };
+        }
+      }
+      case 'multi_edit': {
+        const edits: Array<{ path: string; old_string: string; new_string: string }> = [];
+        for (let i = 0; i < 50; i++) {
+          const p = call.params[`edit_${i}_path`];
+          const old = call.params[`edit_${i}_old_string`];
+          const nw = call.params[`edit_${i}_new_string`];
+          if (!p || old === undefined || nw === undefined) break;
+          edits.push({ path: p, old_string: old, new_string: nw });
+        }
+        if (edits.length === 0) return { tool: call.name, success: false, output: 'No edits specified.' };
+        const editPaths = [...new Set(edits.map((e) => e.path))];
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Apply ${edits.length} edit(s) to: ${editPaths.join(', ')}?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        const editResults: string[] = [];
+        const editChangedFiles: string[] = [];
+        for (const edit of edits) {
+          const absPath = path.resolve(cwd, edit.path);
+          if (!absPath.startsWith(resolvedCwd)) { editResults.push(`${edit.path}: path traversal blocked`); continue; }
+          if (!fs.existsSync(absPath)) { editResults.push(`${edit.path}: file not found`); continue; }
+          const content = fs.readFileSync(absPath, 'utf-8');
+          const occ = content.split(edit.old_string).length - 1;
+          if (occ === 0) { editResults.push(`${edit.path}: old_string not found`); continue; }
+          if (occ > 1) { editResults.push(`${edit.path}: old_string found ${occ} times (must be unique)`); continue; }
+          const updated = content.replace(edit.old_string, edit.new_string);
+          if (cb?.onDiff) cb.onDiff(edit.path, simpleDiff(content, updated, edit.path));
+          fs.writeFileSync(absPath, updated, 'utf-8');
+          editResults.push(`${edit.path}: edited`);
+          if (!editChangedFiles.includes(edit.path)) editChangedFiles.push(edit.path);
+        }
+        return { tool: call.name, success: true, output: editResults.join('\n'), changedFiles: editChangedFiles };
+      }
+      case 'git_status': {
+        try {
+          const output = execSync('git status --short', { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: output || '(clean)' };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_log': {
+        const count = parseInt(call.params['count'] || '10', 10);
+        try {
+          const output = execSync(`git log --oneline -${Math.min(count, 50)}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: output || '(no commits)' };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_diff': {
+        const diffPath = call.params['path'] || '';
+        try {
+          const output = execSync(`git diff ${diffPath}`.trim(), { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: output || '(no changes)' };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_branch': {
+        try {
+          const output = execSync('git branch -a', { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: output || '(no branches)' };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_add': {
+        const addPath = call.params['path'] || '.';
+        try {
+          execSync(`git add ${addPath}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: `Staged: ${addPath}` };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_commit': {
+        const msg = call.params['message'];
+        if (!msg) return { tool: call.name, success: false, output: 'Missing "message" parameter.' };
+        if (cb?.confirm) {
+          const ok = await cb.confirm(`Git commit: "${msg}"?`);
+          if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
+        }
+        try {
+          const output = execSync(`git commit -m ${JSON.stringify(msg)}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'git_stash': {
+        const action = call.params['action'] || 'push';
+        try {
+          const output = execSync(`git stash ${action}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          return { tool: call.name, success: true, output: output || `Stash ${action} done.` };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+      case 'fetch_url': {
+        const url = call.params['url'];
+        if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        try {
+          new URL(url);
+        } catch {
+          return { tool: call.name, success: false, output: 'Invalid URL.' };
+        }
+        try {
+          const resp = await fetch(url, {
+            headers: { 'User-Agent': 'Deyad-CLI/0.1' },
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!resp.ok) return { tool: call.name, success: false, output: `HTTP ${resp.status}: ${resp.statusText}` };
+          const text = await resp.text();
+          // Strip HTML tags for cleaner output
+          const cleaned = text.replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          const truncated = cleaned.length > 15000 ? cleaned.slice(0, 15000) + '\n... (truncated)' : cleaned;
+          return { tool: call.name, success: true, output: truncated };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: String((err as Error).message) };
+        }
+      }
+
+      // ── Memory tools ──
+      case 'memory_read': {
+        const key = call.params['key'];
+        if (!key) return { tool: call.name, success: false, output: 'Missing "key" parameter.' };
+        const value = memoryRead(key);
+        if (value === null) return { tool: call.name, success: true, output: `No memory found for key: ${key}` };
+        return { tool: call.name, success: true, output: value };
+      }
+      case 'memory_write': {
+        const key = call.params['key'];
+        const value = call.params['value'];
+        if (!key || !value) return { tool: call.name, success: false, output: 'Missing "key" or "value" parameter.' };
+        memoryWrite(key, value);
+        return { tool: call.name, success: true, output: `Saved memory: ${key}` };
+      }
+      case 'memory_list': {
+        const entries = memoryList();
+        if (entries.length === 0) return { tool: call.name, success: true, output: 'No memory entries.' };
+        const list = entries.map((e) => `${e.key}: ${e.value.slice(0, 100)}`).join('\n');
+        return { tool: call.name, success: true, output: list };
+      }
+      case 'memory_delete': {
+        const key = call.params['key'];
+        if (!key) return { tool: call.name, success: false, output: 'Missing "key" parameter.' };
+        const deleted = memoryDelete(key);
+        return { tool: call.name, success: deleted, output: deleted ? `Deleted: ${key}` : `Not found: ${key}` };
+      }
+
       default:
         return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
     }

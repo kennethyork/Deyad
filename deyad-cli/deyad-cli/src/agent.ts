@@ -72,25 +72,37 @@ function compactConversation(messages: OllamaMessage[]): void {
 }
 
 function getSystemPrompt(cwd: string, mcpToolsDesc: string = ''): string {
-  return `You are a terminal-based Ollama coding agent.
-You can independently read code, write files, run shell commands, and iterate until the task is complete.
-You work directly in the user's project directory: ${cwd}
+  return `You are Deyad, an expert AI coding agent running in the user's terminal.
+You have full access to their project at: ${cwd}
+You can read, write, edit, and delete files, run shell commands, search code, manage git, and fetch URLs.
 
 ${TOOLS_DESCRIPTION}${mcpToolsDesc}
 
-IMPORTANT: For any request that modifies the project, runs a command, or performs a task, reply with tool_call XML only. If you have not executed any tools yet, do not return <done/>. Only use plain language for general chat or final summaries after tools have executed.
+TOOL CALL FORMAT — you MUST use this exact XML format:
+<tool_call>
+<name>TOOL_NAME</name>
+<param name="KEY">VALUE</param>
+</tool_call>
+
+You can make multiple tool calls in a single response. Each must be wrapped in its own <tool_call> tags.
 
 WORKFLOW:
-1. First, understand the request and explore the current project (list_files, read_file).
-2. Plan your approach briefly in prose.
-3. Implement changes using write_files, edit_file, and run_command.
-4. Verify your work (e.g. check for errors, read files to confirm).
-5. When everything is done, write a brief SUMMARY of what you did, then output <done/>.
+1. UNDERSTAND — Read relevant files and explore the project structure before making changes.
+2. PLAN — Briefly state your approach (1-2 sentences max).
+3. IMPLEMENT — Use tools to make changes. Prefer edit_file for targeted edits, write_files for new files.
+4. VERIFY — After changes, run tests/linting/build commands to verify. Read modified files to confirm correctness.
+5. ITERATE — If verification fails, diagnose and fix. Do not give up after one attempt.
+6. COMPLETE — Write a brief summary of what you did, then output <done/>.
 
 RULES:
-- ALWAYS follow the user's instructions exactly.
-- NEVER just describe what you would do — actually perform the actions with tool calls.
-- Do not output <done/> until the task is complete.
+- ALWAYS use tool calls for actions. Never describe what you would do without doing it.
+- Do NOT output <done/> until the task is fully complete and verified.
+- If you have not used any tools yet, you MUST use tools before outputting <done/>.
+- For edit_file, include enough context in old_string to uniquely match (3+ lines).
+- For run_command, prefer specific commands over interactive ones. Use non-interactive flags.
+- When creating files, always include complete, working content — never use placeholders like "// TODO".
+- If a tool fails, read the error, adjust your approach, and retry.
+- Ask for confirmation only when truly ambiguous. Otherwise, take action.
 `;
 }
 
@@ -100,6 +112,20 @@ async function buildContext(cwd: string): Promise<string> {
   const files = listing.output.split('\n').filter(Boolean);
 
   let context = `Project files (${files.length}):\n${listing.output}\n`;
+
+  // Read project instructions if present
+  const instructionFiles = ['DEYAD.md', '.deyad.md', 'deyad.md'];
+  for (const instFile of instructionFiles) {
+    if (files.includes(instFile)) {
+      const result = await exec({ name: 'read_file', params: { path: instFile } }, cwd);
+      if (result.success) {
+        const content = result.output.length > 4000 ? result.output.slice(0, 4000) + '\n...' : result.output;
+        context += `\n--- PROJECT INSTRUCTIONS (${instFile}) ---\nFollow these project-specific instructions:\n${content}\n--- END INSTRUCTIONS ---\n`;
+      }
+      break;
+    }
+  }
+
   const keyFiles = [
     'package.json', 'tsconfig.json',
     'Cargo.toml',
@@ -153,15 +179,33 @@ export async function runAgentLoop(
     let iteration = 0;
     let hasPerformedAction = false;
 
+    const MAX_ITERATIONS = 50;
+
     while (!abortController.signal.aborted) {
+      if (iteration >= MAX_ITERATIONS) {
+        callbacks.onError(`Reached maximum iterations (${MAX_ITERATIONS}). Stopping.`);
+        break;
+      }
       compactConversation(messages);
-      const result = await streamChat(
-        model,
-        messages,
-        callbacks.onToken,
-        ollamaOptions,
-        abortController.signal,
-      );
+      let result;
+      try {
+        result = await streamChat(
+          model,
+          messages,
+          callbacks.onToken,
+          ollamaOptions,
+          abortController.signal,
+        );
+      } catch (err: unknown) {
+        const errMsg = String((err as Error).message || err);
+        callbacks.onError(`Ollama error: ${errMsg}`);
+        if (iteration > 0) {
+          // Retry once on transient errors
+          iteration++;
+          continue;
+        }
+        break;
+      }
       if (abortController.signal.aborted) break;
 
       const turnResponse = result.content;
@@ -178,7 +222,7 @@ export async function runAgentLoop(
           messages.push({ role: 'assistant', content: turnResponse });
           messages.push({
             role: 'user',
-            content: 'This request requires action, but no tool_call was produced. Reply with tool_call XML only. Use write_files/edit_file/delete_file/multi_edit for file updates, run_command for shell operations, read_file/search_files/glob_files/list_files for inspection, and do not output <done/> until the task is complete.',
+            content: 'Your response did not contain any tool calls. You MUST respond with tool_call XML to take action. Example:\n<tool_call>\n<name>list_files</name>\n</tool_call>\n\nUse the tools to complete the task. Do not describe what you would do — actually do it.',
           });
           iteration++;
           continue;
@@ -191,8 +235,8 @@ export async function runAgentLoop(
 
       messages.push({ role: 'assistant', content: turnResponse });
       const toolCb: ToolCallbacks = { confirm: callbacks.confirm, onDiff: callbacks.onDiff };
-      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'memory_read', 'git_status', 'git_log', 'git_diff', 'git_branch', 'git_remote_get', 'web_search', 'analyze_image']);
-      const writeTools = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit']);
+      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'git_status', 'git_log', 'git_diff', 'git_branch']);
+      const writeTools = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit', 'run_command', 'git_add', 'git_commit', 'git_stash']);
 
       let results: ToolResult[] = [];
       let filesChanged = false;
