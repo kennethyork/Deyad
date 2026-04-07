@@ -232,14 +232,14 @@ export async function runAgentLoop(
       const toolCalls = parseToolCalls(turnResponse);
       const actionable = isActionableRequest(userMessage);
 
-      if (isDone(turnResponse)) {
-        const summary = stripToolMarkup(turnResponse);
-        callbacks.onDone(summary);
-        messages.push({ role: 'assistant', content: turnResponse });
-        return { history: messages, changedFiles, stats };
-      }
-
       if (toolCalls.length === 0) {
+        if (isDone(turnResponse)) {
+          const summary = stripToolMarkup(turnResponse);
+          callbacks.onDone(summary);
+          messages.push({ role: 'assistant', content: turnResponse });
+          return { history: messages, changedFiles, stats };
+        }
+
         // Nudge: if the assistant is describing actions instead of performing them,
         // require tool usage before finishing. Allow a second retry if needed.
         const stripped = stripToolMarkup(turnResponse).trim();
@@ -318,6 +318,13 @@ export async function runAgentLoop(
       const resultsText = results.map(r =>
         `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`
       ).join('\n\n');
+
+      if (isDone(turnResponse)) {
+        const summary = stripToolMarkup(turnResponse);
+        callbacks.onDone(summary);
+        messages.push({ role: 'user', content: resultsText });
+        return { history: messages, changedFiles, stats };
+      }
 
       // Auto-lint: after file changes, detect project language and run appropriate linter
       let autoLintText = '';
