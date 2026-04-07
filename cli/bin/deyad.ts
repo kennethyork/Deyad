@@ -4,10 +4,14 @@
  * Deyad CLI — local AI coding agent powered by Ollama.
  *
  * Usage:
- *   deyad                         # interactive mode in current directory
- *   deyad "add a login page"      # one-shot mode
+ *   deyad                         # interactive chat mode in current directory
+ *   deyad "add a login page"      # one-shot task mode (executes or edits project once)
  *   deyad --model codestral       # specify model
- *   deyad --print "fix the bug"   # headless CI mode (no REPL)
+ *   deyad --print "fix the bug"   # headless mode (single prompt, no REPL)
+ *
+ * Notes:
+ *   - Use plain conversational prompts for chat and non-actionable questions.
+ *   - Use task requests like "create file" or "fix bug" to trigger file/command tools.
  */
 
 import * as fs from 'node:fs';
@@ -160,12 +164,17 @@ function printUsage() {
 ${bold('Deyad CLI')} — Local AI coding agent powered by Ollama
 
 ${bold('Usage:')}
-  deyad                              Interactive mode
-  deyad "add a login page"           One-shot mode
-  deyad -m codestral "fix bugs"      Specify model
-  deyad --print "fix the bug"        Headless/CI mode (no REPL, exits after)
+  deyad                              Interactive chat/task mode in current directory
+  deyad "add a login page"           One-shot task mode (executes a single request)
+  deyad -m codestral "fix bugs"      Specify model for one-shot or interactive use
+  deyad --print "fix the bug"        Headless CI/chat mode (no REPL, exits after)
   deyad --resume                     Resume last saved conversation
   deyad init                         Create DEYAD.md memory file
+
+${bold('Modes:')}
+  Interactive chat: use \`deyad\` and type conversational prompts.
+  Headless chat: use \`--print\` with plain questions or chat prompts.
+  Task mode: use actionable requests like create/write/edit/run to modify the project.
 
 ${bold('Options:')}
   -m, --model <name>    Ollama model to use
