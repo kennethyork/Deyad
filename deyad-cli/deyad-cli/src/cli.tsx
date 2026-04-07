@@ -10,28 +10,34 @@ import { loadOrCreateSession, saveSession, pruneSessions, memoryList } from './s
 import type { SessionData } from './session.js';
 import { createSnapshot, undoLast, getSnapshots, diffFromSnapshot } from './undo.js';
 import { enterSandbox, exitSandbox, isSandboxed } from './sandbox.js';
+import {
+  c, box, divider, Spinner,
+  printBanner, formatToolStart, formatToolEnd, formatDiff,
+  formatConfirm, formatStatus, formatHelp, formatError,
+  formatSuccess, formatTokenBadge, getPrompt,
+} from './tui.js';
 
 const VERSION = '0.1.31';
 
 function printUsage(): void {
   console.log(`
-  Deyad CLI v${VERSION} — local AI coding agent powered by Ollama
+  ${c.brandBold('Deyad CLI')} ${c.dim('v' + VERSION)} — local AI coding agent powered by Ollama
 
-  Usage
-    $ deyad                          Interactive chat mode
-    $ deyad "add a login page"       One-shot task mode
-    $ deyad --model codestral        Specify model
-    $ deyad --print "explain this"   Print response and exit
-    $ deyad --auto "refactor utils"  Full-auto sandbox mode
-    $ deyad --resume                 Resume last session
+  ${c.bold('Usage')}
+    ${c.cyan('$ deyad')}                          Interactive chat mode
+    ${c.cyan('$ deyad "add a login page"')}       One-shot task mode
+    ${c.cyan('$ deyad --model codestral')}        Specify model
+    ${c.cyan('$ deyad --print "explain this"')}   Print response and exit
+    ${c.cyan('$ deyad --auto "refactor utils"')}  Full-auto sandbox mode
+    ${c.cyan('$ deyad --resume')}                 Resume last session
 
-  Options
-    -h, --help             Show this help
-    -m, --model <model>    Ollama model (default: DEYAD_MODEL env or first available)
-    -p, --print <prompt>   Run prompt non-interactively and print result
-    -a, --auto             Full-auto mode (sandbox + no confirmations)
-    --resume               Resume the most recent session for this directory
-    -v, --version          Show version
+  ${c.bold('Options')}
+    ${c.yellow('-h, --help')}             Show this help
+    ${c.yellow('-m, --model <model>')}    Ollama model (default: DEYAD_MODEL env or first available)
+    ${c.yellow('-p, --print <prompt>')}   Run prompt non-interactively and print result
+    ${c.yellow('-a, --auto')}             Full-auto mode (sandbox + no confirmations)
+    ${c.yellow('--resume')}               Resume the most recent session for this directory
+    ${c.yellow('-v, --version')}          Show version
 `);
 }
 
@@ -90,26 +96,42 @@ async function runOnce(
   cwd: string,
   silent: boolean,
 ): Promise<void> {
+  const spinner = new Spinner('Thinking...');
+  let spinnerActive = false;
+
   const callbacks: AgentCallbacks = {
-    onToken: (t) => { if (!silent) process.stdout.write(t); },
+    onToken: (t) => {
+      if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      if (!silent) process.stdout.write(t);
+    },
     onToolStart: (name, params) => {
-      if (!silent) console.log(`\n\x1b[36m> ${name}\x1b[0m`, Object.keys(params).length ? params : '');
+      if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      if (!silent) console.log('\n' + formatToolStart(name, params));
     },
     onToolResult: (r) => {
       if (!silent) {
-        const tag = r.success ? '\x1b[32m\u2713\x1b[0m' : '\x1b[31m\u2717\x1b[0m';
-        console.log(`${tag} ${r.tool}: ${r.output.slice(0, 200)}`);
+        console.log(formatToolEnd(r.tool, r.success, r.output));
       }
+      spinner.update('Thinking...');
+      spinner.start();
+      spinnerActive = true;
     },
     onDiff: () => {},
     onDone: (summary) => {
+      if (spinnerActive) { spinner.stop(); spinnerActive = false; }
       if (silent && summary) console.log(summary);
       if (!silent) console.log('');
     },
-    onError: (e) => console.error(`\x1b[31mError: ${e}\x1b[0m`),
+    onError: (e) => {
+      if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      console.error(formatError(e));
+    },
     confirm: async () => true,
   };
+
+  if (!silent) { spinner.start(); spinnerActive = true; }
   await runAgentLoop(model, prompt, cwd, callbacks);
+  if (spinnerActive) { spinner.stop(); spinnerActive = false; }
 }
 
 async function main(): Promise<void> {
@@ -126,19 +148,19 @@ async function main(): Promise<void> {
 
   const ok = await checkOllama();
   if (!ok) {
-    console.error('\x1b[31mCannot connect to Ollama. Is it running? (ollama serve)\x1b[0m');
+    console.error(formatError('Cannot connect to Ollama. Is it running? (ollama serve)'));
     process.exit(1);
   }
 
   const models = await listModels();
   if (models.length === 0) {
-    console.error('\x1b[31mNo Ollama models found. Pull one first: ollama pull llama3.2\x1b[0m');
+    console.error(formatError('No Ollama models found. Pull one first: ollama pull llama3.2'));
     process.exit(1);
   }
 
   let model: string = args.model ?? process.env['DEYAD_MODEL'] ?? models[0]!;
   if (!models.includes(model)) {
-    console.error(`\x1b[31mModel "${model}" not found. Available: ${models.join(', ')}\x1b[0m`);
+    console.error(formatError(`Model "${model}" not found. Available: ${models.join(', ')}`));
     process.exit(1);
   }
 
@@ -153,42 +175,63 @@ async function main(): Promise<void> {
 
   // --auto mode: enter sandbox, run task, prompt to merge or discard
   if (args.auto && args.prompt) {
-    console.log(`\x1b[1m\x1b[36mDeyad CLI v${VERSION}\x1b[0m \u2014 \x1b[33mfull-auto sandbox\x1b[0m`);
+    console.log('');
+    console.log(`  ${c.brandBold('Deyad')} ${c.dim('v' + VERSION)} ${c.dim('\u00b7')} ${c.yellow('full-auto sandbox')}`);
     const sbResult = enterSandbox(cwd);
     if (!sbResult.success) {
-      console.error(`\x1b[31m${sbResult.message}\x1b[0m`);
+      console.error(formatError(sbResult.message));
       process.exit(1);
     }
-    console.log(`\x1b[32m${sbResult.message}\x1b[0m\n`);
+    console.log(formatSuccess(sbResult.message));
+    console.log(divider());
+    console.log('');
+
+    const autoSpinner = new Spinner('Working...');
+    let autoSpinnerActive = false;
 
     const autoCallbacks: AgentCallbacks = {
-      onToken: (t) => process.stdout.write(t),
+      onToken: (t) => {
+        if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
+        process.stdout.write(t);
+      },
       onToolStart: (name, params) => {
-        const paramStr = Object.entries(params).map(([k, v]) => `${k}=${v.length > 60 ? v.slice(0, 60) + '\u2026' : v}`).join(' ');
-        console.log(`\n  \x1b[36m\u26A1 ${name}\x1b[0m ${paramStr ? '\x1b[2m' + paramStr + '\x1b[0m' : ''}`);
+        if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
+        console.log('\n' + formatToolStart(name, params));
       },
       onToolResult: (r) => {
-        const tag = r.success ? '\x1b[32m\u2713\x1b[0m' : '\x1b[31m\u2717\x1b[0m';
-        const preview = r.output.split('\n')[0]?.slice(0, 120) || '';
-        console.log(`  ${tag} ${r.tool}${preview ? ': ' + preview : ''}`);
+        console.log(formatToolEnd(r.tool, r.success, r.output));
+        autoSpinner.update('Working...');
+        autoSpinner.start();
+        autoSpinnerActive = true;
       },
       onDiff: () => {},
-      onDone: () => { console.log(''); },
-      onError: (e) => console.error(`\x1b[31mError: ${e}\x1b[0m`),
-      confirm: async () => true, // auto-approve everything in sandbox
+      onDone: () => {
+        if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
+        console.log('');
+      },
+      onError: (e) => {
+        if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
+        console.error(formatError(e));
+      },
+      confirm: async () => true,
     };
 
+    autoSpinner.start(); autoSpinnerActive = true;
     await runAgentLoop(model, args.prompt, cwd, autoCallbacks);
-    console.log('\n\x1b[1mSandbox complete.\x1b[0m Review the changes:');
+    if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
+
+    console.log('');
+    console.log(divider('Sandbox Complete'));
+    console.log('');
 
     const autoRl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    autoRl.question('\x1b[33mMerge changes? (y/n) \x1b[0m', (answer) => {
+    autoRl.question(formatConfirm('Merge changes into your branch?'), (answer) => {
       const merge = answer.trim().toLowerCase().startsWith('y');
       const result = exitSandbox(cwd, merge);
       if (result.diff) {
-        console.log(`\x1b[2m${result.diff}\x1b[0m`);
+        console.log(c.dim(result.diff));
       }
-      console.log(result.success ? `\x1b[32m${result.message}\x1b[0m` : `\x1b[31m${result.message}\x1b[0m`);
+      console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
       autoRl.close();
       process.exit(0);
     });
@@ -201,18 +244,15 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // \u2500\u2500 Interactive REPL \u2500\u2500
+  // ── Interactive REPL ──
   // Load or create session
   let session = loadOrCreateSession(cwd, model);
   if (args.resume && session.history.length > 0) {
-    console.log(`\x1b[2mResuming session ${session.id} (${session.taskCount} tasks, ${session.history.length} messages)\x1b[0m`);
+    console.log(c.dim(`  Resuming session ${session.id} (${session.taskCount} tasks, ${session.history.length} messages)`));
   }
   pruneSessions();
 
-  console.log(`\x1b[1m\x1b[36mDeyad CLI v${VERSION}\x1b[0m \u2014 model: \x1b[33m${model}\x1b[0m`);
-  console.log(`Working in: ${cwd}`);
-  if (isSandboxed()) console.log(`\x1b[33m\u26A0 Sandbox mode active\x1b[0m`);
-  console.log('Commands: /help /undo /sandbox /sessions /model <name> /clear /status | "exit" to quit\n');
+  printBanner(VERSION, model, cwd, isSandboxed());
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   let history: OllamaMessage[] = args.resume ? session.history : [];
@@ -220,7 +260,7 @@ async function main(): Promise<void> {
   let taskCount = args.resume ? session.taskCount : 0;
 
   const ask = (): void => {
-    rl.question('\x1b[1mdeyad>\x1b[0m ', async (line) => {
+    rl.question(getPrompt(isSandboxed()), async (line) => {
       const input = line.trim();
       if (!input) { ask(); return; }
       if (input === 'exit' || input === 'quit') {
@@ -230,64 +270,52 @@ async function main(): Promise<void> {
         session.taskCount = taskCount;
         session.model = model;
         saveSession(session);
-        console.log(`Session saved: ${session.id}`);
-        console.log(`Session: ${taskCount} tasks, ~${totalTokens.toLocaleString()} tokens used.`);
-        console.log('Bye!');
+        console.log('');
+        console.log(divider());
+        console.log(c.dim(`  Session saved: ${session.id}`));
+        console.log(formatStatus(model, taskCount, totalTokens, isSandboxed()));
+        console.log(c.dim('  Goodbye!'));
+        console.log('');
         rl.close();
         process.exit(0);
       }
       if (input === '/help') {
-        console.log(`
-  \x1b[1mDeyad CLI Commands:\x1b[0m
-    /model <name>    Switch Ollama model
-    /models          List available models
-    /clear           Clear conversation history
-    /status          Show session stats
-    /compact         Force conversation compaction
-    /undo            Undo last agent task (git rollback)
-    /snapshots       List available undo points
-    /sandbox start   Enter sandbox mode (temp git branch)
-    /sandbox merge   Merge sandbox changes back
-    /sandbox discard Discard sandbox changes
-    /sessions        List saved sessions
-    /memory          List persistent memory notes
-    exit             Quit
-  
-  \x1b[1mProject Instructions:\x1b[0m
-    Create a DEYAD.md file in your project root with instructions
-    that Deyad will follow for every task.
-`);
+        console.log(formatHelp());
         ask();
         return;
       }
       if (input === '/clear') {
         history = [];
-        console.log('History cleared.');
+        console.log(formatSuccess('History cleared.'));
         ask();
         return;
       }
       if (input === '/status') {
-        console.log(`Model: ${model}`);
-        console.log(`Tasks completed: ${taskCount}`);
-        console.log(`Tokens used: ~${totalTokens.toLocaleString()}`);
-        console.log(`History messages: ${history.length}`);
+        console.log('');
+        console.log(formatStatus(model, taskCount, totalTokens, isSandboxed()));
+        console.log(c.dim(`  history: ${history.length} messages · session: ${session.id}`));
+        console.log('');
         ask();
         return;
       }
       if (input === '/models') {
-        console.log(`Available models: ${models.join(', ')}`);
-        console.log(`Current: ${model}`);
+        console.log('');
+        console.log(`  ${c.bold('Models')}`);
+        models.forEach((m) => {
+          const marker = m === model ? c.green('● ') : c.dim('○ ');
+          console.log(`  ${marker}${m === model ? c.yellow(m) : m}`);
+        });
+        console.log('');
         ask();
         return;
       }
       if (input === '/compact') {
         const before = history.length;
-        // Trigger compaction by shortening history
         if (history.length > 10) {
           const keep = history.slice(-10);
           history = [{ role: 'system' as const, content: `[Earlier conversation compacted — ${before - 10} messages summarized]` }, ...keep];
         }
-        console.log(`Compacted: ${before} → ${history.length} messages`);
+        console.log(formatSuccess(`Compacted: ${before} → ${history.length} messages`));
         ask();
         return;
       }
@@ -295,9 +323,9 @@ async function main(): Promise<void> {
         const newModel = input.slice(7).trim();
         if (models.includes(newModel)) {
           model = newModel;
-          console.log(`Switched to model: ${model}`);
+          console.log(formatSuccess(`Switched to model: ${c.yellow(model)}`));
         } else {
-          console.log(`Model not found. Available: ${models.join(', ')}`);
+          console.log(formatError(`Model "${newModel}" not found. Available: ${models.join(', ')}`));
         }
         ask();
         return;
@@ -306,18 +334,21 @@ async function main(): Promise<void> {
       // ── Undo commands ──
       if (input === '/undo') {
         const result = undoLast(cwd);
-        console.log(result.success ? `\x1b[32m${result.message}\x1b[0m` : `\x1b[31m${result.message}\x1b[0m`);
+        console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
         ask();
         return;
       }
       if (input === '/snapshots') {
         const snaps = getSnapshots();
         if (snaps.length === 0) {
-          console.log('No snapshots yet. Snapshots are created before each task.');
+          console.log(c.dim('  No snapshots yet. Snapshots are created before each task.'));
         } else {
+          console.log('');
+          console.log(`  ${c.bold('Snapshots')}`);
           snaps.forEach((s, i) => {
-            console.log(`  ${i + 1}. ${s.ref.slice(0, 8)} — ${s.description} (${s.timestamp})`);
+            console.log(`  ${c.dim(String(i + 1) + '.')} ${c.cyan(s.ref.slice(0, 8))} ${c.dim('—')} ${s.description} ${c.dim(s.timestamp)}`);
           });
+          console.log('');
         }
         ask();
         return;
@@ -326,21 +357,21 @@ async function main(): Promise<void> {
       // ── Sandbox commands ──
       if (input === '/sandbox start' || input === '/sandbox') {
         const result = enterSandbox(cwd);
-        console.log(result.success ? `\x1b[32m${result.message}\x1b[0m` : `\x1b[31m${result.message}\x1b[0m`);
+        console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
         ask();
         return;
       }
       if (input === '/sandbox merge') {
         const result = exitSandbox(cwd, true);
-        if (result.diff) console.log(`\x1b[2m${result.diff}\x1b[0m`);
-        console.log(result.success ? `\x1b[32m${result.message}\x1b[0m` : `\x1b[31m${result.message}\x1b[0m`);
+        if (result.diff) console.log(c.dim(result.diff));
+        console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
         ask();
         return;
       }
       if (input === '/sandbox discard') {
         const result = exitSandbox(cwd, false);
-        if (result.diff) console.log(`\x1b[2m${result.diff}\x1b[0m`);
-        console.log(result.success ? `\x1b[32m${result.message}\x1b[0m` : `\x1b[31m${result.message}\x1b[0m`);
+        if (result.diff) console.log(c.dim(result.diff));
+        console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
         ask();
         return;
       }
@@ -350,11 +381,14 @@ async function main(): Promise<void> {
         const { listSessions } = await import('./session.js');
         const sessions = listSessions();
         if (sessions.length === 0) {
-          console.log('No saved sessions.');
+          console.log(c.dim('  No saved sessions.'));
         } else {
+          console.log('');
+          console.log(`  ${c.bold('Sessions')}`);
           sessions.slice(0, 10).forEach((s) => {
-            console.log(`  ${s.id} — ${s.cwd} (${s.taskCount} tasks, ${s.updatedAt})`);
+            console.log(`  ${c.cyan(s.id)} ${c.dim('—')} ${s.cwd} ${c.dim(`(${s.taskCount} tasks, ${s.updatedAt})`)}`);
           });
+          console.log('');
         }
         ask();
         return;
@@ -362,11 +396,14 @@ async function main(): Promise<void> {
       if (input === '/memory') {
         const entries = memoryList();
         if (entries.length === 0) {
-          console.log('No memory entries. The agent can store notes with memory_write.');
+          console.log(c.dim('  No memory entries. The agent can store notes with memory_write.'));
         } else {
+          console.log('');
+          console.log(`  ${c.bold('Memory')}`);
           entries.forEach((e) => {
-            console.log(`  \x1b[1m${e.key}\x1b[0m: ${e.value.slice(0, 80)}${e.value.length > 80 ? '…' : ''}`);
+            console.log(`  ${c.cyan(e.key)} ${c.dim('—')} ${e.value.slice(0, 80)}${e.value.length > 80 ? '…' : ''}`);
           });
+          console.log('');
         }
         ask();
         return;
@@ -378,23 +415,20 @@ async function main(): Promise<void> {
       const callbacks: AgentCallbacks = {
         onToken: (t) => process.stdout.write(t),
         onToolStart: (name, params) => {
-          const paramStr = Object.entries(params).map(([k, v]) => `${k}=${v.length > 60 ? v.slice(0, 60) + '…' : v}`).join(' ');
-          console.log(`\n  \x1b[36m⚡ ${name}\x1b[0m ${paramStr ? '\x1b[2m' + paramStr + '\x1b[0m' : ''}`);
+          console.log('');
+          console.log(formatToolStart(name, params));
         },
         onToolResult: (r) => {
-          const tag = r.success ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m';
-          const preview = r.output.split('\n')[0]?.slice(0, 120) || '';
-          console.log(`  ${tag} ${r.tool}${preview ? ': ' + preview : ''}`);
+          console.log(formatToolEnd(r.tool, r.success, r.output));
         },
-        onDiff: (_path, diff) => {
-          const lines = diff.split('\n').slice(0, 15);
-          console.log(`\x1b[33m${lines.join('\n')}\x1b[0m${diff.split('\n').length > 15 ? '\n  ... (diff truncated)' : ''}`);
+        onDiff: (path, diff) => {
+          console.log(formatDiff(path, diff));
         },
         onDone: () => { console.log(''); },
-        onError: (e) => console.error(`\x1b[31mError: ${e}\x1b[0m`),
+        onError: (e) => console.error(formatError(String(e))),
         confirm: async (question) => {
           return new Promise((resolve) => {
-            rl.question(`\x1b[33m${question}\x1b[0m (y/n) `, (answer) => {
+            rl.question(formatConfirm(question), (answer) => {
               resolve(answer.trim().toLowerCase().startsWith('y'));
             });
           });
@@ -406,7 +440,7 @@ async function main(): Promise<void> {
         history = result.history;
         totalTokens += result.stats.totalTokens;
         taskCount++;
-        console.log(`\x1b[2m  [~${result.stats.totalTokens.toLocaleString()} tokens]\x1b[0m`);
+        console.log(formatTokenBadge(result.stats.totalTokens));
 
         // Auto-save session after each task
         session.history = history;
@@ -415,7 +449,7 @@ async function main(): Promise<void> {
         session.model = model;
         saveSession(session);
       } catch (err) {
-        console.error(`\x1b[31m${String(err)}\x1b[0m`);
+        console.error(formatError(String(err)));
       }
       ask();
     });
