@@ -523,6 +523,7 @@ async function runOnce(
   let currentLine = '';
   let inToolBlock = false;
   let inThinkBlock = false;
+  let printedVisible = false;
 
   // Build the user message with optional images
   const userMsg: OllamaMessage = { role: 'user', content: message };
@@ -561,6 +562,7 @@ async function runOnce(
       if (currentLine.includes('<done')) { inToolBlock = true; }
       if (!inToolBlock && !inThinkBlock) {
         process.stdout.write(token);
+        if (token.trim()) printedVisible = true;
       }
       if (currentLine.includes('</tool_call>')) {
         inToolBlock = false;
@@ -577,7 +579,11 @@ async function runOnce(
     onDiff: (filePath, diff) => {
       console.log(formatDiff(filePath, diff));
     },
-    onDone: (_summary) => {
+    onDone: (summary) => {
+      if (!printedVisible && summary.trim()) {
+        process.stdout.write(summary.trim());
+        process.stdout.write('\n');
+      }
       if (headless) {
         console.log(''); // newline after streamed output
       } else {
