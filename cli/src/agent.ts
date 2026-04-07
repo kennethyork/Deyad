@@ -86,6 +86,7 @@ WORKFLOW:
 
 RULES:
 - ALWAYS follow the user's instructions and constraints exactly. If the user says "only modify X", or any other constraint, obey it literally.
+- NEVER just describe what you would do — actually DO it by calling tools. If the user asks you to run something, use run_command immediately. If they ask to create a file, use write_files immediately. Do not respond with "I'll do X" and then stop — call the tool in the same response.
 - Only modify files and components that are directly relevant to the user's request. Do NOT change unrelated code unless explicitly asked.
 - Always explore the project structure before making changes.
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
@@ -97,6 +98,7 @@ RULES:
 - Use memory_read at the start to check for project conventions in DEYAD.md.
 - Use memory_write to save important project notes and conventions.
 - When the user asks for any git operation, use the dedicated git_* tools directly — do NOT use run_command with git.
+- Do NOT output <done/> until you have actually performed the task with tools. Planning or describing is not completing.
 
 SELF-REVIEW — After writing code, verify these before outputting <done/>:
 - Array/list lengths match their declared count.
@@ -198,6 +200,7 @@ export async function runAgentLoop(
     ];
 
     // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
+    let iteration = 0;
     while (!abortController.signal.aborted) {
       compactConversation(messages);
 
@@ -222,6 +225,16 @@ export async function runAgentLoop(
       const toolCalls = parseToolCalls(turnResponse);
 
       if (toolCalls.length === 0 || isDone(turnResponse)) {
+        // Nudge: if this is the first turn and the response looks like a plan
+        // rather than a final answer, push the model to actually use tools.
+        const stripped = stripToolMarkup(turnResponse).trim();
+        const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to)\b/i.test(stripped);
+        if (iteration === 0 && looksLikePlan && stripped.length < 300) {
+          messages.push({ role: 'assistant', content: turnResponse });
+          messages.push({ role: 'user', content: 'You described what you would do but didn\'t actually do it. Please call the appropriate tools now to carry out the task. Do not just describe — act.' });
+          iteration++;
+          continue;
+        }
         const summary = stripToolMarkup(turnResponse);
         callbacks.onDone(summary);
         messages.push({ role: 'assistant', content: turnResponse });
@@ -566,6 +579,7 @@ export async function runAgentLoop(
       }
 
       messages.push({ role: 'user', content: resultsText + autoLintText + autoReviewText });
+      iteration++;
     }
 
     return { history: messages, changedFiles, stats };
