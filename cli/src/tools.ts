@@ -398,6 +398,111 @@ async function executeToolRaw(
         return { tool: call.name, success: true, output: 'Updated DEYAD.md', changedFiles: ['DEYAD.md'] };
       }
 
+      case 'web_search': {
+        const query = call.params.query;
+        if (!query) return { tool: call.name, success: false, output: 'Missing "query" parameter.' };
+        try {
+          const encoded = encodeURIComponent(query);
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15_000);
+          // Use DuckDuckGo HTML search (no API key, privacy-respecting)
+          const resp = await fetch(`https://html.duckduckgo.com/html/?q=${encoded}`, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Deyad-CLI/1.0',
+              'Accept': 'text/html',
+            },
+          });
+          clearTimeout(timeout);
+          const html = await resp.text();
+          // Parse search results from DuckDuckGo HTML
+          const results: string[] = [];
+          const resultPattern = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+          let match: RegExpExecArray | null;
+          while ((match = resultPattern.exec(html)) !== null && results.length < 8) {
+            const url = match[1].replace(/&amp;/g, '&');
+            const title = match[2].replace(/<[^>]+>/g, '').trim();
+            const snippet = match[3].replace(/<[^>]+>/g, '').trim();
+            if (title && url) {
+              results.push(`${title}\n  ${url}\n  ${snippet}`);
+            }
+          }
+          // Fallback: try simpler pattern if the above didn't match
+          if (results.length === 0) {
+            const linkPattern = /<a[^>]+class="result__a"[^>]*>([\s\S]*?)<\/a>/gi;
+            while ((match = linkPattern.exec(html)) !== null && results.length < 8) {
+              const text = match[1].replace(/<[^>]+>/g, '').trim();
+              if (text) results.push(text);
+            }
+          }
+          if (results.length === 0) {
+            // Final fallback: extract any useful text
+            const stripped = html
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            const truncated = stripped.length > 3000 ? stripped.slice(0, 3000) + '...' : stripped;
+            return { tool: call.name, success: true, output: `Search results for "${query}":\n${truncated}` };
+          }
+          return { tool: call.name, success: true, output: `Search results for "${query}":\n\n${results.join('\n\n')}` };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: `Search failed: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+
+      case 'analyze_image': {
+        const imagePath = call.params.path;
+        const question = call.params.question || 'Describe this image in detail. What do you see?';
+        if (!imagePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
+        const absPath = path.resolve(cwd, imagePath);
+        if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
+        if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${imagePath}` };
+        const ext = path.extname(imagePath).toLowerCase();
+        const imageExts = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']);
+        if (!imageExts.has(ext)) return { tool: call.name, success: false, output: `Not an image file: ${imagePath}. Supported: png, jpg, jpeg, gif, webp, bmp` };
+        // Read image and convert to base64
+        const imageBuffer = fs.readFileSync(absPath);
+        const base64 = imageBuffer.toString('base64');
+        // Check file size (limit to 10MB)
+        if (imageBuffer.length > 10 * 1024 * 1024) {
+          return { tool: call.name, success: false, output: 'Image too large (max 10MB).' };
+        }
+        try {
+          const baseUrl = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
+          // Find a vision model — try common vision model names
+          const modelsResp = await fetch(`${baseUrl}/api/tags`);
+          const modelsData = await modelsResp.json() as { models?: Array<{ name: string }> };
+          const allModels = (modelsData.models || []).map(m => m.name);
+          const visionPatterns = [/llava/i, /vision/i, /vl/i, /bakllava/i, /moondream/i, /minicpm.*v/i];
+          let visionModel = allModels.find(m => visionPatterns.some(p => p.test(m)));
+          if (!visionModel) {
+            return { tool: call.name, success: false, output: `No vision model found in Ollama. Install one with: ollama pull qwen2.5-vl:7b\nAvailable models: ${allModels.join(', ')}` };
+          }
+          // Send image to vision model via Ollama API
+          const chatResp = await fetch(`${baseUrl}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: visionModel,
+              messages: [{ role: 'user', content: question, images: [base64] }],
+              stream: false,
+            }),
+            signal: AbortSignal.timeout(60_000),
+          });
+          if (!chatResp.ok) {
+            const errText = await chatResp.text().catch(() => '');
+            return { tool: call.name, success: false, output: `Vision model error: ${chatResp.status} ${errText}` };
+          }
+          const chatData = await chatResp.json() as { message?: { content?: string } };
+          const analysis = chatData.message?.content || '(no response from vision model)';
+          return { tool: call.name, success: true, output: `[${visionModel}] ${analysis}` };
+        } catch (err: unknown) {
+          return { tool: call.name, success: false, output: `Image analysis failed: ${err instanceof Error ? err.message : String(err)}` };
+        }
+      }
+
       case 'git_status': return await runCommand('git status --short', cwd);
 
       case 'git_commit': {
@@ -709,6 +814,16 @@ Available tools:
 
 24. **git_remote_set** — Set the remote origin URL.
     <param name="url">https://github.com/user/repo.git</param>
+
+25. **web_search** — Search the web using DuckDuckGo (no API key needed).
+    <param name="query">how to implement OAuth2 in Express</param>
+    Returns top search results with titles, URLs, and snippets.
+
+26. **analyze_image** — Analyze an image file using an Ollama vision model (e.g. qwen2.5-vl, llava).
+    <param name="path">screenshot.png</param>
+    <param name="question">What UI elements are shown? Are there any layout issues?</param>
+    The question param is optional — defaults to a general description.
+    Requires a vision model installed in Ollama (e.g. ollama pull qwen2.5-vl:7b).
 
 When the user asks for any git operation (push, pull, commit, branch, status, log, remote, etc.), use the dedicated git_* tools directly — do NOT use run_command with git.
 
