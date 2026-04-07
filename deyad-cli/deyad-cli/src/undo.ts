@@ -35,28 +35,41 @@ function hasChanges(cwd: string): boolean {
 
 /**
  * Take a snapshot of the current state before the agent makes changes.
- * Uses a hidden commit on a temp tag to avoid polluting stash.
+ * Saves the current HEAD so we can reset back to it after the agent acts.
+ * If there are uncommitted changes, stashes them as a named stash entry.
  */
 export function createSnapshot(cwd: string, description: string): Snapshot | null {
   if (!isGitRepo(cwd)) return null;
 
   try {
-    // Stage everything and create a snapshot commit
+    const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+    let ref = head;
+    let type: Snapshot['type'] = 'commit';
+
+    // If there are uncommitted changes, create a stash entry to preserve them
     if (hasChanges(cwd)) {
-      execSync('git stash push -u -m "deyad-snapshot: ' + description.replace(/"/g, '\\"') + '"', {
-        cwd,
-        stdio: 'pipe',
-        encoding: 'utf-8',
-      });
-      // Immediately pop it back so user's working state is preserved
-      execSync('git stash pop', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+      const safeDesc = description.replace(/["\\`$]/g, '_');
+      try {
+        execSync(`git stash push -u -m "deyad-snapshot: ${safeDesc}"`, {
+          cwd,
+          stdio: 'pipe',
+          encoding: 'utf-8',
+        });
+        // Get the stash ref
+        ref = execSync('git stash list -1 --format=%H', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim() || head;
+        type = 'stash';
+        // Pop it back so working directory is unchanged
+        execSync('git stash pop', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+      } catch {
+        // If stash fails, fall back to HEAD ref
+        ref = head;
+        type = 'commit';
+      }
     }
 
-    // Get the current HEAD as a reference point
-    const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
     const snapshot: Snapshot = {
-      type: 'commit',
-      ref: head,
+      type,
+      ref: head, // Always use HEAD as the rollback target
       description,
       timestamp: new Date().toISOString(),
     };
@@ -81,7 +94,8 @@ export function createCheckpoint(cwd: string, message: string): string | null {
 
     // Stage all and create checkpoint
     execSync('git add -A', { cwd, stdio: 'pipe' });
-    execSync(`git commit --allow-empty -m "deyad-checkpoint: ${message.replace(/"/g, '\\"')}"`, {
+    const safeMsg = message.replace(/["\\`$]/g, '_');
+    execSync(`git commit --allow-empty -m "deyad-checkpoint: ${safeMsg}"`, {
       cwd,
       stdio: 'pipe',
       encoding: 'utf-8',
@@ -106,6 +120,8 @@ export function createCheckpoint(cwd: string, message: string): string | null {
  */
 export function rollbackTo(cwd: string, ref: string): boolean {
   if (!isGitRepo(cwd)) return false;
+  // Validate ref is a valid git hash (prevent command injection)
+  if (!/^[0-9a-f]{7,40}$/.test(ref)) return false;
 
   try {
     execSync(`git reset --hard ${ref}`, { cwd, stdio: 'pipe', encoding: 'utf-8' });

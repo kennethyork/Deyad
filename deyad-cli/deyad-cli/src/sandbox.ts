@@ -41,20 +41,35 @@ export function enterSandbox(cwd: string): { success: boolean; message: string }
 
   try {
     const originalBranch = getCurrentBranch(cwd);
+    if (!/^[\w./-]+$/.test(originalBranch)) {
+      return { success: false, message: 'Current branch name contains invalid characters.' };
+    }
     const timestamp = Date.now().toString(36);
     const sandboxBranch = `deyad-sandbox-${timestamp}`;
 
-    // Commit any pending changes first
+    // Stash any pending changes instead of committing them
+    let hadStash = false;
     try {
-      execSync('git add -A && git commit --allow-empty -m "deyad: pre-sandbox checkpoint"', {
-        cwd, stdio: 'pipe', encoding: 'utf-8', shell: '/bin/bash',
-      });
-    } catch { /* no changes to commit, that's fine */ }
+      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      if (status) {
+        execSync('git stash push -u -m "deyad: pre-sandbox stash"', {
+          cwd, stdio: 'pipe', encoding: 'utf-8',
+        });
+        hadStash = true;
+      }
+    } catch { /* no changes to stash, that's fine */ }
 
     const startRef = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
 
     // Create and switch to sandbox branch
     execSync(`git checkout -b ${sandboxBranch}`, { cwd, stdio: 'pipe' });
+
+    // Restore stashed changes in the sandbox
+    if (hadStash) {
+      try {
+        execSync('git stash pop', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+      } catch { /* conflicts possible, leave in working dir */ }
+    }
 
     sandbox = { active: true, originalBranch, sandboxBranch, startRef };
 
@@ -78,9 +93,13 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
   try {
     // Commit any remaining changes in sandbox
     try {
-      execSync('git add -A && git commit -m "deyad: sandbox final changes"', {
-        cwd, stdio: 'pipe', encoding: 'utf-8', shell: '/bin/bash',
-      });
+      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      if (status) {
+        execSync('git add -A', { cwd, stdio: 'pipe' });
+        execSync('git commit -m "deyad: sandbox final changes"', {
+          cwd, stdio: 'pipe', encoding: 'utf-8',
+        });
+      }
     } catch { /* nothing to commit */ }
 
     // Get diff summary
@@ -88,23 +107,22 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
       cwd, encoding: 'utf-8', stdio: 'pipe',
     });
 
+    const savedSandbox = { ...sandbox };
+    sandbox = null; // Clear state early to avoid stuck sandbox on error
+
     if (merge) {
       // Switch back to original branch and merge
-      execSync(`git checkout ${sandbox.originalBranch}`, { cwd, stdio: 'pipe' });
-      execSync(`git merge ${sandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
-      execSync(`git branch -d ${sandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
+      execSync(`git merge ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      execSync(`git branch -d ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
 
-      const msg = `Merged sandbox changes into ${sandbox.originalBranch}`;
-      sandbox = null;
-      return { success: true, message: msg, diff };
+      return { success: true, message: `Merged sandbox changes into ${savedSandbox.originalBranch}`, diff };
     } else {
       // Switch back and discard sandbox
-      execSync(`git checkout ${sandbox.originalBranch}`, { cwd, stdio: 'pipe' });
-      execSync(`git branch -D ${sandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
+      execSync(`git branch -D ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
 
-      const msg = `Discarded sandbox. Back on ${sandbox.originalBranch}`;
-      sandbox = null;
-      return { success: true, message: msg, diff };
+      return { success: true, message: `Discarded sandbox. Back on ${savedSandbox.originalBranch}`, diff };
     }
   } catch (err) {
     return { success: false, message: `Sandbox exit failed: ${String(err)}` };

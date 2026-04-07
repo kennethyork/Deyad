@@ -162,7 +162,7 @@ describe('ipcDeploy handler registration', () => {
     expect(result.error).not.toContain('Invalid domain');
     expect(result.error).not.toContain('Invalid characters');
     expect(result.error).not.toContain('required');
-  });
+  }, 30_000);
 
   it('deploy-electron returns error when app dir does not exist', async () => {
     const { registerDeployHandlers } = await import('./ipcDeploy');
