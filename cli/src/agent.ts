@@ -12,6 +12,10 @@ import * as path from 'node:path';
 import { execSync } from 'node:child_process';
 const MAX_CONVERSATION_CHARS = 128_000;
 
+function isActionableRequest(message: string): boolean {
+  return /\b(create|write|edit|delete|install|run|execute|build|test|compile|deploy|generate|fix|update|add|remove|launch|open|serve|start|configure)\b/i.test(message);
+}
+
 export interface TokenStats {
   promptTokens: number;
   completionTokens: number;
@@ -77,6 +81,8 @@ You work directly in the user's project directory: ${cwd}
 
 ${TOOLS_DESCRIPTION}${mcpToolsDesc}
 
+IMPORTANT: For any request that modifies the project, runs a command, or performs a task, reply with tool_call XML only. Do not reply with prose descriptions when action is required. Only use plain language for general chat or final summaries after tools have executed.
+
 WORKFLOW:
 1. First, understand the request and explore the current project (list_files, read_file).
 2. Plan your approach briefly in prose.
@@ -87,7 +93,7 @@ WORKFLOW:
 RULES:
 - ALWAYS follow the user's instructions and constraints exactly. If the user says "only modify X", or any other constraint, obey it literally.
 - NEVER just describe what you would do — actually DO it by calling tools. If the user asks you to run something, use run_command immediately. If they ask to create a file, use write_files immediately. Do not respond with "I'll do X" and then stop — call the tool in the same response.
-- If the user asks you to execute or run a command, your next response MUST be a <tool_call> for run_command only. Do not output plain English instead of the tool call.
+- If the request is actionable (creates files, edits code, runs commands, installs packages, builds/tests/deploys, or changes project state), your response must contain tool_call XML only. Do not output plain English instead of the tool call.
 - Only modify files and components that are directly relevant to the user's request. Do NOT change unrelated code unless explicitly asked.
 - Always explore the project structure before making changes.
 - Prefer edit_file for small, targeted changes. Use write_files only for new files or complete rewrites.
@@ -224,17 +230,23 @@ export async function runAgentLoop(
 
       // Parse tool calls
       const toolCalls = parseToolCalls(turnResponse);
+      const actionable = isActionableRequest(userMessage);
 
-      if (toolCalls.length === 0 || isDone(turnResponse)) {
+      if (isDone(turnResponse)) {
+        const summary = stripToolMarkup(turnResponse);
+        callbacks.onDone(summary);
+        messages.push({ role: 'assistant', content: turnResponse });
+        return { history: messages, changedFiles, stats };
+      }
+
+      if (toolCalls.length === 0) {
         // Nudge: if the assistant is describing actions instead of performing them,
         // require tool usage before finishing. Allow a second retry if needed.
         const stripped = stripToolMarkup(turnResponse).trim();
         const looksLikePlan = /\b(I'll|I will|Let me|I can|I'm going to|I'll run|I will run|Let's run|Let's start|Running|Starting)\b/i.test(stripped);
-        const originalUserRequest = userMessage;
-        const isExecutionRequest = /\b(run|execute|start|launch|open|build|test|deploy|compile|install|create|write|append|make)\b/i.test(originalUserRequest);
-        if (iteration < 3 && (looksLikePlan || isExecutionRequest) && stripped.length < 500) {
+        if (actionable && iteration < 3 && (looksLikePlan || stripped.length < 500)) {
           messages.push({ role: 'assistant', content: turnResponse });
-          messages.push({ role: 'user', content: 'This is not enough. You must now call a tool instead of describing what you would do. Use run_command with the exact shell command. Example: <tool_call><name>run_command</name><param name="command">npm run dev</param></tool_call>. Do not respond with prose.' });
+          messages.push({ role: 'user', content: 'This reply did not use any tools, but the request requires action. Respond with tool_call XML only — no prose descriptions. For shell tasks use run_command, for files use write_files/edit_file/multi_edit, for reading/search use read_file/search_files. If you are done after tools, you may return <done/>.' });
           iteration++;
           continue;
         }
