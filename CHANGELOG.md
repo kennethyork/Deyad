@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-04-08
+
+### Added
+
+- **CLI**: `compaction.ts` module — conversation compaction extracted for testability
+- **CLI**: `git-utils.ts` module — shared git helpers (DRY across sandbox + undo)
+- **CLI**: 26 new tests: git-utils (8), compaction (5), undo snapshot/checkpoint (8), session persistence (5)
+- **CLI**: 133 total tests across 10 files (up from 107 across 8)
+
+### Changed
+
+- **CLI**: agent.ts decomposed — extracted compaction.ts and git-utils.ts (505 → 465 LOC)
+- **CLI**: Coverage thresholds raised: statements 55→63%, branches 65→70%, functions 65→80%, lines 55→63%
+- **Desktop**: Coverage thresholds raised: statements 65→67%, branches 60→74%, functions 45→47%, lines 65→67%
+- **Desktop**: ChatPanel decomposed into ChatHeader + ErrorBanners sub-components
+- **Desktop**: EditorPanel decomposed — FileTreeComponents extracted
+- **Desktop**: WCAG accessibility: focus-visible outlines, high-contrast mode, reduced-motion, aria-labels
+- **Desktop**: CSP header enforcement via session.webRequest.onHeadersReceived
+- **Desktop**: CSP unsafe-eval documented in SECURITY.md (required by Monaco Editor)
+
+### Fixed
+
+- CLI markdown lint warnings: code fence languages, blank lines around headings, table column spacing
+
 ## [1.4.36] — 2026-04-06
 
 ### Added
