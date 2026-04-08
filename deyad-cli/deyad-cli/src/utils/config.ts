@@ -426,11 +426,23 @@ export const saveConfig = (
   }
 
   const ext = extname(targetPath).toLowerCase();
-  // Create the config object to save
+  // Create the config object to save - persist all relevant fields
   const configToSave: StoredConfig = {
     model: config.model,
     approvalMode: config.approvalMode,
+    baseURL: config.baseURL,
+    provider: config.provider,
+    fullAutoErrorMode: config.fullAutoErrorMode,
+    memory: config.memory,
   };
+  
+  // Only include non-undefined values
+  Object.keys(configToSave).forEach((key) => {
+    if (configToSave[key as keyof StoredConfig] === undefined) {
+      delete configToSave[key as keyof StoredConfig];
+    }
+  });
+  
   if (ext === ".yaml" || ext === ".yml") {
     writeFileSync(targetPath, dumpYaml(configToSave), "utf-8");
   } else {

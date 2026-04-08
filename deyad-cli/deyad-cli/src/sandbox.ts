@@ -90,6 +90,8 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
     return { success: false, message: 'Not in sandbox mode.' };
   }
 
+  const savedSandbox = { ...sandbox };
+  
   try {
     // Commit any remaining changes in sandbox
     try {
@@ -103,12 +105,11 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
     } catch { /* nothing to commit */ }
 
     // Get diff summary
-    const diff = execSync(`git diff ${sandbox.startRef}..HEAD --stat`, {
+    const diff = execSync(`git diff ${savedSandbox.startRef}..HEAD --stat`, {
       cwd, encoding: 'utf-8', stdio: 'pipe',
     });
 
-    const savedSandbox = { ...sandbox };
-    sandbox = null; // Clear state early to avoid stuck sandbox on error
+    let result: { success: boolean; message: string; diff?: string };
 
     if (merge) {
       // Switch back to original branch and merge
@@ -116,15 +117,20 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
       execSync(`git merge ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
       execSync(`git branch -d ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
 
-      return { success: true, message: `Merged sandbox changes into ${savedSandbox.originalBranch}`, diff };
+      result = { success: true, message: `Merged sandbox changes into ${savedSandbox.originalBranch}`, diff };
     } else {
       // Switch back and discard sandbox
       execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
       execSync(`git branch -D ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
 
-      return { success: true, message: `Discarded sandbox. Back on ${savedSandbox.originalBranch}`, diff };
+      result = { success: true, message: `Discarded sandbox. Back on ${savedSandbox.originalBranch}`, diff };
     }
+
+    // Only clear state after all git operations succeed
+    sandbox = null;
+    return result;
   } catch (err) {
+    // Don't clear state on error - allows retry
     return { success: false, message: `Sandbox exit failed: ${String(err)}` };
   }
 }

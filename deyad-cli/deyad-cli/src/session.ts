@@ -144,12 +144,14 @@ export function memoryRead(key: string): string | null {
 
 export function memoryWrite(key: string, value: string): void {
   ensureDir(MEMORY_DIR);
-  const filePath = path.join(MEMORY_DIR, `${sanitizeKey(key)}.json`);
+  const sanitizedKey = sanitizeKey(key);
+  const filePath = path.join(MEMORY_DIR, `${sanitizedKey}.json`);
   const existing = memoryRead(key);
+  
   const entry: MemoryEntry = {
     key,
     value,
-    createdAt: existing ? (JSON.parse(fs.readFileSync(filePath, 'utf-8')) as MemoryEntry).createdAt : new Date().toISOString(),
+    createdAt: existing ? new Date().toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(filePath, JSON.stringify(entry, null, 2), 'utf-8');

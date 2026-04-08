@@ -60,10 +60,10 @@ test("loads default config if files don't exist", () => {
     forceApiKeyForTest: "test-api-key",
   });
   expect(config).toEqual({
-    model: "o4-mini",
-    baseURL: "https://api.openai.com/v1",
+    model: "llama2",
+    baseURL: "http://localhost:11434/v1",
     instructions: "",
-    provider: "openai",
+    provider: "ollama",
     apiKey: "test-api-key",
   });
 });
@@ -73,8 +73,8 @@ test("saves and loads config correctly", () => {
     model: "test-model",
     instructions: "test instructions",
     apiKey: "test-api-key",
-    provider: "openai",
-    baseURL: "https://api.openai.com/v1",
+    provider: "ollama",
+    baseURL: "http://localhost:11434/v1",
   };
   saveConfig(testConfig, testConfigPath, testInstructionsPath);
 
@@ -86,7 +86,10 @@ test("saves and loads config correctly", () => {
     disableProjectDoc: true,
     forceApiKeyForTest: "test-api-key",
   });
-  expect(loadedConfig).toEqual(testConfig);
+  expect(loadedConfig).toEqual({
+    ...testConfig,
+    approvalMode: undefined, // saveConfig doesn't save approvalMode by default
+  });
 });
 
 test("loads user instructions + project doc when codex.md is present", () => {
