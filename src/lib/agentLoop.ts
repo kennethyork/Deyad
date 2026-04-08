@@ -16,10 +16,49 @@ import { embedChunks } from './codebaseIndexer';
 /** Approximate character budget for the full conversation (≈ 32k tokens at ~4 chars/token). */
 const MAX_CONVERSATION_CHARS = 128_000;
 
+/** Minimum messages to always keep regardless of budget. */
+const MIN_KEEP = 4;
+
+/**
+ * Score a message's importance for retention during compaction.
+ * Higher scores → more likely to survive compaction.
+ */
+function messageImportance(msg: { role: string; content: string }): number {
+  // User messages with real questions are high-value
+  if (msg.role === 'user' && !msg.content.startsWith('<tool_result>')) {
+    // Longer user messages (actual questions/instructions) are more important
+    return 10 + Math.min(msg.content.length / 100, 5);
+  }
+
+  // Tool results that wrote/edited files are high-value (evidence of changes)
+  if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
+    if (/write_files|edit_file|multi_edit|delete_file|run_command/.test(msg.content)) return 8;
+    // Read-only tool results are low-value (can be re-read)
+    if (/read_file|list_files|search_files|glob_files|git_status|git_log/.test(msg.content)) return 2;
+    return 4;
+  }
+
+  // Assistant messages with tool calls are medium-high (show intent)
+  if (msg.role === 'assistant') {
+    const hasToolCalls = /<tool_call>/.test(msg.content) || (msg as Record<string, unknown>).tool_calls;
+    const prose = stripToolMarkup(msg.content).trim();
+    // Agent explanation + tool calls = high value
+    if (hasToolCalls && prose.length > 50) return 9;
+    // Agent tool calls only = medium
+    if (hasToolCalls) return 6;
+    // Agent prose (progress updates, explanations) = medium
+    if (prose.length > 100) return 7;
+    // Short ack messages = low
+    return 3;
+  }
+
+  return 5; // default
+}
+
 /**
  * Compact the conversation when it exceeds the character budget.
- * Keeps system messages and the most recent turns, summarizing
- * older assistant+tool_result pairs into a single summary message.
+ * Uses importance-weighted retention: high-importance messages survive
+ * longer than low-importance ones (e.g. read-only tool results).
  */
 function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
@@ -33,22 +72,47 @@ function compactConversation(
     firstNonSystem++;
   }
 
-  // Keep at least the last 6 non-system messages
-  const keepRecent = 6;
-  const nonSystemCount = messages.length - firstNonSystem;
-  if (nonSystemCount <= keepRecent) return; // nothing to compact
+  const nonSystem = messages.slice(firstNonSystem);
+  if (nonSystem.length <= MIN_KEEP) return;
 
-  const compactEnd = messages.length - keepRecent;
-  const toSummarize = messages.slice(firstNonSystem, compactEnd);
+  // Score each non-system message by importance
+  const scored = nonSystem.map((msg, idx) => ({
+    msg,
+    idx: firstNonSystem + idx,
+    importance: messageImportance(msg),
+    // Recency boost: more recent messages get a bonus (0-5 points)
+    recencyBoost: (idx / nonSystem.length) * 5,
+  }));
 
-  // Build a brief summary of the compacted turns
+  // Sort by combined score (importance + recency), lowest first
+  const sortedByScore = [...scored].sort(
+    (a, b) => (a.importance + a.recencyBoost) - (b.importance + b.recencyBoost),
+  );
+
+  // Remove lowest-scored messages until we're under budget, keeping at least MIN_KEEP
+  const toRemoveIndices = new Set<number>();
+  let currentChars = totalChars;
+  const maxRemovable = nonSystem.length - MIN_KEEP;
+
+  for (const item of sortedByScore) {
+    if (currentChars <= MAX_CONVERSATION_CHARS || toRemoveIndices.size >= maxRemovable) break;
+    toRemoveIndices.add(item.idx);
+    currentChars -= item.msg.content.length;
+  }
+
+  if (toRemoveIndices.size === 0) return;
+
+  // Build summary of removed messages
+  const removed = scored
+    .filter((s) => toRemoveIndices.has(s.idx))
+    .sort((a, b) => a.idx - b.idx);
+
   const summaryParts: string[] = [];
-  for (const msg of toSummarize) {
+  for (const { msg } of removed) {
     if (msg.role === 'assistant') {
       const prose = stripToolMarkup(msg.content).slice(0, 200);
       if (prose) summaryParts.push(`Agent: ${prose}`);
     } else if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
-      // Tool results — just note tools used
       const toolNames = [...msg.content.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1]);
       if (toolNames.length) summaryParts.push(`Tools executed: ${toolNames.join(', ')}`);
     } else if (msg.role === 'user') {
@@ -56,10 +120,16 @@ function compactConversation(
     }
   }
 
-  const summary = `[Earlier conversation compacted]\n${summaryParts.join('\n')}`;
+  const summary = `[Earlier conversation compacted — ${removed.length} messages summarized]\n${summaryParts.join('\n')}`;
 
-  // Splice: remove the old messages and insert the summary
-  messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
+  // Remove compacted messages (iterate in reverse to preserve indices)
+  const sortedIndices = [...toRemoveIndices].sort((a, b) => b - a);
+  for (const idx of sortedIndices) {
+    messages.splice(idx, 1);
+  }
+
+  // Insert summary after system messages
+  messages.splice(firstNonSystem, 0, {
     role: 'system' as const,
     content: summary,
   });

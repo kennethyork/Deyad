@@ -43,13 +43,30 @@ class TaskQueue {
 
   constructor() {
     this.load();
-    // Auto-start if there are queued tasks (e.g. after app restart)
-    const hasQueued = this.queue.some((t) => t.status === 'queued');
     // Reset any tasks that were "running" (interrupted by restart) back to queued
     for (const t of this.queue) {
       if (t.status === 'running') t.status = 'queued';
     }
-    if (hasQueued) this.processNext();
+    // Defer auto-resume until the Electron bridge is ready (window.deyad)
+    // On fresh load, processNext() needs window.deyad.readFiles which isn't
+    // available until the preload bridge mounts.
+    const hasQueued = this.queue.some((t) => t.status === 'queued');
+    if (hasQueued) {
+      const tryResume = () => {
+        if (typeof window !== 'undefined' && window.deyad) {
+          this.processNext();
+        } else {
+          setTimeout(tryResume, 500);
+        }
+      };
+      // Use requestIdleCallback if available, otherwise setTimeout
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => tryResume());
+      } else {
+        setTimeout(tryResume, 500);
+      }
+    }
+    this.save();
   }
 
   /** Subscribe to queue changes. Returns unsubscribe function. */

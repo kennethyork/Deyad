@@ -50,10 +50,30 @@ export interface StreamChatResult {
   usage: OllamaUsage;
 }
 
-export const CHARS_PER_TOKEN = 4.0;
+export const DEFAULT_CHARS_PER_TOKEN = 3.5;
+
+/**
+ * Adaptive chars-per-token ratio that learns from actual Ollama usage data.
+ * Starts at 3.5 (good default for English + code), adjusts as real data comes in.
+ */
+let calibratedRatio = DEFAULT_CHARS_PER_TOKEN;
+let calibrationSamples = 0;
+const MAX_CALIBRATION_SAMPLES = 20; // running average window
 
 export function estimateTokens(chars: number): number {
-  return Math.round(chars / CHARS_PER_TOKEN);
+  return Math.round(chars / calibratedRatio);
+}
+
+/** Update the adaptive ratio with actual Ollama token counts. */
+function calibrateTokenRatio(actualTokens: number, charCount: number): void {
+  if (actualTokens <= 0 || charCount <= 0) return;
+  const actualRatio = charCount / actualTokens;
+  // Clamp to reasonable range (1.5 – 8.0 chars/token)
+  if (actualRatio < 1.5 || actualRatio > 8.0) return;
+  calibrationSamples = Math.min(calibrationSamples + 1, MAX_CALIBRATION_SAMPLES);
+  // Exponential moving average: weight new data more when we have few samples
+  const alpha = 1 / calibrationSamples;
+  calibratedRatio = calibratedRatio * (1 - alpha) + actualRatio * alpha;
 }
 
 export async function streamChat(
@@ -167,6 +187,15 @@ export async function streamChat(
   }
   if (usage.completionTokens === 0) {
     usage.completionTokens = estimateTokens(full.length + thinking.length);
+  }
+
+  // Calibrate the adaptive ratio from actual Ollama token counts
+  if (usage.promptTokens > 0) {
+    const promptChars = messages.reduce((s, m) => s + m.content.length, 0);
+    calibrateTokenRatio(usage.promptTokens, promptChars);
+  }
+  if (usage.completionTokens > 0) {
+    calibrateTokenRatio(usage.completionTokens, full.length + thinking.length);
   }
 
   return { content: full, thinking, toolCalls, usage };

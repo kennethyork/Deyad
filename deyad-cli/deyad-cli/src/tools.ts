@@ -265,18 +265,37 @@ export async function executeTool(
           const ok = await cb.confirm(`Write ${paths.length} file(s): ${paths.join(', ')}?`);
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
         }
-        for (const [rel, content] of Object.entries(fileMap)) {
-          const absPath = path.resolve(cwd, rel);
-          if (!absPath.startsWith(resolvedCwd)) continue;
-          if (fs.existsSync(absPath) && cb?.onDiff) {
-            const oldContent = fs.readFileSync(absPath, 'utf-8');
-            cb.onDiff(rel, simpleDiff(oldContent, content, rel));
-          } else if (cb?.onDiff) {
-            cb.onDiff(rel, `+++ b/${rel} (new file, ${content.split('\n').length} lines)`);
+
+        // Stage all writes to temp files first for atomicity
+        const staged: Array<{ absPath: string; tmpPath: string; rel: string; content: string }> = [];
+        try {
+          for (const [rel, content] of Object.entries(fileMap)) {
+            const absPath = path.resolve(cwd, rel);
+            if (!absPath.startsWith(resolvedCwd)) continue;
+            if (fs.existsSync(absPath) && cb?.onDiff) {
+              const oldContent = fs.readFileSync(absPath, 'utf-8');
+              cb.onDiff(rel, simpleDiff(oldContent, content, rel));
+            } else if (cb?.onDiff) {
+              cb.onDiff(rel, `+++ b/${rel} (new file, ${content.split('\n').length} lines)`);
+            }
+            fs.mkdirSync(path.dirname(absPath), { recursive: true });
+            const tmpPath = absPath + '.deyad-tmp';
+            fs.writeFileSync(tmpPath, content, 'utf-8');
+            staged.push({ absPath, tmpPath, rel, content });
           }
-          fs.mkdirSync(path.dirname(absPath), { recursive: true });
-          fs.writeFileSync(absPath, content, 'utf-8');
+
+          // All temp writes succeeded — atomically rename all
+          for (const { absPath, tmpPath } of staged) {
+            fs.renameSync(tmpPath, absPath);
+          }
+        } catch (err) {
+          // Clean up any temp files on failure
+          for (const { tmpPath } of staged) {
+            try { fs.unlinkSync(tmpPath); } catch { /* already gone */ }
+          }
+          return { tool: call.name, success: false, output: `Atomic write failed: ${String(err)}` };
         }
+
         return { tool: call.name, success: true, output: `Wrote ${paths.length} file(s): ${paths.join(', ')}`, changedFiles: paths };
       }
       case 'edit_file': {
