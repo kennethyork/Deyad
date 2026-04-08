@@ -6,12 +6,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.*', 'src/utils/singlepass/**', 'src/cli.tsx', 'src/tui.ts'],
+      exclude: ['src/**/*.test.*', 'src/utils/singlepass/**', 'src/cli.ts', 'src/tui.ts', 'src/minimatch.d.ts'],
       thresholds: {
-        statements: 50,
-        branches: 60,
-        functions: 60,
-        lines: 50,
+        statements: 55,
+        branches: 65,
+        functions: 65,
+        lines: 55,
       },
     },
   },

@@ -1,11 +1,18 @@
 /**
- * Tests for agent module — conversation compaction, system prompt, action detection.
+ * Tests for agent module — extracted helpers, conversation compaction, action detection, security.
  */
 import { describe, it, expect } from 'vitest';
 
-// Test the private helpers by importing the module and testing observable behavior
-// Since isActionableRequest and compactConversation are not exported,
-// we test via the exported runAgentLoop with mocked dependencies.
+// Extracted helpers are now exported and directly testable
+import {
+  parseToolCallsFromTurn,
+  dispatchTools,
+  runAutoLint,
+  formatToolResultMessages,
+  READ_ONLY_TOOLS,
+  WRITE_TOOLS,
+} from '../src/agent.js';
+import type { AgentCallbacks } from '../src/agent.js';
 
 // Test tool-related security (new shell-quote-based run_command)
 import { executeTool } from '../src/tools.js';
@@ -159,3 +166,140 @@ describe('fetch_url — SSRF protection', () => {
 
 // Add missing imports for beforeEach/afterEach
 import { beforeEach, afterEach } from 'vitest';
+
+// ── Tests for extracted agent helpers ──────────────────────────────────────
+
+describe('parseToolCallsFromTurn', () => {
+  it('parses native tool calls when present', () => {
+    const nativeCalls = [
+      { function: { name: 'read_file', arguments: { path: 'foo.ts' } } },
+    ];
+    const { toolCalls, usedNativeTools } = parseToolCallsFromTurn(nativeCalls, '', '');
+    expect(usedNativeTools).toBe(true);
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.name).toBe('read_file');
+    expect(toolCalls[0]!.params['path']).toBe('foo.ts');
+  });
+
+  it('converts numeric arguments to strings', () => {
+    const nativeCalls = [
+      { function: { name: 'run_command', arguments: { command: 'echo', timeout: 5000 } } },
+    ];
+    const { toolCalls } = parseToolCallsFromTurn(nativeCalls, '', '');
+    expect(toolCalls[0]!.params['timeout']).toBe('5000');
+  });
+
+  it('falls back to XML parsing when no native calls', () => {
+    const xmlContent = '<tool_call>\n<name>list_files</name>\n</tool_call>';
+    const { toolCalls, usedNativeTools } = parseToolCallsFromTurn([], xmlContent, '');
+    expect(usedNativeTools).toBe(false);
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.name).toBe('list_files');
+  });
+
+  it('parses from thinking + response when no native calls', () => {
+    const thinking = '<tool_call>\n<name>read_file</name>\n<param name="path">a.ts</param>\n</tool_call>';
+    const { toolCalls } = parseToolCallsFromTurn([], '', thinking);
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]!.name).toBe('read_file');
+  });
+
+  it('returns empty array for plain text response', () => {
+    const { toolCalls } = parseToolCallsFromTurn([], 'Hello, I can help!', '');
+    expect(toolCalls).toHaveLength(0);
+  });
+});
+
+describe('formatToolResultMessages', () => {
+  const results = [
+    { tool: 'read_file', success: true, output: 'file contents' },
+    { tool: 'edit_file', success: false, output: 'no match found' },
+  ];
+
+  it('formats native tool results as individual tool messages', () => {
+    const msgs = formatToolResultMessages(results, true);
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0]!.role).toBe('tool');
+    expect(msgs[0]!.content).toContain('[success]');
+    expect(msgs[0]!.tool_name).toBe('read_file');
+    expect(msgs[1]!.content).toContain('[error]');
+    expect(msgs[1]!.tool_name).toBe('edit_file');
+  });
+
+  it('formats XML results as a single user message', () => {
+    const msgs = formatToolResultMessages(results, false);
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.role).toBe('user');
+    expect(msgs[0]!.content).toContain('<tool_result>');
+    expect(msgs[0]!.content).toContain('<name>read_file</name>');
+    expect(msgs[0]!.content).toContain('<status>success</status>');
+    expect(msgs[0]!.content).toContain('<status>error</status>');
+  });
+});
+
+describe('READ_ONLY_TOOLS / WRITE_TOOLS', () => {
+  it('read-only and write sets are disjoint', () => {
+    for (const tool of READ_ONLY_TOOLS) {
+      expect(WRITE_TOOLS.has(tool)).toBe(false);
+    }
+  });
+
+  it('read-only set contains expected tools', () => {
+    expect(READ_ONLY_TOOLS.has('read_file')).toBe(true);
+    expect(READ_ONLY_TOOLS.has('list_files')).toBe(true);
+    expect(READ_ONLY_TOOLS.has('search_files')).toBe(true);
+    expect(READ_ONLY_TOOLS.has('git_status')).toBe(true);
+  });
+
+  it('write set contains expected tools', () => {
+    expect(WRITE_TOOLS.has('write_files')).toBe(true);
+    expect(WRITE_TOOLS.has('edit_file')).toBe(true);
+    expect(WRITE_TOOLS.has('run_command')).toBe(true);
+  });
+});
+
+describe('dispatchTools', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-dispatch-'));
+    fs.writeFileSync(path.join(tmpDir, 'hello.txt'), 'hello world');
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('dispatches read-only tools in parallel', async () => {
+    const startOrder: string[] = [];
+    const callbacks = {
+      onToolStart: (name: string) => startOrder.push(name),
+      onToolResult: () => {},
+    };
+    const calls = [
+      { name: 'read_file', params: { path: 'hello.txt' } },
+      { name: 'list_files', params: {} },
+    ];
+    const { results, filesChanged } = await dispatchTools(
+      calls, tmpDir, {}, callbacks, [], new AbortController().signal,
+    );
+    expect(results).toHaveLength(2);
+    expect(filesChanged).toBe(false);
+    expect(startOrder).toEqual(['read_file', 'list_files']);
+  });
+
+  it('dispatches write tools sequentially', async () => {
+    const calls = [
+      { name: 'write_files', params: { path: 'new.txt', content: 'created' } },
+    ];
+    const callbacks = { onToolStart: () => {}, onToolResult: () => {} };
+    const changedFiles: string[] = [];
+    const { results, filesChanged } = await dispatchTools(
+      calls, tmpDir, {}, callbacks, changedFiles, new AbortController().signal,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0]!.success).toBe(true);
+    expect(filesChanged).toBe(true);
+    expect(changedFiles).toContain('new.txt');
+  });
+});

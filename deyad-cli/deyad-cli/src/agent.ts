@@ -1,5 +1,14 @@
 /**
  * CLI agent loop — multi-turn conversation with Ollama + tool execution.
+ *
+ * The loop coordinates: system prompt → RAG context → streaming LLM call →
+ * tool call parsing → tool dispatch → lint feedback → response formatting.
+ *
+ * Key exported helpers (testable independently):
+ * - {@link parseToolCallsFromTurn} — parse native or XML tool calls
+ * - {@link dispatchTools} — parallel read-only / sequential write dispatch
+ * - {@link runAutoLint} — lint changed files, format feedback
+ * - {@link formatToolResultMessages} — format tool results for conversation
  */
 
 import { streamChat } from './ollama.js';
@@ -9,24 +18,50 @@ import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { ToolCall } from './tools.js';
 import { runLint, formatLintErrors } from './lint.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
+
+// ── Documented constants ──────────────────────────────────────────────────
+
+/** Maximum conversation size (chars) before compaction kicks in. ~32k tokens at ~4 chars/token. */
 const MAX_CONVERSATION_CHARS = 128_000;
+
+/** Maximum agent iterations to prevent infinite loops. */
+const MAX_ITERATIONS = 50;
+
+/** Number of recent messages to keep when compacting conversation history. */
+const COMPACT_KEEP_RECENT = 10;
+
+/** Maximum retries for nudging a non-acting model to use tools. */
+const MAX_NUDGE_RETRIES = 2;
+
+/** Tools that only read data and can safely run in parallel. */
+export const READ_ONLY_TOOLS = new Set([
+  'list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url',
+  'git_status', 'git_log', 'git_diff', 'git_branch',
+]);
+
+/** Tools that modify files/state and must run sequentially. */
+export const WRITE_TOOLS = new Set([
+  'write_files', 'edit_file', 'delete_file', 'multi_edit',
+  'run_command', 'git_add', 'git_commit', 'git_stash',
+]);
 
 function isActionableRequest(message: string): boolean {
   // Almost every user message to a coding agent implies action.
   // Only short greetings / "thanks" / pure questions with no imperative are non-actionable.
   const nonActionable = /^\s*(hi|hello|hey|thanks|thank you|ok|okay|sure|yes|no|bye|goodbye)\s*[.!?]?\s*$/i;
   if (nonActionable.test(message)) return false;
-  // If it's longer than a few words, assume it's actionable
   if (message.split(/\s+/).length >= 4) return true;
   return /\b(create|write|edit|delete|install|run|execute|build|test|compile|deploy|generate|fix|update|add|remove|launch|open|serve|start|configure|analyze|find|check|review|scan|debug|refactor|optimize|migrate|convert|setup|implement|show|list|explain|read|fetch|get|search|examine|inspect|look|improve|make|change|move|rename|copy|merge|revert|undo|reset|clean|lint|format|validate|verify|ensure|tell|describe|help|solve|resolve|diagnose|identify|detect|monitor|profile|benchmark|measure|count|compare|diff|patch)\b/i.test(message);
 }
 
+/** Accumulated token usage across an agent session. */
 export interface TokenStats {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
 }
 
+/** Callbacks for the agent to communicate progress to the UI layer. */
 export interface AgentCallbacks {
   onToken: (token: string) => void;
   onThinkingToken?: (token: string) => void;
@@ -38,12 +73,14 @@ export interface AgentCallbacks {
   confirm: (question: string) => Promise<boolean>;
 }
 
+/** Result returned from a completed agent loop session. */
 export interface AgentResult {
   history: OllamaMessage[];
   changedFiles: string[];
   stats: TokenStats;
 }
 
+/** Compact conversation history when it exceeds {@link MAX_CONVERSATION_CHARS}. */
 function compactConversation(messages: OllamaMessage[]): void {
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
   if (totalChars <= MAX_CONVERSATION_CHARS) return;
@@ -53,11 +90,10 @@ function compactConversation(messages: OllamaMessage[]): void {
     firstNonSystem++;
   }
 
-  const keepRecent = 10;
   const nonSystemCount = messages.length - firstNonSystem;
-  if (nonSystemCount <= keepRecent) return;
+  if (nonSystemCount <= COMPACT_KEEP_RECENT) return;
 
-  const compactEnd = messages.length - keepRecent;
+  const compactEnd = messages.length - COMPACT_KEEP_RECENT;
   const toSummarize = messages.slice(firstNonSystem, compactEnd);
 
   const summaryParts: string[] = [];
@@ -80,6 +116,121 @@ function compactConversation(messages: OllamaMessage[]): void {
     role: 'system' as const,
     content: summary,
   });
+}
+
+// ── Extracted helpers (exported for unit testing) ─────────────────────────
+
+/**
+ * Parse tool calls from a model turn.
+ * Prefers native function-calling format; falls back to XML/Qwen-format parsing.
+ */
+export function parseToolCallsFromTurn(
+  nativeToolCalls: OllamaToolCall[],
+  turnResponse: string,
+  turnThinking: string,
+): { toolCalls: ToolCall[]; usedNativeTools: boolean } {
+  if (nativeToolCalls.length > 0) {
+    const toolCalls = nativeToolCalls.map((tc) => ({
+      name: tc.function.name,
+      params: Object.fromEntries(
+        Object.entries(tc.function.arguments).map(([k, v]) => [k, String(v)]),
+      ),
+    }));
+    return { toolCalls, usedNativeTools: true };
+  }
+  const combined = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+  return { toolCalls: parseToolCalls(combined), usedNativeTools: false };
+}
+
+/**
+ * Dispatch tool calls — runs read-only tools in parallel, write tools sequentially.
+ * Tracks changed files and reports to callbacks.
+ */
+export async function dispatchTools(
+  toolCalls: ToolCall[],
+  cwd: string,
+  toolCb: ToolCallbacks,
+  callbacks: Pick<AgentCallbacks, 'onToolStart' | 'onToolResult'>,
+  changedFiles: string[],
+  signal: AbortSignal,
+): Promise<{ results: ToolResult[]; filesChanged: boolean }> {
+  let results: ToolResult[] = [];
+  let filesChanged = false;
+
+  const allReadOnly = toolCalls.every((c) => READ_ONLY_TOOLS.has(c.name));
+  if (allReadOnly && toolCalls.length > 1) {
+    for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
+    results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));
+    for (const r of results) {
+      callbacks.onToolResult(r);
+      if (r.changedFiles) {
+        for (const f of r.changedFiles) {
+          if (!changedFiles.includes(f)) changedFiles.push(f);
+        }
+      }
+    }
+  } else {
+    for (const call of toolCalls) {
+      if (signal.aborted) break;
+      callbacks.onToolStart(call.name, call.params);
+      const r = await executeTool(call, cwd, toolCb);
+      results.push(r);
+      callbacks.onToolResult(r);
+      if (r.changedFiles) {
+        for (const f of r.changedFiles) {
+          if (!changedFiles.includes(f)) changedFiles.push(f);
+        }
+      }
+      if (WRITE_TOOLS.has(call.name) && r.success) filesChanged = true;
+    }
+  }
+  return { results, filesChanged };
+}
+
+/**
+ * Run auto-lint on changed files and format errors as agent feedback.
+ * Returns a lint message string if errors found, or null if clean.
+ */
+export function runAutoLint(
+  cwd: string,
+  changedFiles: string[],
+  callbacks: Pick<AgentCallbacks, 'onToolStart' | 'onToolResult'>,
+): string | null {
+  const allChanged = [...changedFiles];
+  const lintResults = runLint(cwd, allChanged);
+  const lintMessage = formatLintErrors(lintResults);
+  if (!lintMessage) return null;
+
+  callbacks.onToolStart('auto_lint', { files: allChanged.join(', ') });
+  const errorSummary = lintResults
+    .filter((r) => r.hasErrors)
+    .map((r) => `${r.linter}: errors found`)
+    .join(', ');
+  callbacks.onToolResult({ tool: 'auto_lint', success: false, output: errorSummary });
+  return lintMessage;
+}
+
+/**
+ * Format tool results into conversation messages (native tool or XML format).
+ */
+export function formatToolResultMessages(
+  results: ToolResult[],
+  usedNativeTools: boolean,
+): OllamaMessage[] {
+  if (usedNativeTools) {
+    return results.map((r) => ({
+      role: 'tool' as const,
+      content: `[${r.success ? 'success' : 'error'}] ${r.output}`,
+      tool_name: r.tool,
+    }));
+  }
+  const resultsText = results
+    .map(
+      (r) =>
+        `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`,
+    )
+    .join('\n\n');
+  return [{ role: 'user' as const, content: resultsText }];
 }
 
 function getSystemPrompt(cwd: string): string {
@@ -197,6 +348,10 @@ async function buildContext(cwd: string): Promise<string> {
   return context;
 }
 
+/**
+ * Run the multi-turn agent loop: stream LLM responses, parse + execute tool calls,
+ * auto-lint changed files, and compact conversation when it grows too large.
+ */
 export async function runAgentLoop(
   model: string,
   userMessage: string | OllamaMessage,
@@ -253,7 +408,6 @@ export async function runAgentLoop(
         const errMsg = String((err as Error).message || err);
         callbacks.onError(`Ollama error: ${errMsg}`);
         if (iteration > 0) {
-          // Retry once on transient errors
           iteration++;
           continue;
         }
@@ -268,27 +422,15 @@ export async function runAgentLoop(
       stats.completionTokens += result.usage.completionTokens;
       stats.totalTokens = stats.promptTokens + stats.completionTokens;
 
-      // Native tool calls take priority over XML text-based parsing
-      let toolCalls: ToolCall[];
-      let usedNativeTools = false;
-      if (nativeToolCalls.length > 0) {
-        toolCalls = nativeToolCalls.map(tc => ({
-          name: tc.function.name,
-          params: Object.fromEntries(
-            Object.entries(tc.function.arguments).map(([k, v]) => [k, String(v)])
-          ),
-        }));
-        usedNativeTools = true;
-      } else {
-        // Fallback: parse XML / Qwen-format tool calls from content + thinking
-        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        toolCalls = parseToolCalls(combinedForParsing);
-      }
+      // ── Parse tool calls ────────────────────────────────────────────
+      const { toolCalls, usedNativeTools } = parseToolCallsFromTurn(
+        nativeToolCalls, turnResponse, turnThinking,
+      );
 
+      // ── No tools → nudge or finish ─────────────────────────────────
       if (toolCalls.length === 0) {
-        // If the model just narrated without acting, nudge it to use tools (up to 2 retries)
         const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
-        if (isActionableRequest(userMessageText) && !hasPerformedAction && iteration < 2) {
+        if (isActionableRequest(userMessageText) && !hasPerformedAction && iteration < MAX_NUDGE_RETRIES) {
           const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
           messages.push({ role: 'assistant', content: assistantContent });
           messages.push({
@@ -298,7 +440,6 @@ export async function runAgentLoop(
           iteration++;
           continue;
         }
-        // Strip tool markup and thinking from the visible summary
         const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
         callbacks.onDone(summary);
         const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
@@ -306,124 +447,54 @@ export async function runAgentLoop(
         return { history: messages, changedFiles, stats };
       }
 
-      // Push assistant message to history (format depends on native vs XML tool calling)
+      // ── Push assistant message ──────────────────────────────────────
       if (usedNativeTools) {
         messages.push({ role: 'assistant', content: turnResponse, tool_calls: nativeToolCalls });
       } else {
-        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        messages.push({ role: 'assistant', content: combinedForParsing });
+        const combined = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        messages.push({ role: 'assistant', content: combined });
       }
 
+      // ── Dispatch tools ──────────────────────────────────────────────
       const toolCb: ToolCallbacks = { confirm: callbacks.confirm, onDiff: callbacks.onDiff };
-      const readOnlyTools = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url', 'git_status', 'git_log', 'git_diff', 'git_branch']);
-      const writeTools = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit', 'run_command', 'git_add', 'git_commit', 'git_stash']);
+      const { results, filesChanged } = await dispatchTools(
+        toolCalls, cwd, toolCb, callbacks, changedFiles, abortController.signal,
+      );
+      hasPerformedAction = true;
 
-      let results: ToolResult[] = [];
-      let filesChanged = false;
-      const allReadOnly = toolCalls.every((c) => readOnlyTools.has(c.name));
-      if (allReadOnly && toolCalls.length > 1) {
-        for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
-        results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));
-        for (const r of results) {
-          callbacks.onToolResult(r);
-          if (r.changedFiles) {
-            for (const f of r.changedFiles) {
-              if (!changedFiles.includes(f)) changedFiles.push(f);
-            }
-          }
-        }
-        hasPerformedAction = true;
-      } else {
-        results = [];
-        for (const call of toolCalls) {
-          if (abortController.signal.aborted) break;
-          callbacks.onToolStart(call.name, call.params);
-          const r = await executeTool(call, cwd, toolCb);
-          results.push(r);
-          callbacks.onToolResult(r);
-          if (r.changedFiles) {
-            for (const f of r.changedFiles) {
-              if (!changedFiles.includes(f)) changedFiles.push(f);
-            }
-          }
-          if (writeTools.has(call.name) && r.success) filesChanged = true;
-        }
-        hasPerformedAction = true;
-      }
-
+      // ── Post-write: refresh context + auto-lint ─────────────────────
       if (filesChanged) {
-        // Invalidate RAG index since files changed
         invalidateIndex();
-
         try {
           const freshContext = await buildContext(cwd);
           const second = messages[1];
           if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
             messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
           }
-        } catch {
-          // ignore
-        }
+        } catch { /* ignore */ }
 
-        // Auto-lint: run linters on changed files and feed errors back
-        const allChanged = [...changedFiles];
-        const lintResults = runLint(cwd, allChanged);
-        const lintMessage = formatLintErrors(lintResults);
-        if (lintMessage) {
-          callbacks.onToolStart('auto_lint', { files: allChanged.join(', ') });
-          const errorSummary = lintResults
-            .filter((r) => r.hasErrors)
-            .map((r) => `${r.linter}: errors found`)
-            .join(', ');
-          callbacks.onToolResult({
-            tool: 'auto_lint',
-            success: false,
-            output: errorSummary,
-          });
-          // Inject lint errors so the agent can self-correct
-          if (usedNativeTools) {
-            messages.push({
-              role: 'user' as const,
-              content: lintMessage,
-            });
-          } else {
-            messages.push({
-              role: 'user' as const,
-              content: lintMessage,
-            });
-          }
+        const lintMsg = runAutoLint(cwd, changedFiles, callbacks);
+        if (lintMsg) {
+          messages.push({ role: 'user' as const, content: lintMsg });
           iteration++;
-          continue; // let the agent fix the lint errors
+          continue;
         }
       }
 
-      // Send tool results back in the appropriate format
-      if (usedNativeTools) {
-        // Native tool calling: each result as a 'tool' role message
-        for (const r of results) {
-          messages.push({
-            role: 'tool' as const,
-            content: `[${r.success ? 'success' : 'error'}] ${r.output}`,
-            tool_name: r.tool,
-          });
-        }
-      } else {
-        // XML fallback: results as user message with XML markup
-        const resultsText = results.map((r) =>
-          `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`,
-        ).join('\n\n');
+      // ── Send tool results back ──────────────────────────────────────
+      const resultMessages = formatToolResultMessages(results, usedNativeTools);
 
-        const combinedForParsing = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        if (isDone(combinedForParsing)) {
+      if (!usedNativeTools) {
+        const combined = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        if (isDone(combined)) {
           const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
           callbacks.onDone(summary);
-          messages.push({ role: 'user', content: resultsText });
+          messages.push(...resultMessages);
           return { history: messages, changedFiles, stats };
         }
-
-        messages.push({ role: 'user', content: resultsText });
       }
 
+      messages.push(...resultMessages);
       iteration++;
     }
 

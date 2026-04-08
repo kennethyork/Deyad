@@ -163,6 +163,27 @@ const createWindow = () => {
   // clear cache before loading to ensure latest CSS/JS is used
   mainWindow.webContents.session.clearCache().then(() => {
 
+    // Enforce Content Security Policy (WCAG + OWASP best practice)
+    mainWindow.webContents.session.webRequest.onHeadersReceived(
+      { urls: ['file://*', 'http://localhost:*/*'] },
+      (details, callback) => {
+        callback({
+          responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': [
+              "default-src 'self'; " +
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:*; " +
+              "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:*; " +
+              "font-src 'self' data:; " +
+              "frame-src http://localhost:* http://127.0.0.1:*;"
+            ],
+          },
+        });
+      },
+    );
+
     // Helper: register header stripping on a session so embedded webviews
     // (Prisma Studio etc.) can load without X-Frame-Options / CSP blocking.
     // SECURITY: Only strips headers for localhost origins — external sites
