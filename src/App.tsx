@@ -376,6 +376,7 @@ function AppInner() {
 
   return (
     <Suspense fallback={<div className="app-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f172a', color: '#94a3b8' }}>Loading…</div>}>
+    <a href="#main-content" className="skip-to-content">Skip to content</a>
     <div
       className={`app-layout mobile-show-${layout.mobilePanel}`}
       style={{
@@ -421,7 +422,7 @@ function AppInner() {
 
       {/* centre: chat panels (kept alive across app switches) or empty state */}
       {selectedApp ? (
-        <div className="chat-wrapper">
+        <div id="main-content" className="chat-wrapper">
           {openedApps.map(appId => {
             const appObj = apps.find(a => a.id === appId);
             if (!appObj) return null;
@@ -478,44 +479,72 @@ function AppInner() {
       <div className="right-panel">
         {selectedApp && (
           <>
-            <div className="right-panel-tabs">
+            <div className="right-panel-tabs" role="tablist" aria-label="Right panel tabs">
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'editor'}
+                aria-controls="tabpanel-editor"
+                id="tab-editor"
                 className={`right-tab ${cur.rightTab === 'editor' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'editor' })}
               >
                 Files
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'preview'}
+                aria-controls="tabpanel-preview"
+                id="tab-preview"
                 className={`right-tab ${cur.rightTab === 'preview' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'preview' })}
               >
                 Preview
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'terminal'}
+                aria-controls="tabpanel-terminal"
+                id="tab-terminal"
                 className={`right-tab ${cur.rightTab === 'terminal' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'terminal' })}
               >
                 Terminal
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'packages'}
+                aria-controls="tabpanel-packages"
+                id="tab-packages"
                 className={`right-tab ${cur.rightTab === 'packages' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'packages' })}
               >
                 Packages
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'envvars'}
+                aria-controls="tabpanel-envvars"
+                id="tab-envvars"
                 className={`right-tab ${cur.rightTab === 'envvars' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'envvars' })}
               >
                 Env
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'search'}
+                aria-controls="tabpanel-search"
+                id="tab-search"
                 className={`right-tab ${cur.rightTab === 'search' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'search' })}
               >
                 Search
               </button>
               <button
+                role="tab"
+                aria-selected={cur.rightTab === 'git'}
+                aria-controls="tabpanel-git"
+                id="tab-git"
                 className={`right-tab ${cur.rightTab === 'git' ? 'active' : ''}`}
                 onClick={() => updatePerApp(selectedApp.id, { rightTab: 'git' })}
               >
@@ -523,6 +552,10 @@ function AppInner() {
               </button>
               {selectedApp?.appType === 'fullstack' && (
                 <button
+                  role="tab"
+                  aria-selected={cur.rightTab === 'database'}
+                  aria-controls="tabpanel-database"
+                  id="tab-database"
                   className={`right-tab ${cur.rightTab === 'database' ? 'active' : ''}`}
                   onClick={() => updatePerApp(selectedApp.id, { rightTab: 'database' })}
                 >
@@ -532,6 +565,7 @@ function AppInner() {
             </div>
 
             {cur.rightTab === 'editor' ? (
+              <div role="tabpanel" id="tabpanel-editor" aria-labelledby="tab-editor" style={{ display: 'contents' }}>
               <EditorPanel
                 files={cur.appFiles}
                 selectedFile={cur.selectedFile}
@@ -541,13 +575,21 @@ function AppInner() {
                 autocompleteEnabled={settings.autocompleteEnabled}
                 completionModel={settings.completionModel || settings.defaultModel}
               />
+              </div>
             ) : cur.rightTab === 'terminal' ? (
+              <div role="tabpanel" id="tabpanel-terminal" aria-labelledby="tab-terminal" style={{ display: 'contents' }}>
               <TerminalPanel appId={selectedApp.id} />
+              </div>
             ) : cur.rightTab === 'packages' ? (
+              <div role="tabpanel" id="tabpanel-packages" aria-labelledby="tab-packages" style={{ display: 'contents' }}>
               <PackageManagerPanel appId={selectedApp.id} />
+              </div>
             ) : cur.rightTab === 'envvars' ? (
+              <div role="tabpanel" id="tabpanel-envvars" aria-labelledby="tab-envvars" style={{ display: 'contents' }}>
               <EnvVarsPanel appId={selectedApp.id} />
+              </div>
             ) : cur.rightTab === 'git' ? (
+              <div role="tabpanel" id="tabpanel-git" aria-labelledby="tab-git" style={{ display: 'contents' }}>
               <GitPanel
                 appId={selectedApp.id}
                 onFilesChanged={async () => {
@@ -556,16 +598,21 @@ function AppInner() {
                   dispatch({ type: 'REFRESH_PREVIEW' });
                 }}
               />
+              </div>
             ) : cur.rightTab === 'search' ? (
+              <div role="tabpanel" id="tabpanel-search" aria-labelledby="tab-search" style={{ display: 'contents' }}>
               <SearchPanel
                 appId={selectedApp.id}
                 onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file, rightTab: 'editor' })}
               />
+              </div>
             ) : cur.rightTab === 'database' ? (
+              <div role="tabpanel" id="tabpanel-database" aria-labelledby="tab-database" style={{ display: 'contents' }}>
               <DatabasePanel app={selectedApp} dbStatus={cur.dbStatus} onDbToggle={() => handleDbToggle(selectedApp.id)} />
+              </div>
             ) : null}
             {/* Keep PreviewPanel mounted so it maintains HMR/WebSocket connection */}
-            <div style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
+            <div role="tabpanel" id="tabpanel-preview" aria-labelledby="tab-preview" style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
               <PreviewPanel app={selectedApp} onPublish={() => modals.setShowDeployModal(true)} refreshKey={previewRefreshKey} />
             </div>
           </>

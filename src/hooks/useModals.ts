@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useReducer, useCallback } from 'react';
 
 export interface ModalState {
   showNewAppModal: boolean;
@@ -13,63 +13,85 @@ export interface ModalState {
   exportResult: string | null;
 }
 
-export function useModals() {
-  const [showNewAppModal, setShowNewAppModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showDeployModal, setShowDeployModal] = useState(false);
-  const [showTaskQueue, setShowTaskQueue] = useState(false);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [showWizard, setShowWizard] = useState(false);
-  const [exportConfirm, setExportConfirm] = useState<{ open: boolean; appId: string }>({ open: false, appId: '' });
-  const [exportResult, setExportResult] = useState<string | null>(null);
+type ModalAction =
+  | { type: 'SET'; key: keyof ModalState; value: boolean }
+  | { type: 'TOGGLE'; key: keyof ModalState }
+  | { type: 'SET_EXPORT_CONFIRM'; value: { open: boolean; appId: string } }
+  | { type: 'SET_EXPORT_RESULT'; value: string | null };
 
-  const openModal = useCallback((modal: keyof Pick<ModalState,
-    'showNewAppModal' | 'showSettings' | 'showImportModal' | 'showDeployModal' |
-    'showTaskQueue' | 'showVersionHistory' | 'showCommandPalette' | 'showWizard'
-  >) => {
-    const setters: Record<string, (v: boolean) => void> = {
-      showNewAppModal: setShowNewAppModal,
-      showSettings: setShowSettings,
-      showImportModal: setShowImportModal,
-      showDeployModal: setShowDeployModal,
-      showTaskQueue: setShowTaskQueue,
-      showVersionHistory: setShowVersionHistory,
-      showCommandPalette: setShowCommandPalette,
-      showWizard: setShowWizard,
+const initialState: ModalState = {
+  showNewAppModal: false,
+  showSettings: false,
+  showImportModal: false,
+  showDeployModal: false,
+  showTaskQueue: false,
+  showVersionHistory: false,
+  showCommandPalette: false,
+  showWizard: false,
+  exportConfirm: { open: false, appId: '' },
+  exportResult: null,
+};
+
+function modalReducer(state: ModalState, action: ModalAction): ModalState {
+  switch (action.type) {
+    case 'SET':
+      return { ...state, [action.key]: action.value };
+    case 'TOGGLE':
+      return { ...state, [action.key]: !state[action.key] };
+    case 'SET_EXPORT_CONFIRM':
+      return { ...state, exportConfirm: action.value };
+    case 'SET_EXPORT_RESULT':
+      return { ...state, exportResult: action.value };
+    default:
+      return state;
+  }
+}
+
+type BooleanModalKey =
+  'showNewAppModal' | 'showSettings' | 'showImportModal' | 'showDeployModal' |
+  'showTaskQueue' | 'showVersionHistory' | 'showCommandPalette' | 'showWizard';
+
+export function useModals() {
+  const [state, dispatch] = useReducer(modalReducer, initialState);
+
+  const setter = (key: BooleanModalKey) =>
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === 'function' ? v(state[key] as boolean) : v;
+      dispatch({ type: 'SET', key, value: next });
     };
-    setters[modal]?.(true);
+
+  const openModal = useCallback((modal: BooleanModalKey) => {
+    dispatch({ type: 'SET', key: modal, value: true });
   }, []);
 
-  const closeModal = useCallback((modal: keyof Pick<ModalState,
-    'showNewAppModal' | 'showSettings' | 'showImportModal' | 'showDeployModal' |
-    'showTaskQueue' | 'showVersionHistory' | 'showCommandPalette' | 'showWizard'
-  >) => {
-    const setters: Record<string, (v: boolean) => void> = {
-      showNewAppModal: setShowNewAppModal,
-      showSettings: setShowSettings,
-      showImportModal: setShowImportModal,
-      showDeployModal: setShowDeployModal,
-      showTaskQueue: setShowTaskQueue,
-      showVersionHistory: setShowVersionHistory,
-      showCommandPalette: setShowCommandPalette,
-      showWizard: setShowWizard,
-    };
-    setters[modal]?.(false);
+  const closeModal = useCallback((modal: BooleanModalKey) => {
+    dispatch({ type: 'SET', key: modal, value: false });
   }, []);
 
   return {
-    showNewAppModal, setShowNewAppModal,
-    showSettings, setShowSettings,
-    showImportModal, setShowImportModal,
-    showDeployModal, setShowDeployModal,
-    showTaskQueue, setShowTaskQueue,
-    showVersionHistory, setShowVersionHistory,
-    showCommandPalette, setShowCommandPalette,
-    showWizard, setShowWizard,
-    exportConfirm, setExportConfirm,
-    exportResult, setExportResult,
-    openModal, closeModal,
+    showNewAppModal: state.showNewAppModal,
+    setShowNewAppModal: setter('showNewAppModal'),
+    showSettings: state.showSettings,
+    setShowSettings: setter('showSettings'),
+    showImportModal: state.showImportModal,
+    setShowImportModal: setter('showImportModal'),
+    showDeployModal: state.showDeployModal,
+    setShowDeployModal: setter('showDeployModal'),
+    showTaskQueue: state.showTaskQueue,
+    setShowTaskQueue: setter('showTaskQueue'),
+    showVersionHistory: state.showVersionHistory,
+    setShowVersionHistory: setter('showVersionHistory'),
+    showCommandPalette: state.showCommandPalette,
+    setShowCommandPalette: setter('showCommandPalette'),
+    showWizard: state.showWizard,
+    setShowWizard: setter('showWizard'),
+    exportConfirm: state.exportConfirm,
+    setExportConfirm: (v: { open: boolean; appId: string }) =>
+      dispatch({ type: 'SET_EXPORT_CONFIRM', value: v }),
+    exportResult: state.exportResult,
+    setExportResult: (v: string | null) =>
+      dispatch({ type: 'SET_EXPORT_RESULT', value: v }),
+    openModal,
+    closeModal,
   };
 }

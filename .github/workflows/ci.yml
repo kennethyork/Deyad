@@ -19,7 +19,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npx vitest run --coverage
+      - run: npm audit --audit-level=high
 
   cli:
     name: CLI — lint, typecheck, test
@@ -36,4 +37,5 @@ jobs:
           cache-dependency-path: deyad-cli/deyad-cli/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npx vitest run --coverage
+      - run: npm audit --audit-level=high

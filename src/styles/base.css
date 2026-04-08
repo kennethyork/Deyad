@@ -1,6 +1,23 @@
 /* ─── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ─── Skip to content (a11y) ──────────────────────────────────────────────── */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10000;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.875rem;
+  border-radius: 0 0 var(--radius) 0;
+  text-decoration: none;
+}
+.skip-to-content:focus {
+  left: 0;
+}
+
 :root {
   --bg-base:       #0f172a;
   --bg-surface:    #1e293b;

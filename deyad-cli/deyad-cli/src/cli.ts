@@ -424,14 +424,14 @@ async function main(): Promise<void> {
       // ── Diff command ──
       if (input === '/diff') {
         try {
-          const { execSync } = await import('node:child_process');
-          const diff = execSync('git diff', { cwd, encoding: 'utf-8', timeout: 10000 });
+          const { execFileSync } = await import('node:child_process');
+          const diff = execFileSync('git', ['diff'], { cwd, encoding: 'utf-8', timeout: 10000 });
           if (diff.trim()) {
             console.log('');
             console.log(`  ${c.bold('Unstaged Changes')}`);
             console.log(c.dim(diff));
           } else {
-            const staged = execSync('git diff --cached', { cwd, encoding: 'utf-8', timeout: 10000 });
+            const staged = execFileSync('git', ['diff', '--cached'], { cwd, encoding: 'utf-8', timeout: 10000 });
             if (staged.trim()) {
               console.log('');
               console.log(`  ${c.bold('Staged Changes')}`);

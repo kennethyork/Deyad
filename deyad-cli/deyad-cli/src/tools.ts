@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
 import { minimatch } from 'minimatch';
+import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import type { OllamaTool } from './ollama.js';
 
@@ -413,14 +414,21 @@ async function executeToolInner(
         }
         const timeoutMs = parseInt(call.params['timeout'] || '30000', 10);
         try {
-          const output = execSync(command, {
+          // Parse command with shell-quote; use execFileSync for simple commands
+          // to avoid shell injection, fall back to execSync for shell operators
+          const parsed = shellParse(command);
+          const isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
+          const execOpts = {
             cwd,
-            encoding: 'utf-8',
+            encoding: 'utf-8' as const,
             timeout: timeoutMs,
             maxBuffer: 1024 * 1024,
-            stdio: ['pipe', 'pipe', 'pipe'],
+            stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
             env: { ...process.env, FORCE_COLOR: '0' },
-          });
+          };
+          const output = isSimple
+            ? execFileSync((parsed as string[])[0]!, (parsed as string[]).slice(1), execOpts)
+            : execSync(command, execOpts);
           const truncated = output.length > 10000 ? output.slice(0, 10000) + '\n... (truncated)' : output;
           return { tool: call.name, success: true, output: truncated || '(no output)' };
         } catch (err: unknown) {
@@ -535,10 +543,29 @@ async function executeToolInner(
       case 'fetch_url': {
         const url = call.params['url'];
         if (!url) return { tool: call.name, success: false, output: 'Missing "url" parameter.' };
+        let parsed: URL;
         try {
-          new URL(url);
+          parsed = new URL(url);
         } catch {
           return { tool: call.name, success: false, output: 'Invalid URL.' };
+        }
+        // SSRF protection: block private/internal IPs and non-HTTP schemes
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return { tool: call.name, success: false, output: 'Only HTTP(S) URLs are allowed.' };
+        }
+        const host = parsed.hostname.toLowerCase();
+        if (
+          host === 'localhost' ||
+          host === '127.0.0.1' ||
+          host === '[::1]' ||
+          host.startsWith('10.') ||
+          host.startsWith('192.168.') ||
+          host.startsWith('172.') ||
+          host.startsWith('169.254.') ||
+          host.endsWith('.local') ||
+          host === '0.0.0.0'
+        ) {
+          return { tool: call.name, success: false, output: 'Requests to private/internal addresses are blocked.' };
         }
         try {
           const resp = await fetch(url, {

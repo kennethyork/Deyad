@@ -41,7 +41,7 @@ if (isDevBuild) {
 
 esbuild
   .build({
-    entryPoints: ["src/cli.tsx"],
+    entryPoints: ["src/cli.ts"],
     bundle: true,
     format: "esm",
     platform: "node",

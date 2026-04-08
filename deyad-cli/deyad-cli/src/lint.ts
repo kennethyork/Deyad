@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 
 export interface LintResult {
   linter: string;
@@ -93,24 +93,38 @@ export function runLint(cwd: string, changedFiles: string[]): LintResult[] {
 
   for (const linter of linters) {
     try {
-      // For file-specific linters, substitute changed files
+      // For file-specific linters, use execFileSync with arg arrays to prevent
+      // shell injection via crafted filenames.
       let command = linter.command;
-      if (command.includes('{files}') && linter.fileFilter) {
-        const relevantFiles = changedFiles.filter(linter.fileFilter);
+      const hasFiles = command.includes('{files}') && linter.fileFilter;
+      if (hasFiles) {
+        const relevantFiles = changedFiles.filter(linter.fileFilter!);
         if (relevantFiles.length === 0) continue;
-        command = command.replace('{files}', relevantFiles.map((f) => `"${f}"`).join(' '));
+        // Build arg array: split command template, insert files at {files} position
+        const stripped = command.replace(' 2>&1', '');
+        const parts = stripped.split(' ');
+        const fileIdx = parts.indexOf('{files}');
+        const cmd = parts[0]!;
+        const args = [...parts.slice(1, fileIdx), ...relevantFiles, ...parts.slice(fileIdx + 1)];
+        execFileSync(cmd, args, {
+          cwd,
+          encoding: 'utf-8',
+          timeout: 30_000,
+          maxBuffer: 512 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, FORCE_COLOR: '0' },
+        });
       } else {
         command = command.replace(' {files}', '');
+        execSync(command, {
+          cwd,
+          encoding: 'utf-8',
+          timeout: 30_000,
+          maxBuffer: 512 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, FORCE_COLOR: '0' },
+        });
       }
-
-      execSync(command, {
-        cwd,
-        encoding: 'utf-8',
-        timeout: 30_000,
-        maxBuffer: 512 * 1024,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, FORCE_COLOR: '0' },
-      });
 
       // Exit code 0 means no errors
       results.push({ linter: linter.name, errors: '', hasErrors: false });
