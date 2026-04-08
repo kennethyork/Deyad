@@ -26,14 +26,16 @@ vi.mock('electron', () => ({
   },
 }));
 
-const handlers = new Map<string, (...args: unknown[]) => unknown>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const handlers = new Map<string, (...args: any[]) => any>();
 
 import { ipcMain } from 'electron';
 
 beforeEach(() => {
   handlers.clear();
   mockResponseHandlers.clear();
-  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: unknown[]) => unknown) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  vi.mocked(ipcMain.handle).mockImplementation((channel: string, handler: (...args: any[]) => any) => {
     handlers.set(channel, handler);
     return undefined as ReturnType<typeof ipcMain.handle>;
   });
