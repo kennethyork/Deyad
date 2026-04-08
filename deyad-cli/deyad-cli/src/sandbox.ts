@@ -114,7 +114,27 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
     if (merge) {
       // Switch back to original branch and merge
       execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
-      execSync(`git merge ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      try {
+        execSync(`git merge ${savedSandbox.sandboxBranch} --no-edit`, { cwd, stdio: 'pipe', encoding: 'utf-8' });
+      } catch (mergeErr) {
+        // Merge conflict — parse and present to user
+        let conflictInfo = '';
+        try {
+          conflictInfo = execSync('git diff --name-only --diff-filter=U', {
+            cwd, encoding: 'utf-8', stdio: 'pipe',
+          }).trim();
+        } catch { /* ignore */ }
+
+        // Abort the merge so we don't leave the repo in a broken state
+        try { execSync('git merge --abort', { cwd, stdio: 'pipe' }); } catch { /* ignore */ }
+
+        const conflictFiles = conflictInfo ? conflictInfo.split('\n').filter(Boolean) : [];
+        const conflictMsg = conflictFiles.length > 0
+          ? `Merge conflict in ${conflictFiles.length} file(s):\n  ${conflictFiles.join('\n  ')}\n\nThe merge was aborted. The sandbox branch "${savedSandbox.sandboxBranch}" is preserved.\nYou can resolve manually: git checkout ${savedSandbox.sandboxBranch} && git rebase ${savedSandbox.originalBranch}`
+          : `Merge conflict detected. The merge was aborted.\nSandbox branch "${savedSandbox.sandboxBranch}" is preserved for manual resolution.`;
+
+        return { success: false, message: conflictMsg, diff };
+      }
       execSync(`git branch -d ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
 
       result = { success: true, message: `Merged sandbox changes into ${savedSandbox.originalBranch}`, diff };

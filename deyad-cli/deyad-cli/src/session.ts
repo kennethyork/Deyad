@@ -1,6 +1,7 @@
 /**
  * Persistent session memory — save and restore conversation history across restarts.
  * Sessions stored in ~/.deyad/sessions/ as JSON files.
+ * Uses atomic write (tmp + rename) and advisory file locking to prevent multi-instance corruption.
  */
 
 import * as fs from 'node:fs';
@@ -11,6 +12,8 @@ import type { OllamaMessage } from './ollama.js';
 const SESSIONS_DIR = path.join(homedir(), '.deyad', 'sessions');
 const MEMORY_DIR = path.join(homedir(), '.deyad', 'memory');
 const MAX_SESSIONS = 50;
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_STALE_MS = 30_000;
 
 export interface SessionData {
   id: string;
@@ -34,6 +37,54 @@ function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+}
+
+/**
+ * Acquire an advisory file lock. Uses mkdir (atomic on POSIX) as a lock mechanism.
+ * Returns true if lock acquired, false if timed out.
+ */
+function acquireLock(filePath: string): boolean {
+  const lockPath = filePath + '.lock';
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    try {
+      fs.mkdirSync(lockPath);
+      // Write PID so stale locks can be detected
+      fs.writeFileSync(path.join(lockPath, 'pid'), String(process.pid), 'utf-8');
+      return true;
+    } catch {
+      // Lock exists — check if stale
+      try {
+        const pidFile = path.join(lockPath, 'pid');
+        if (fs.existsSync(pidFile)) {
+          const stat = fs.statSync(pidFile);
+          if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+            // Stale lock — force remove and retry
+            releaseLock(filePath);
+            continue;
+          }
+        }
+      } catch { /* ignore stat errors */ }
+
+      // Wait 50ms before retrying
+      const start = Date.now();
+      while (Date.now() - start < 50) { /* busy wait — no async in sync context */ }
+    }
+  }
+  return false;
+}
+
+/**
+ * Release an advisory file lock.
+ */
+function releaseLock(filePath: string): void {
+  const lockPath = filePath + '.lock';
+  try {
+    const pidFile = path.join(lockPath, 'pid');
+    if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+    fs.rmdirSync(lockPath);
+  } catch { /* lock already released */ }
 }
 
 function generateId(): string {
@@ -75,7 +126,23 @@ export function saveSession(session: SessionData): void {
   ensureDir(SESSIONS_DIR);
   session.updatedAt = new Date().toISOString();
   const filePath = path.join(SESSIONS_DIR, `${session.id}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
+  const tmpPath = filePath + '.tmp';
+
+  if (!acquireLock(filePath)) {
+    // Timeout — fall back to direct write rather than losing data
+    fs.writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
+    return;
+  }
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(session, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    // Clean up temp file on failure
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw err;
+  } finally {
+    releaseLock(filePath);
+  }
 }
 
 export function listSessions(): SessionData[] {
@@ -154,7 +221,21 @@ export function memoryWrite(key: string, value: string): void {
     createdAt: existing ? new Date().toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  fs.writeFileSync(filePath, JSON.stringify(entry, null, 2), 'utf-8');
+
+  const tmpPath = filePath + '.tmp';
+  if (!acquireLock(filePath)) {
+    fs.writeFileSync(filePath, JSON.stringify(entry, null, 2), 'utf-8');
+    return;
+  }
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(entry, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw err;
+  } finally {
+    releaseLock(filePath);
+  }
 }
 
 export function memoryList(): MemoryEntry[] {
