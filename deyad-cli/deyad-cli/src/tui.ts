@@ -322,6 +322,10 @@ export function formatHelp(): string {
         ['/clear', 'Clear conversation history'],
         ['/status', 'Show session stats'],
         ['/compact', 'Force conversation compaction'],
+        ['/diff', 'Show git changes (unstaged/staged)'],
+        ['/tokens', 'Detailed token usage breakdown'],
+        ['/index', 'Rebuild RAG codebase index'],
+        ['/init', 'Create DEYAD.md project instructions'],
       ],
     },
     {

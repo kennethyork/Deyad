@@ -8,6 +8,8 @@ import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION
 import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { ToolCall } from './tools.js';
 import type { McpManager } from './mcp.js';
+import { runLint, formatLintErrors } from './lint.js';
+import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
 const MAX_CONVERSATION_CHARS = 128_000;
 
 function isActionableRequest(message: string): boolean {
@@ -179,9 +181,15 @@ export async function runAgentLoop(
   try {
     const context = await buildContext(cwd);
     const mcpToolsDesc = mcpManager ? mcpManager.getToolsDescription() : '';
+
+    // RAG: retrieve relevant codebase chunks for the user's query
+    const userQuery = typeof userMessage === 'string' ? userMessage : userMessage.content;
+    const ragResults = queryIndex(userQuery, cwd, 5);
+    const ragContext = formatRAGContext(ragResults);
+
     const messages: OllamaMessage[] = [
       { role: 'system', content: getSystemPrompt(cwd, mcpToolsDesc) },
-      { role: 'system', content: `Project context:\n\n${context}` },
+      { role: 'system', content: `Project context:\n\n${context}${ragContext}` },
       ...history,
       typeof userMessage === 'string' ? { role: 'user', content: userMessage } : userMessage,
     ];
@@ -312,6 +320,9 @@ export async function runAgentLoop(
       }
 
       if (filesChanged) {
+        // Invalidate RAG index since files changed
+        invalidateIndex();
+
         try {
           const freshContext = await buildContext(cwd);
           const second = messages[1];
@@ -320,6 +331,37 @@ export async function runAgentLoop(
           }
         } catch {
           // ignore
+        }
+
+        // Auto-lint: run linters on changed files and feed errors back
+        const allChanged = [...changedFiles];
+        const lintResults = runLint(cwd, allChanged);
+        const lintMessage = formatLintErrors(lintResults);
+        if (lintMessage) {
+          callbacks.onToolStart('auto_lint', { files: allChanged.join(', ') });
+          const errorSummary = lintResults
+            .filter((r) => r.hasErrors)
+            .map((r) => `${r.linter}: errors found`)
+            .join(', ');
+          callbacks.onToolResult({
+            tool: 'auto_lint',
+            success: false,
+            output: errorSummary,
+          });
+          // Inject lint errors so the agent can self-correct
+          if (usedNativeTools) {
+            messages.push({
+              role: 'user' as const,
+              content: lintMessage,
+            });
+          } else {
+            messages.push({
+              role: 'user' as const,
+              content: lintMessage,
+            });
+          }
+          iteration++;
+          continue; // let the agent fix the lint errors
         }
       }
 

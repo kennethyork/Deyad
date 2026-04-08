@@ -2,6 +2,7 @@
 import 'dotenv/config';
 
 import * as readline from 'node:readline';
+import * as path from 'node:path';
 import { checkOllama, listModels } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
@@ -10,6 +11,7 @@ import { loadOrCreateSession, saveSession, pruneSessions, memoryList } from './s
 import type { SessionData } from './session.js';
 import { createSnapshot, undoLast, getSnapshots, diffFromSnapshot } from './undo.js';
 import { enterSandbox, exitSandbox, isSandboxed } from './sandbox.js';
+import { buildIndex, getIndexStats, invalidateIndex } from './rag.js';
 import {
   c, box, divider, Spinner,
   printBanner, formatToolStart, formatToolEnd, formatDiff,
@@ -17,7 +19,7 @@ import {
   formatSuccess, formatTokenBadge, getPrompt,
 } from './tui.js';
 
-const VERSION = '0.1.31';
+const VERSION = '0.1.32';
 
 function printUsage(): void {
   console.log(`
@@ -412,6 +414,102 @@ async function main(): Promise<void> {
             console.log(`  ${c.cyan(e.key)} ${c.dim('—')} ${e.value.slice(0, 80)}${e.value.length > 80 ? '…' : ''}`);
           });
           console.log('');
+        }
+        ask();
+        return;
+      }
+
+      // ── Diff command ──
+      if (input === '/diff') {
+        try {
+          const { execSync } = await import('node:child_process');
+          const diff = execSync('git diff', { cwd, encoding: 'utf-8', timeout: 10000 });
+          if (diff.trim()) {
+            console.log('');
+            console.log(`  ${c.bold('Unstaged Changes')}`);
+            console.log(c.dim(diff));
+          } else {
+            const staged = execSync('git diff --cached', { cwd, encoding: 'utf-8', timeout: 10000 });
+            if (staged.trim()) {
+              console.log('');
+              console.log(`  ${c.bold('Staged Changes')}`);
+              console.log(c.dim(staged));
+            } else {
+              console.log(c.dim('  No changes detected.'));
+            }
+          }
+        } catch (e) {
+          console.log(formatError('Not a git repository or git not available.'));
+        }
+        ask();
+        return;
+      }
+
+      // ── Tokens command ──
+      if (input === '/tokens') {
+        console.log('');
+        console.log(`  ${c.bold('Token Usage')}`);
+        console.log(`  ${c.cyan('Total tokens:')}  ${c.yellow(String(totalTokens))}`);
+        console.log(`  ${c.cyan('Tasks run:')}     ${c.yellow(String(taskCount))}`);
+        if (taskCount > 0) {
+          console.log(`  ${c.cyan('Avg per task:')}  ${c.yellow(String(Math.round(totalTokens / taskCount)))}`);
+        }
+        console.log(`  ${c.cyan('Messages:')}      ${c.yellow(String(history.length))}`);
+        console.log('');
+        ask();
+        return;
+      }
+
+      // ── Index command (RAG) ──
+      if (input === '/index') {
+        console.log('');
+        const spinner = new Spinner('Indexing codebase...');
+        spinner.start();
+        buildIndex(cwd, true);
+        spinner.stop();
+        const stats = getIndexStats(cwd);
+        if (stats) {
+          console.log(formatSuccess(`Indexed ${stats.files} files → ${stats.chunks} chunks`));
+        } else {
+          console.log(formatError('Failed to build index.'));
+        }
+        console.log('');
+        ask();
+        return;
+      }
+
+      // ── Init command ──
+      if (input === '/init') {
+        const { existsSync, writeFileSync } = await import('node:fs');
+        const deyadMd = path.join(cwd, 'DEYAD.md');
+        if (existsSync(deyadMd)) {
+          console.log(c.dim('  DEYAD.md already exists.'));
+        } else {
+          const template = `# Project Instructions for Deyad
+
+<!-- Deyad reads this file before every task. Add project-specific instructions here. -->
+
+## Project Overview
+<!-- Describe what this project does -->
+
+## Tech Stack
+<!-- e.g., TypeScript, React, Node.js, Python, Rust -->
+
+## Conventions
+<!-- Coding conventions, naming patterns, file structure rules -->
+
+## Build & Test
+<!-- How to build, test, and run this project -->
+\`\`\`bash
+# npm run build
+# npm test
+\`\`\`
+
+## Important Notes
+<!-- Anything the agent should know: gotchas, restrictions, preferences -->
+`;
+          writeFileSync(deyadMd, template, 'utf-8');
+          console.log(formatSuccess('Created DEYAD.md — edit it to give the agent project-specific instructions.'));
         }
         ask();
         return;
