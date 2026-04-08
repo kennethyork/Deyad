@@ -61,7 +61,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     print: undefined,
     prompt: undefined,
     auto: false,
-    resume: false,
+    resume: true,
   };
   const positional: string[] = [];
   let i = 0;
@@ -81,6 +81,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       args.auto = true;
     } else if (arg === '--resume') {
       args.resume = true;
+    } else if (arg === '--no-resume') {
+      args.resume = false;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }

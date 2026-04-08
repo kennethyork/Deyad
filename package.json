@@ -24,7 +24,8 @@
     "lint": "eslint src/",
     "test": "vitest run",
     "test:e2e": "npm run build:all && npx playwright test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "analyze": "npm run build:all && echo '=== Bundle Sizes ===' && du -sh .vite/build/*.js 2>/dev/null && du -sh .vite/renderer/*.js 2>/dev/null; echo '=== Renderer Assets ===' && find .vite/renderer -name '*.js' -o -name '*.css' | xargs ls -lhS 2>/dev/null | head -20"
   },
   "keywords": [
     "ollama",

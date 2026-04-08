@@ -347,8 +347,16 @@ export function runAgentLoop(options: AgentOptions): () => void {
       // Get Ollama-native tool definitions
       const ollamaTools = getDesktopOllamaTools();
 
-      // Agent loop — runs until task is done or aborted (no iteration cap; Ollama is local)
+      const MAX_ITERATIONS = 50;
+      let iteration = 0;
+
+      // Agent loop — runs until task is done, aborted, or hits iteration safeguard
       while (!aborted) {
+        if (iteration >= MAX_ITERATIONS) {
+          fullOutput += `\n\n[Reached ${MAX_ITERATIONS} iteration safeguard — stopping. You can send another message to continue.]`;
+          callbacks.onContent(fullOutput);
+          break;
+        }
         // Compact conversation if it's getting too large for the context window
         compactConversation(messages);
 
@@ -634,6 +642,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
         // Add a separator in the display
         fullOutput += '\n\n---\n\n';
         callbacks.onContent(fullOutput);
+        iteration++;
       }
 
       callbacks.onDone();

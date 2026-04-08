@@ -220,7 +220,35 @@ export function globFiles(pattern: string, cwd: string): string[] {
   return allFiles.filter((file) => minimatch(file, pattern, { dot: true }));
 }
 
+/** Best-effort structured audit log — appends to ~/.deyad/audit.log */
+function auditLog(tool: string, params: Record<string, string>, result: ToolResult): void {
+  try {
+    const dir = path.join(process.env['HOME'] ?? '/tmp', '.deyad');
+    fs.mkdirSync(dir, { recursive: true });
+    const entry = {
+      ts: new Date().toISOString(),
+      tool,
+      params: Object.fromEntries(
+        Object.entries(params).map(([k, v]) => [k, v.length > 200 ? v.slice(0, 200) + '\u2026' : v]),
+      ),
+      success: result.success,
+      outputLen: result.output.length,
+    };
+    fs.appendFileSync(path.join(dir, 'audit.log'), JSON.stringify(entry) + '\n');
+  } catch { /* best-effort */ }
+}
+
 export async function executeTool(
+  call: ToolCall,
+  cwd: string,
+  cb?: ToolCallbacks,
+): Promise<ToolResult> {
+  const result = await executeToolInner(call, cwd, cb);
+  auditLog(call.name, call.params, result);
+  return result;
+}
+
+async function executeToolInner(
   call: ToolCall,
   cwd: string,
   cb?: ToolCallbacks,

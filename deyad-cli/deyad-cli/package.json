@@ -22,7 +22,8 @@
     "build:dev": "NODE_ENV=development node build.mjs --dev && NODE_OPTIONS=--enable-source-maps node dist/cli-dev.js",
     "release:readme": "cp ../README.md ./README.md",
     "release:version": "npm run build:dev -- -a full-auto 'update the CLI_VERSION in deyad-cli/src/utils/session.ts and the version in package.json to the next value.'",
-    "release": "npm run release:readme && npm run release:version && npm run build && npm publish"
+    "release": "npm run release:readme && npm run release:version && npm run build && npm publish",
+    "analyze": "node build.mjs && echo '=== Bundle Size ===' && ls -lhS dist/*.js && echo '=== Module Breakdown ===' && node -e \"const fs=require('fs');const s=fs.statSync('dist/cli.js');console.log('cli.js:',Math.round(s.size/1024)+'KB')\""
   },
   "files": [
     "dist"
