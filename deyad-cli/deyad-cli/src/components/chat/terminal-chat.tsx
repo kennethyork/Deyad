@@ -9,6 +9,7 @@ import TerminalChatInput from "./terminal-chat-input.js";
 import { TerminalChatToolCallCommand } from "./terminal-chat-tool-call-item.js";
 import { calculateContextPercentRemaining } from "./terminal-chat-utils.js";
 import TerminalMessageHistory from "./terminal-message-history.js";
+import { useOverlayState } from "./use-overlay-state.js";
 import { formatCommandForDisplay } from "../../format-command.js";
 import { useConfirmation } from "../../hooks/use-confirmation.js";
 import { useTerminalSize } from "../../hooks/use-terminal-size.js";
@@ -60,13 +61,11 @@ export default function TerminalChat({
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
   const { requestConfirmation, confirmationPrompt, submitConfirmation } =
     useConfirmation();
-  const [overlayMode, setOverlayMode] = useState<
-    "none" | "history" | "model" | "approval" | "help"
-  >("none");
-
-  const [initialPrompt, setInitialPrompt] = useState(_initialPrompt);
-  const [initialImagePaths, setInitialImagePaths] =
-    useState(_initialImagePaths);
+  const {
+    overlayMode, setOverlayMode,
+    initialPrompt, clearPrompt,
+    initialImagePaths, clearImagePaths,
+  } = useOverlayState(_initialPrompt, _initialImagePaths);
 
   const PWD = React.useMemo(() => shortCwd(), []);
 
@@ -199,8 +198,8 @@ export default function TerminalChat({
         await createInputItem(initialPrompt || "", initialImagePaths || []),
       ];
       // Clear them to prevent subsequent runs
-      setInitialPrompt("");
-      setInitialImagePaths([]);
+      clearPrompt();
+      clearImagePaths();
       agent?.run(inputItems, prevItems);
     };
     processInitialInputItems();

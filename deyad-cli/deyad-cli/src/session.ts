@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { homedir } from 'node:os';
 import type { OllamaMessage } from './ollama.js';
 
@@ -197,13 +198,45 @@ export function pruneSessions(): number {
 
 // ── Persistent Memory (key-value notes across sessions) ──
 
+/**
+ * Machine-local obfuscation for memory values at rest.
+ * Uses AES-256-CBC with a key derived from machine identity (hostname + user).
+ * Not meant as strong encryption — prevents plaintext exposure of secrets in ~/.deyad/memory/.
+ */
+const OBFUSCATION_ALGO = 'aes-256-cbc';
+function getObfuscationKey(): Buffer {
+  const seed = `deyad:${require('node:os').hostname()}:${require('node:os').userInfo().username}`;
+  return crypto.createHash('sha256').update(seed).digest();
+}
+
+function obfuscate(plaintext: string): string {
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(OBFUSCATION_ALGO, getObfuscationKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
+
+function deobfuscate(encoded: string): string {
+  const sep = encoded.indexOf(':');
+  if (sep === -1) return encoded; // legacy plaintext value
+  const iv = Buffer.from(encoded.slice(0, sep), 'hex');
+  if (iv.length !== 16) return encoded; // not obfuscated
+  try {
+    const data = Buffer.from(encoded.slice(sep + 1), 'hex');
+    const decipher = crypto.createDecipheriv(OBFUSCATION_ALGO, getObfuscationKey(), iv);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf-8');
+  } catch {
+    return encoded; // fallback: return raw value (legacy or corrupted)
+  }
+}
+
 export function memoryRead(key: string): string | null {
   ensureDir(MEMORY_DIR);
   const filePath = path.join(MEMORY_DIR, `${sanitizeKey(key)}.json`);
   if (!fs.existsSync(filePath)) return null;
   try {
     const entry: MemoryEntry = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return entry.value;
+    return deobfuscate(entry.value);
   } catch {
     return null;
   }
@@ -217,7 +250,7 @@ export function memoryWrite(key: string, value: string): void {
   
   const entry: MemoryEntry = {
     key,
-    value,
+    value: obfuscate(value),
     createdAt: existing ? new Date().toISOString() : new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

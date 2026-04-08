@@ -1,27 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
-import EditorPanel from './components/EditorPanel';
-import PreviewPanel from './components/PreviewPanel';
-import TerminalPanel from './components/TerminalPanel';
-import DatabasePanel from './components/DatabasePanel';
-import NewAppModal from './components/NewAppModal';
-import ImportModal from './components/ImportModal';
-import SettingsModal from './components/SettingsModal';
-import DeployModal from './components/DeployModal';
-import WelcomeWizard from './components/WelcomeWizard';
-import TaskQueuePanel from './components/TaskQueuePanel';
-import DiffModal from './components/DiffModal';
-import VersionHistoryPanel from './components/VersionHistoryPanel';
-import PackageManagerPanel from './components/PackageManagerPanel';
-import EnvVarsPanel from './components/EnvVarsPanel';
-import GitPanel from './components/GitPanel';
-import SearchPanel from './components/SearchPanel';
 import ConfirmDialog from './components/ConfirmDialog';
 import CommandPalette from './components/CommandPalette';
 import type { Command } from './components/CommandPalette';
 import { ToastProvider, useToast } from './components/ToastContainer';
 import { taskQueue } from './lib/taskQueue';
+
+// Lazy-loaded heavy components (Monaco editor, xterm.js, etc.)
+const EditorPanel = lazy(() => import('./components/EditorPanel'));
+const PreviewPanel = lazy(() => import('./components/PreviewPanel'));
+const TerminalPanel = lazy(() => import('./components/TerminalPanel'));
+const DatabasePanel = lazy(() => import('./components/DatabasePanel'));
+const NewAppModal = lazy(() => import('./components/NewAppModal'));
+const ImportModal = lazy(() => import('./components/ImportModal'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const DeployModal = lazy(() => import('./components/DeployModal'));
+const WelcomeWizard = lazy(() => import('./components/WelcomeWizard'));
+const TaskQueuePanel = lazy(() => import('./components/TaskQueuePanel'));
+const DiffModal = lazy(() => import('./components/DiffModal'));
+const VersionHistoryPanel = lazy(() => import('./components/VersionHistoryPanel'));
+const PackageManagerPanel = lazy(() => import('./components/PackageManagerPanel'));
+const EnvVarsPanel = lazy(() => import('./components/EnvVarsPanel'));
+const GitPanel = lazy(() => import('./components/GitPanel'));
+const SearchPanel = lazy(() => import('./components/SearchPanel'));
 
 export interface AppProject {
   id: string;
@@ -523,6 +525,7 @@ function AppInner() {
   ];
 
   return (
+    <Suspense fallback={<div className="app-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f172a', color: '#94a3b8' }}>Loading…</div>}>
     <div
       className={`app-layout mobile-show-${mobilePanel}`}
       style={{
@@ -859,5 +862,6 @@ function AppInner() {
         />
       )}
     </div>
+    </Suspense>
   );
 }

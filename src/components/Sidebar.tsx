@@ -65,22 +65,22 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
   };
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" role="complementary" aria-label="Project sidebar">
       <div className="sidebar-header">
         <span className="sidebar-logo">Deyad</span>
         <div className="sidebar-header-actions">
-          <button className="btn-import-app" onClick={onImportApp} title="Import existing project">
+          <button className="btn-import-app" onClick={onImportApp} title="Import existing project" aria-label="Import existing project">
             Import
           </button>
-          <button className="btn-new-app" onClick={onNewApp} title="New App">
+          <button className="btn-new-app" onClick={onNewApp} title="New App" aria-label="Create new app">
             +
           </button>
         </div>
       </div>
 
-      <div className="sidebar-section-label">APPS</div>
+      <div className="sidebar-section-label" id="sidebar-apps-label">APPS</div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" aria-labelledby="sidebar-apps-label" role="navigation">
         {apps.length === 0 && (
           <p className="sidebar-empty">No apps yet</p>
         )}
@@ -89,6 +89,11 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
             key={app.id}
             className={`sidebar-item ${selectedApp?.id === app.id ? 'active' : ''}`}
             onClick={() => renamingId !== app.id && onSelectApp(app)}
+            role="button"
+            tabIndex={0}
+            aria-current={selectedApp?.id === app.id ? 'true' : undefined}
+            aria-label={`Select app ${app.name}`}
+            onKeyDown={(e) => { if (e.key === 'Enter' && renamingId !== app.id) onSelectApp(app); }}
           >
             <span className="sidebar-item-icon" />
             {renamingId === app.id ? (
@@ -145,14 +150,14 @@ export default function Sidebar({ apps, selectedApp, onSelectApp, onNewApp, onDe
         ))}
       </nav>
 
-      <div className="sidebar-footer">
-        <button className="sidebar-tasks-btn" onClick={onOpenTaskQueue} title="Background task queue">
-          Tasks{activeTasks > 0 && <span className="task-badge">{activeTasks}</span>}
+      <div className="sidebar-footer" role="toolbar" aria-label="Sidebar actions">
+        <button className="sidebar-tasks-btn" onClick={onOpenTaskQueue} title="Background task queue" aria-label={`Task queue${activeTasks > 0 ? `, ${activeTasks} active` : ''}`}>
+          Tasks{activeTasks > 0 && <span className="task-badge" aria-hidden="true">{activeTasks}</span>}
         </button>
-        <button className="sidebar-history-btn" onClick={onOpenVersionHistory} title="Version history">
+        <button className="sidebar-history-btn" onClick={onOpenVersionHistory} title="Version history" aria-label="Version history">
           History
         </button>
-        <button className="sidebar-settings-btn" onClick={onOpenSettings} title="Settings">
+        <button className="sidebar-settings-btn" onClick={onOpenSettings} title="Settings" aria-label="Settings">
           Settings
         </button>
       </div>

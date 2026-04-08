@@ -86,6 +86,19 @@ export async function streamChat(
   tools?: OllamaTool[],
 ): Promise<StreamChatResult> {
   const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+
+  // Health check: verify Ollama is reachable before starting the stream
+  try {
+    const ping = await fetch(`${baseUrl}/api/tags`, { signal: signal ?? AbortSignal.timeout(5000) });
+    if (!ping.ok) throw new Error(`Ollama returned ${ping.status}`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Cannot reach Ollama at ${baseUrl} — ${msg}.\n` +
+      `Make sure Ollama is running: ollama serve`
+    );
+  }
+
   const body = {
     model,
     messages,

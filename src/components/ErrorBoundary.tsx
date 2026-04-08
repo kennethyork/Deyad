@@ -29,10 +29,12 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
           color: '#f8fafc', fontFamily: 'sans-serif', textAlign: 'center', gap: '1rem',
           padding: '2rem',
         }}>
-          <div style={{ fontSize: '3rem' }}></div>
+          <div style={{ fontSize: '3rem' }} aria-hidden="true"></div>
           <h1 style={{ margin: 0 }}>Something went wrong</h1>
           <p style={{ color: '#94a3b8', maxWidth: '480px', margin: 0 }}>
-            An unexpected error occurred. You can try reloading the app.
+            An unexpected error occurred. Your project data is safe.
+            Try reloading — if the issue persists, check the Ollama connection
+            or open DevTools (Ctrl+Shift+I) for details.
           </p>
           {this.state.error && (
             <pre style={{

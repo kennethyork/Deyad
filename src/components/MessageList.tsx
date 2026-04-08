@@ -22,8 +22,8 @@ export default memo(function MessageList({ messages, pendingPlan, streaming, onA
   return (
     <>
       {messages.map((m) => (
-        <div key={m.id} className={`message message-${m.role}`}>
-          <div className="message-avatar">{m.role === 'user' ? '👤' : '🤖'}</div>
+        <div key={m.id} className={`message message-${m.role}`} role="article" aria-label={`${m.role === 'user' ? 'User' : 'Assistant'} message`}>
+          <div className="message-avatar" aria-hidden="true">{m.role === 'user' ? '👤' : '🤖'}</div>
           <div className="message-body">
             {m.model && <span className="model-badge">{m.model}</span>}
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>

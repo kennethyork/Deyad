@@ -239,8 +239,11 @@ export async function executeTool(
         if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         const content = fs.readFileSync(absPath, 'utf-8');
-        if (content.length > 50000) {
-          return { tool: call.name, success: true, output: content.slice(0, 50000) + '\n... (truncated, file too large)' };
+        if (content.length > 200000) {
+          // Keep first 150KB + last 10KB so head and tail context are preserved
+          const head = content.slice(0, 150000);
+          const tail = content.slice(-10000);
+          return { tool: call.name, success: true, output: head + '\n\n... (truncated ' + Math.round(content.length / 1024) + 'KB file) ...\n\n' + tail };
         }
         return { tool: call.name, success: true, output: content };
       }

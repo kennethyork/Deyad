@@ -58,6 +58,8 @@ export default memo(function ChatInput({
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
+      role="form"
+      aria-label="Chat input"
     >
       {imageAttachment && (
         <div className="image-preview">
@@ -89,13 +91,14 @@ export default memo(function ChatInput({
           rows={2}
           placeholder={streaming ? 'AI is responding…' : imageAttachment ? 'Describe what to build from this image…' : 'Describe what you want to build…'}
           disabled={streaming}
+          aria-label="Chat message input"
         />
         {streaming ? (
-          <button className="btn-stop" onClick={onStop} title="Stop agent" type="button">
+          <button className="btn-stop" onClick={onStop} title="Stop agent" type="button" aria-label="Stop AI response">
             ■
           </button>
         ) : (
-          <button className="btn-send" onClick={onSend} disabled={!input.trim()}>
+          <button className="btn-send" onClick={onSend} disabled={!input.trim()} aria-label="Send message">
             {agentMode ? '⚡' : '↑'}
           </button>
         )}
