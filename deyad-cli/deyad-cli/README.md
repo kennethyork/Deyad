@@ -49,7 +49,7 @@ deyad --sandbox
 ## Configuration
 
 | Environment Variable | Description | Default |
-|---|---|---|
+| --- | --- | --- |
 | `OLLAMA_HOST` | Ollama API endpoint | `http://127.0.0.1:11434` |
 | `DEYAD_MODEL` | Default model name | (prompted on first run) |
 | `DEYAD_DEBUG` | Enable verbose debug logging | unset |

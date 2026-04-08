@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { rollbackTo, diffFromSnapshot } from '../src/undo.js';
+import { rollbackTo, diffFromSnapshot, createSnapshot, undoLast, getSnapshots, createCheckpoint } from '../src/undo.js';
 
 let tmpDir: string;
 
@@ -78,5 +78,68 @@ describe('diffFromSnapshot', () => {
     const head = git(['rev-parse', 'HEAD'], tmpDir);
     const diff = diffFromSnapshot(tmpDir, head);
     expect(diff).toMatch(/no changes/);
+  });
+});
+
+describe('createSnapshot', () => {
+  it('returns null for a non-git directory', () => {
+    expect(createSnapshot(tmpDir, 'test')).toBeNull();
+  });
+
+  it('creates a snapshot from a clean HEAD', () => {
+    initRepo();
+    const snap = createSnapshot(tmpDir, 'before changes');
+    expect(snap).not.toBeNull();
+    expect(snap!.description).toBe('before changes');
+    expect(snap!.ref).toMatch(/^[0-9a-f]{40}$/);
+    expect(snap!.timestamp).toBeTruthy();
+  });
+
+  it('creates a snapshot with uncommitted changes', () => {
+    initRepo();
+    fs.writeFileSync(path.join(tmpDir, 'dirty.txt'), 'dirty');
+    const snap = createSnapshot(tmpDir, 'dirty state');
+    expect(snap).not.toBeNull();
+    // Working directory should still have the dirty file after snapshot
+    expect(fs.existsSync(path.join(tmpDir, 'dirty.txt'))).toBe(true);
+  });
+});
+
+describe('getSnapshots', () => {
+  it('returns an array of snapshots', () => {
+    const snaps = getSnapshots();
+    expect(Array.isArray(snaps)).toBe(true);
+  });
+});
+
+describe('createCheckpoint', () => {
+  it('returns null for a non-git directory', () => {
+    expect(createCheckpoint(tmpDir, 'test')).toBeNull();
+  });
+
+  it('returns HEAD ref when no changes to commit', () => {
+    initRepo();
+    const head = git(['rev-parse', 'HEAD'], tmpDir);
+    const ref = createCheckpoint(tmpDir, 'no changes');
+    expect(ref).toBe(head);
+  });
+
+  it('creates a commit checkpoint with uncommitted changes', () => {
+    initRepo();
+    fs.writeFileSync(path.join(tmpDir, 'new-file.txt'), 'checkpoint content');
+    const ref = createCheckpoint(tmpDir, 'my checkpoint');
+    expect(ref).not.toBeNull();
+    expect(ref).toMatch(/^[0-9a-f]{40}$/);
+    // The commit message should contain the checkpoint tag
+    const log = git(['log', '-1', '--format=%s'], tmpDir);
+    expect(log).toContain('deyad-checkpoint');
+  });
+});
+
+describe('undoLast', () => {
+  it('returns failure for a non-git directory', () => {
+    const result = undoLast(tmpDir);
+    expect(result.success).toBe(false);
+    expect(result.message).toContain('Not a git repository');
   });
 });

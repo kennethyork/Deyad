@@ -4,7 +4,7 @@
  * so the user can roll back any changes the agent made.
  */
 
-import { execFileSync } from 'node:child_process';
+import { git, isGitRepo, hasChanges } from './git-utils.js';
 
 export interface Snapshot {
   type: 'stash' | 'commit';
@@ -14,28 +14,6 @@ export interface Snapshot {
 }
 
 const snapshots: Snapshot[] = [];
-
-function git(args: string[], cwd: string): string {
-  return execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf-8' }).toString().trim();
-}
-
-function isGitRepo(cwd: string): boolean {
-  try {
-    git(['rev-parse', '--is-inside-work-tree'], cwd);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function hasChanges(cwd: string): boolean {
-  try {
-    const status = git(['status', '--porcelain'], cwd);
-    return status.length > 0;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Take a snapshot of the current state before the agent makes changes.

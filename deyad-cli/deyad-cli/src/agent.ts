@@ -18,17 +18,15 @@ import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { ToolCall } from './tools.js';
 import { runLint, formatLintErrors } from './lint.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
+import { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
+
+// Re-export compaction symbols so existing consumers are not broken
+export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
 
 // ── Documented constants ──────────────────────────────────────────────────
 
-/** Maximum conversation size (chars) before compaction kicks in. ~32k tokens at ~4 chars/token. */
-const MAX_CONVERSATION_CHARS = 128_000;
-
 /** Maximum agent iterations to prevent infinite loops. */
 const MAX_ITERATIONS = 50;
-
-/** Number of recent messages to keep when compacting conversation history. */
-const COMPACT_KEEP_RECENT = 10;
 
 /** Maximum retries for nudging a non-acting model to use tools. */
 const MAX_NUDGE_RETRIES = 2;
@@ -78,44 +76,6 @@ export interface AgentResult {
   history: OllamaMessage[];
   changedFiles: string[];
   stats: TokenStats;
-}
-
-/** Compact conversation history when it exceeds {@link MAX_CONVERSATION_CHARS}. */
-function compactConversation(messages: OllamaMessage[]): void {
-  const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
-  if (totalChars <= MAX_CONVERSATION_CHARS) return;
-
-  let firstNonSystem = 0;
-  while (firstNonSystem < messages.length && messages[firstNonSystem]?.role === 'system') {
-    firstNonSystem++;
-  }
-
-  const nonSystemCount = messages.length - firstNonSystem;
-  if (nonSystemCount <= COMPACT_KEEP_RECENT) return;
-
-  const compactEnd = messages.length - COMPACT_KEEP_RECENT;
-  const toSummarize = messages.slice(firstNonSystem, compactEnd);
-
-  const summaryParts: string[] = [];
-  for (const msg of toSummarize) {
-    if (msg.role === 'assistant') {
-      const prose = stripToolMarkup(msg.content).slice(0, 200);
-      if (prose) summaryParts.push(`Agent: ${prose}`);
-    } else if (msg.role === 'tool') {
-      summaryParts.push(`Tool: ${msg.tool_name ?? 'unknown'} result`);
-    } else if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
-      const toolNames = [...msg.content.matchAll(/<name>([^<]+)<\/name>/g)].map((m) => m[1]);
-      if (toolNames.length) summaryParts.push(`Tools: ${toolNames.join(', ')}`);
-    } else if (msg.role === 'user') {
-      summaryParts.push(`User: ${msg.content.slice(0, 200)}`);
-    }
-  }
-
-  const summary = `[Earlier conversation compacted]\n${summaryParts.join('\n')}`;
-  messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
-    role: 'system' as const,
-    content: summary,
-  });
 }
 
 // ── Extracted helpers (exported for unit testing) ─────────────────────────

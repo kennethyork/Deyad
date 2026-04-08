@@ -40,6 +40,8 @@ Deyad is designed with a **local-first** security model:
 - All AI inference runs locally via Ollama — no data leaves your machine
 - Electron context isolation and sandboxed preload bridge
 - IPC channel allowlisting — only declared channels are exposed
+- Content Security Policy enforced via `session.webRequest.onHeadersReceived`
+  - `'unsafe-eval'` is required in `script-src` for the Monaco Editor's web-worker evaluation; this is scoped to `file://` and `http://localhost` origins only
 - No telemetry, no analytics, no cloud dependencies
 
 ### CLI Agent

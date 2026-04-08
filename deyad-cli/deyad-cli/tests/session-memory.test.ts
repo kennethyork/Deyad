@@ -2,7 +2,7 @@
  * Tests for session memory — encryption roundtrip, CRUD, key sanitization.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { memoryWrite, memoryRead, memoryList, memoryDelete } from '../src/session.js';
+import { memoryWrite, memoryRead, memoryList, memoryDelete, loadOrCreateSession, saveSession, listSessions, deleteSession, pruneSessions } from '../src/session.js';
 
 // Use a unique prefix so tests don't collide with real memory
 const PREFIX = `__test_${Date.now()}_`;
@@ -95,5 +95,71 @@ describe('session memory — key sanitization', () => {
     memoryWrite(key, 'safe');
     expect(memoryRead(key)).toBe('safe');
     memoryDelete(key);
+  });
+});
+
+// ── Session persistence tests ─────────────────────────────────────────────
+
+describe('session persistence — loadOrCreateSession', () => {
+  const testCwd = `/tmp/deyad-session-test-${Date.now()}`;
+
+  afterEach(() => {
+    // Clean up sessions created during test
+    for (const s of listSessions()) {
+      if (s.cwd === testCwd) deleteSession(s.id);
+    }
+  });
+
+  it('creates a new session when none exists', () => {
+    const session = loadOrCreateSession(testCwd, 'llama3');
+    expect(session).toBeDefined();
+    expect(session.model).toBe('llama3');
+    expect(session.cwd).toBe(testCwd);
+    expect(session.history).toEqual([]);
+    expect(session.totalTokens).toBe(0);
+  });
+
+  it('returns existing session on second call', () => {
+    const s1 = loadOrCreateSession(testCwd, 'llama3');
+    const s2 = loadOrCreateSession(testCwd, 'llama3');
+    expect(s2.id).toBe(s1.id);
+  });
+});
+
+describe('session persistence — saveSession + listSessions', () => {
+  const testCwd = `/tmp/deyad-session-save-test-${Date.now()}`;
+  let sessionId: string;
+
+  afterEach(() => {
+    if (sessionId) deleteSession(sessionId);
+  });
+
+  it('saves and lists sessions', () => {
+    const session = loadOrCreateSession(testCwd, 'codellama');
+    sessionId = session.id;
+    session.totalTokens = 42;
+    saveSession(session);
+
+    const all = listSessions();
+    const found = all.find((s) => s.id === sessionId);
+    expect(found).toBeDefined();
+    expect(found!.totalTokens).toBe(42);
+  });
+});
+
+describe('session persistence — deleteSession', () => {
+  it('deletes an existing session', () => {
+    const testCwd = `/tmp/deyad-session-del-test-${Date.now()}`;
+    const session = loadOrCreateSession(testCwd, 'llama3');
+    expect(deleteSession(session.id)).toBe(true);
+    expect(deleteSession(session.id)).toBe(false); // already deleted
+  });
+});
+
+describe('session persistence — pruneSessions', () => {
+  it('returns number of pruned sessions (0 when under limit)', () => {
+    const count = pruneSessions();
+    expect(typeof count).toBe('number');
+    expect(count).toBeGreaterThanOrEqual(0);
   });
 });

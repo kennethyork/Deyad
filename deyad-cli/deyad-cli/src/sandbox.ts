@@ -3,7 +3,7 @@
  * Creates a temporary git branch for agent work that can be reviewed before merging.
  */
 
-import { execFileSync } from 'node:child_process';
+import { git, isGitRepo, getCurrentBranch } from './git-utils.js';
 
 export interface SandboxState {
   active: boolean;
@@ -13,23 +13,6 @@ export interface SandboxState {
 }
 
 let sandbox: SandboxState | null = null;
-
-function git(args: string[], cwd: string, encoding?: 'utf-8'): string {
-  return execFileSync('git', args, { cwd, stdio: 'pipe', encoding: encoding ?? 'utf-8' }).toString().trim();
-}
-
-function isGitRepo(cwd: string): boolean {
-  try {
-    git(['rev-parse', '--is-inside-work-tree'], cwd);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function getCurrentBranch(cwd: string): string {
-  return git(['branch', '--show-current'], cwd);
-}
 
 /**
  * Enter sandbox mode — creates a temporary branch for agent work.

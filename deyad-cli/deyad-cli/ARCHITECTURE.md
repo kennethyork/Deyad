@@ -2,7 +2,7 @@
 
 ## Module Overview
 
-```
+```text
 src/
 ├── cli.ts        # Entry point — argument parsing, REPL, mode dispatch
 ├── tui.ts        # Terminal UI — readline interface, colors, spinners
@@ -18,7 +18,7 @@ src/
 
 ## Data Flow
 
-```
+```text
 User input
     │
     ▼
@@ -46,20 +46,25 @@ session.ts::saveSession() — persist conversation for --resume
 ## Key Design Decisions
 
 ### Tool Registry Pattern
+
 Tools are registered in a `Map<string, ToolHandler>` (`toolRegistry`). Built-in tools auto-register on import. Custom tools can be added via `toolRegistry.set('name', handler)` without modifying core code.
 
 ### Security Model
+
 Every file operation resolves the path and validates it starts with the project `cwd`. Shell commands are parsed with `shell-quote` to detect operators — simple commands use `execFileSync` (no shell), complex ones fall back to `execSync`. SSRF protection blocks all private/link-local IPs and non-HTTP schemes.
 
 ### Conversation Compaction
+
 When conversation exceeds 128k chars (~32k tokens), older messages are summarized into a compact system message, keeping only the 10 most recent messages intact.
 
 ### RAG Strategy
+
 Uses BM25 (Okapi variant) on code chunks (~40 lines each). Index is cached for 60 seconds and invalidated when the agent writes files. Stop words and camelCase splitting improve relevance.
 
 ### Constants
+
 | Constant | Value | Rationale |
-|---|---|---|
+| --- | --- | --- |
 | `MAX_CONVERSATION_CHARS` | 128,000 | ~32k tokens at 4 chars/token, fits most Ollama context windows |
 | `MAX_ITERATIONS` | 50 | Prevent infinite agent loops |
 | `COMPACT_KEEP_RECENT` | 10 | Keep enough recent context for coherent multi-turn |
