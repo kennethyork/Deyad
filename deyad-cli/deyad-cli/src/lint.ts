@@ -103,7 +103,7 @@ export function runLint(cwd: string, changedFiles: string[]): LintResult[] {
         command = command.replace(' {files}', '');
       }
 
-      const output = execSync(command, {
+      execSync(command, {
         cwd,
         encoding: 'utf-8',
         timeout: 30_000,
