@@ -7,7 +7,6 @@ import type { OllamaMessage, OllamaOptions, OllamaToolCall } from './ollama.js';
 import { parseToolCalls, isDone, stripToolMarkup, executeTool, TOOLS_DESCRIPTION, getOllamaTools } from './tools.js';
 import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { ToolCall } from './tools.js';
-import type { McpManager } from './mcp.js';
 import { runLint, formatLintErrors } from './lint.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
 const MAX_CONVERSATION_CHARS = 128_000;
@@ -83,12 +82,12 @@ function compactConversation(messages: OllamaMessage[]): void {
   });
 }
 
-function getSystemPrompt(cwd: string, mcpToolsDesc: string = ''): string {
+function getSystemPrompt(cwd: string): string {
   return `You are Deyad, an expert AI coding agent running in the user's terminal.
 You have full access to their project at: ${cwd}
 You can read, write, edit, and delete files, run shell commands, search code, manage git, and fetch URLs.
 
-${TOOLS_DESCRIPTION}${mcpToolsDesc}
+${TOOLS_DESCRIPTION}
 
 TOOL CALL FORMAT — you MUST use this exact XML format:
 <tool_call>
@@ -205,7 +204,6 @@ export async function runAgentLoop(
   callbacks: AgentCallbacks,
   history: OllamaMessage[] = [],
   ollamaOptions?: OllamaOptions,
-  mcpManager?: McpManager,
 ): Promise<AgentResult> {
   const abortController = new AbortController();
   const changedFiles: string[] = [];
@@ -215,7 +213,6 @@ export async function runAgentLoop(
 
   try {
     const context = await buildContext(cwd);
-    const mcpToolsDesc = mcpManager ? mcpManager.getToolsDescription() : '';
 
     // RAG: retrieve relevant codebase chunks for the user's query
     const userQuery = typeof userMessage === 'string' ? userMessage : userMessage.content;
@@ -223,7 +220,7 @@ export async function runAgentLoop(
     const ragContext = formatRAGContext(ragResults);
 
     const messages: OllamaMessage[] = [
-      { role: 'system', content: getSystemPrompt(cwd, mcpToolsDesc) },
+      { role: 'system', content: getSystemPrompt(cwd) },
       { role: 'system', content: `Project context:\n\n${context}${ragContext}` },
       ...history,
       typeof userMessage === 'string' ? { role: 'user', content: userMessage } : userMessage,
@@ -323,7 +320,7 @@ export async function runAgentLoop(
 
       let results: ToolResult[] = [];
       let filesChanged = false;
-      const allReadOnly = toolCalls.every((c) => readOnlyTools.has(c.name) || (mcpManager?.isMcpTool(c.name) ?? false));
+      const allReadOnly = toolCalls.every((c) => readOnlyTools.has(c.name));
       if (allReadOnly && toolCalls.length > 1) {
         for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
         results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));

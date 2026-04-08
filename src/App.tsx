@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -6,6 +6,11 @@ import CommandPalette from './components/CommandPalette';
 import type { Command } from './components/CommandPalette';
 import { ToastProvider, useToast } from './components/ToastContainer';
 import { taskQueue } from './lib/taskQueue';
+import { useAppReducer, defaultPerAppState } from './hooks/useAppReducer';
+import type { PerAppState } from './hooks/useAppReducer';
+import { useModals } from './hooks/useModals';
+import { useLayout } from './hooks/useLayout';
+import { useSettings } from './hooks/useSettings';
 
 // Lazy-loaded heavy components (Monaco editor, xterm.js, etc.)
 const EditorPanel = lazy(() => import('./components/EditorPanel'));
@@ -36,29 +41,6 @@ export interface AppProject {
   guiPort?: number;
 }
 
-type RightTab = 'editor' | 'preview' | 'terminal' | 'database' | 'envvars' | 'packages' | 'git' | 'search';
-
-/** Per-app state that persists across app switches. */
-interface PerAppState {
-  appFiles: Record<string, string>;
-  selectedFile: string | null;
-  dbStatus: 'none' | 'running' | 'stopped';
-  rightTab: RightTab;
-  canRevert: boolean;
-  pendingDiffFiles: Record<string, string> | null;
-  preAgentFiles: Record<string, string> | null;
-}
-
-const defaultPerAppState: PerAppState = {
-  appFiles: {},
-  selectedFile: null,
-  dbStatus: 'none',
-  rightTab: 'editor',
-  canRevert: false,
-  pendingDiffFiles: null,
-  preAgentFiles: null,
-};
-
 export default function App() {
   return (
     <ToastProvider>
@@ -69,84 +51,38 @@ export default function App() {
 
 function AppInner() {
   const { addToast } = useToast();
-  const [apps, setApps] = useState<AppProject[]>([]);
-  const [selectedApp, setSelectedApp] = useState<AppProject | null>(null);
-  const [perApp, setPerApp] = useState<Record<string, PerAppState>>({});
-  const perAppRef = useRef(perApp);
-  perAppRef.current = perApp;
-  const [openedApps, setOpenedApps] = useState<string[]>([]);
-  // sidebar width resizer
-  const [showNewAppModal, setShowNewAppModal] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showDeployModal, setShowDeployModal] = useState(false);
-  const [showTaskQueue, setShowTaskQueue] = useState(false);
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [_showEnvEditor, _setShowEnvEditor] = useState(false);
-  const [_showPackageManager, _setShowPackageManager] = useState(false);
-  const [showCommandPalette, setShowCommandPalette] = useState(false);
-  const [activeTasks, setActiveTasks] = useState(0);
-  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
-  const [mobilePanel, setMobilePanel] = useState<'sidebar' | 'chat' | 'right'>('chat');
-  const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
-  const [completionModel, setCompletionModel] = useState('');
-  const [defaultModel, setDefaultModel] = useState('');
-  const [showWizard, setShowWizard] = useState(false);
-  const [exportConfirm, setExportConfirm] = useState<{ open: boolean; appId: string }>({ open: false, appId: '' });
-  const [exportResult, setExportResult] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem('deyad-theme') as 'dark' | 'light') || 'dark';
-  });
 
-  // Helper to update per-app state
-  const updatePerApp = useCallback((appId: string, updates: Partial<PerAppState>) => {
-    setPerApp(prev => ({
-      ...prev,
-      [appId]: { ...(prev[appId] ?? defaultPerAppState), ...updates },
-    }));
-  }, []);
+  // ── State: core app state via useReducer ──
+  const { state, dispatch, perAppRef, updatePerApp, cur } = useAppReducer();
+  const { apps, selectedApp, perApp, openedApps, previewRefreshKey, pendingPrompt, activeTasks } = state;
 
-  // Derived state for the currently selected app
-  const cur = selectedApp ? (perApp[selectedApp.id] ?? defaultPerAppState) : defaultPerAppState;
+  // ── State: modals ──
+  const modals = useModals();
 
-  // resizable panels (persist sizes in localStorage)
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const stored = localStorage.getItem('sidebarWidth');
-    const n = stored ? parseInt(stored, 10) : NaN;
-    return isNaN(n) ? 220 : n;
-  });
-  const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [rightWidth, setRightWidth] = useState<number>(() => {
-    const stored = localStorage.getItem('rightWidth');
-    const n = stored ? parseInt(stored, 10) : NaN;
-    return isNaN(n) ? 340 : n;
-  });
+  // ── State: layout (sidebar/right widths, mobile panel) ──
+  const layout = useLayout();
+
+  // ── State: settings (theme, autocomplete, models) ──
+  const settings = useSettings();
 
   // Load app list on mount
   useEffect(() => {
     loadApps();
-    // Load autocomplete settings
-    window.deyad.getSettings().then((s) => {
-      setAutocompleteEnabled(s.autocompleteEnabled ?? false);
-      setCompletionModel(s.completionModel ?? '');
-      setDefaultModel(s.defaultModel ?? '');
-      if (s.theme) {
-        setTheme(s.theme);
-        localStorage.setItem('deyad-theme', s.theme);
-      }
-      if (!s.hasCompletedWizard) setShowWizard(true);
-    }).catch((err) => console.warn('Failed to load settings:', err));
+    settings.loadSettings().then((s) => {
+      if (s && !s.hasCompletedWizard) modals.setShowWizard(true);
+    });
   }, []);
 
   // Subscribe to task queue changes for activity badge
   useEffect(() => {
     const unsub = taskQueue.subscribe(() => {
       const active = taskQueue.getAll().filter((t) => t.status === 'running' || t.status === 'queued');
-      setActiveTasks(active.length);
+      dispatch({ type: 'SET_ACTIVE_TASKS', count: active.length });
     });
-    // Set initial count
-    setActiveTasks(taskQueue.getAll().filter((t) => t.status === 'running' || t.status === 'queued').length);
+    dispatch({
+      type: 'SET_ACTIVE_TASKS',
+      count: taskQueue.getAll().filter((t) => t.status === 'running' || t.status === 'queued').length,
+    });
     return unsub;
   }, []);
 
@@ -155,34 +91,17 @@ function AppInner() {
     taskQueue.setOnFilesChanged(async (appId) => {
       const files = await window.deyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files });
-      setPreviewRefreshKey(k => k + 1);
+      dispatch({ type: 'REFRESH_PREVIEW' });
     });
     return () => taskQueue.setOnFilesChanged(null);
   }, [updatePerApp]);
-
-  // persist when sizes change (sidebar & right panel) and update CSS variables
-  useEffect(() => {
-    localStorage.setItem('sidebarWidth', sidebarWidth.toString());
-    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
-  }, [sidebarWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('rightWidth', rightWidth.toString());
-    document.documentElement.style.setProperty('--editor-width', `${rightWidth}px`);
-  }, [rightWidth]);
-
-  // Apply theme class to <html>
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('deyad-theme', theme);
-  }, [theme]);
 
   // Command palette & search keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
-        setShowCommandPalette((v) => !v);
+        modals.setShowCommandPalette((v) => !v);
       }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
         e.preventDefault();
@@ -198,25 +117,35 @@ function AppInner() {
   // Subscribe to DB status events (any app)
   useEffect(() => {
     const unsub = window.deyad.onDbStatus(({ appId, status }) => {
-      setPerApp(prev => {
-        if (!prev[appId]) return prev;
-        return {
-          ...prev,
-          [appId]: { ...prev[appId], dbStatus: status as 'running' | 'stopped' },
-        };
-      });
+      // Only update if we have per-app state for this app
+      if (perAppRef.current[appId]) {
+        updatePerApp(appId, { dbStatus: status as 'running' | 'stopped' });
+      }
     });
     return unsub;
   }, []);
 
+  // global context menu support
+  useEffect(() => {
+    const handleContext = (e: MouseEvent) => {
+      e.preventDefault();
+      const el = e.target as HTMLElement;
+      if (!el.closest('.terminal-panel')) {
+        window.deyad.showContextMenu('global');
+      }
+    };
+    window.addEventListener('contextmenu', handleContext);
+    return () => window.removeEventListener('contextmenu', handleContext);
+  }, []);
+
   const loadApps = async () => {
     const list = await window.deyad.listApps();
-    setApps(list);
+    dispatch({ type: 'SET_APPS', apps: list });
   };
 
   const selectApp = useCallback(async (app: AppProject) => {
-    setSelectedApp(app);
-    setOpenedApps(prev => prev.includes(app.id) ? prev : [...prev, app.id]);
+    dispatch({ type: 'SELECT_APP', app });
+    dispatch({ type: 'OPEN_APP', appId: app.id });
 
     try {
       const files = await window.deyad.readFiles(app.id);
@@ -228,37 +157,24 @@ function AppInner() {
         dbSt = result.status as 'none' | 'running' | 'stopped';
       }
 
-      // Update files and status but preserve other per-app state (selectedFile, rightTab, etc.)
-      setPerApp(prev => {
-        const existing = prev[app.id] ?? defaultPerAppState;
-        return {
-          ...prev,
-          [app.id]: { ...existing, appFiles: files, canRevert: hasSnap, dbStatus: dbSt },
-        };
-      });
+      updatePerApp(app.id, { appFiles: files, canRevert: hasSnap, dbStatus: dbSt });
     } catch (err) {
       console.error('Failed to load app:', err);
-      setSelectedApp(null);
+      dispatch({ type: 'SELECT_APP', app: null });
     }
-  }, []);
+  }, [updatePerApp]);
 
   const handleFilesUpdated = useCallback((appId: string, newFiles: Record<string, string>) => {
-    setPerApp(prev => {
-      const s = prev[appId] ?? defaultPerAppState;
-      const newPending = s.pendingDiffFiles
-        ? { ...s.pendingDiffFiles, ...newFiles }
-        : newFiles;
-      const newPreAgent = s.pendingDiffFiles
-        ? s.preAgentFiles
-        : { ...s.appFiles };
-      return {
-        ...prev,
-        [appId]: { ...s, pendingDiffFiles: newPending, preAgentFiles: newPreAgent },
-      };
-    });
-    // Trigger preview iframe refresh after agent writes files
-    setPreviewRefreshKey(k => k + 1);
-  }, []);
+    const s = perAppRef.current[appId] ?? defaultPerAppState;
+    const newPending = s.pendingDiffFiles
+      ? { ...s.pendingDiffFiles, ...newFiles }
+      : newFiles;
+    const newPreAgent = s.pendingDiffFiles
+      ? s.preAgentFiles
+      : { ...s.appFiles };
+    updatePerApp(appId, { pendingDiffFiles: newPending, preAgentFiles: newPreAgent });
+    dispatch({ type: 'REFRESH_PREVIEW' });
+  }, [updatePerApp]);
 
   const handleApplyDiff = useCallback(async () => {
     if (!selectedApp) return;
@@ -269,7 +185,6 @@ function AppInner() {
     if (s.preAgentFiles) {
       await window.deyad.snapshotFiles(appId, s.preAgentFiles);
     }
-    // Write pending files to disk (chat mode doesn't write them during generation)
     await window.deyad.writeFiles(appId, s.pendingDiffFiles);
     const freshFiles = await window.deyad.readFiles(appId);
     const firstKey = Object.keys(s.pendingDiffFiles)[0];
@@ -281,7 +196,7 @@ function AppInner() {
     };
     if (firstKey) updates.selectedFile = firstKey;
     updatePerApp(appId, updates);
-    setPreviewRefreshKey(k => k + 1);
+    dispatch({ type: 'REFRESH_PREVIEW' });
   }, [selectedApp, updatePerApp]);
 
   const handleRejectDiff = useCallback(async () => {
@@ -299,7 +214,6 @@ function AppInner() {
       if (filePath in s.preAgentFiles) {
         revertMap[filePath] = s.preAgentFiles[filePath];
       } else {
-        // File didn't exist before — delete it from disk
         newFilePaths.push(filePath);
       }
     }
@@ -320,78 +234,27 @@ function AppInner() {
     if (!selectedApp) return;
     const appId = selectedApp.id;
     await window.deyad.writeFiles(appId, { [filePath]: content });
-    setPerApp(prev => {
-      const s = prev[appId] ?? defaultPerAppState;
-      return {
-        ...prev,
-        [appId]: { ...s, appFiles: { ...s.appFiles, [filePath]: content } },
-      };
-    });
-    setPreviewRefreshKey(k => k + 1);
-  }, [selectedApp]);
-
-
-
-  // global context menu support
-  useEffect(() => {
-    const handleContext = (e: MouseEvent) => {
-      e.preventDefault();
-      // if right-click happened inside terminal, we let TerminalPanel handle it;
-      // otherwise show a generic global menu (copy/paste/select all).
-      const el = e.target as HTMLElement;
-      if (!el.closest('.terminal-panel')) {
-        window.deyad.showContextMenu('global');
-      }
-    };
-    window.addEventListener('contextmenu', handleContext);
-    return () => window.removeEventListener('contextmenu', handleContext);
-  }, []);
-
-  // drag resizing helpers
-  const startDrag = (type: 'sidebar' | 'right', startX: number) => {
-    const initSidebar = sidebarWidth;
-    const initRight = rightWidth;
-    const move = (e: MouseEvent) => {
-      const dx = e.clientX - startX;
-      if (type === 'sidebar') {
-        setSidebarWidth(Math.max(100, initSidebar + dx));
-      } else {
-        setRightWidth(Math.max(200, initRight - dx));
-      }
-    };
-    const up = () => {
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  };
-
+    updatePerApp(appId, { appFiles: { ...(perAppRef.current[appId]?.appFiles ?? {}), [filePath]: content } });
+    dispatch({ type: 'REFRESH_PREVIEW' });
+  }, [selectedApp, updatePerApp]);
 
   const handleCreateApp = async (name: string, description: string, appType: 'frontend' | 'fullstack', templatePrompt?: string) => {
     const app = await window.deyad.createApp(name, description, appType, 'sqlite');
-    setShowNewAppModal(false);
+    modals.setShowNewAppModal(false);
     await loadApps();
 
     if (appType === 'fullstack') {
-      // Write scaffold files with SQLite configuration
       const { generateFullStackScaffold } = await import('./lib/scaffoldGenerator');
-      const scaffold = generateFullStackScaffold({
-        appName: name,
-        description,
-        guiPort: app.guiPort,
-      });
+      const scaffold = generateFullStackScaffold({ appName: name, description, guiPort: app.guiPort });
       await window.deyad.writeFiles(app.id, scaffold);
     } else {
-      // Write a minimal runnable Vite scaffold so the app can be previewed right away
       const { generateFrontendScaffold } = await import('./lib/scaffoldGenerator');
       const scaffold = generateFrontendScaffold({ appName: name, description });
       await window.deyad.writeFiles(app.id, scaffold);
     }
 
-    // If a template prompt was selected, queue it for auto-send in ChatPanel
     if (templatePrompt) {
-      setPendingPrompt(templatePrompt);
+      dispatch({ type: 'SET_PENDING_PROMPT', prompt: templatePrompt });
     }
 
     await selectApp({ ...app });
@@ -399,7 +262,7 @@ function AppInner() {
   };
 
   const handleImportApp = async (name: string) => {
-    setShowImportModal(false);
+    modals.setShowImportModal(false);
     try {
       const app = await window.deyad.importApp(name);
       if (app) {
@@ -414,31 +277,18 @@ function AppInner() {
   };
 
   const handleDeleteApp = async (appId: string) => {
-    // Stop dev server if running before deleting
     await window.deyad.appDevStop(appId).catch((err) => console.warn('appDevStop:', err));
     await window.deyad.deleteApp(appId);
-    if (selectedApp?.id === appId) {
-      setSelectedApp(null);
-    }
-    // Clean up per-app state and opened apps list
-    setPerApp(prev => {
-      const next = { ...prev };
-      delete next[appId];
-      return next;
-    });
-    setOpenedApps(prev => prev.filter(id => id !== appId));
+    dispatch({ type: 'DELETE_APP_STATE', appId });
     await loadApps();
     addToast('success', 'App deleted');
   };
 
   const handleRenameApp = useCallback(async (appId: string, newName: string) => {
     await window.deyad.renameApp(appId, newName);
-    setApps((prev) => prev.map((a) => a.id === appId ? { ...a, name: newName } : a));
-    if (selectedApp?.id === appId) {
-      setSelectedApp((prev) => prev ? { ...prev, name: newName } : prev);
-    }
+    dispatch({ type: 'RENAME_APP', appId, newName });
     addToast('success', `Renamed to "${newName}"`);
-  }, [selectedApp]);
+  }, []);
 
   const handleDuplicateApp = async (appId: string) => {
     const app = await window.deyad.duplicateApp(appId);
@@ -482,36 +332,36 @@ function AppInner() {
     if (result.success) {
       const files = await window.deyad.readFiles(appId);
       updatePerApp(appId, { appFiles: files, selectedFile: null, canRevert: false });
-      setPreviewRefreshKey(k => k + 1);
+      dispatch({ type: 'REFRESH_PREVIEW' });
       addToast('success', 'Changes reverted');
     }
   }, [updatePerApp]);
 
   const handleExportApp = async (appId: string) => {
-    setExportConfirm({ open: true, appId });
+    modals.setExportConfirm({ open: true, appId });
   };
 
   const doExport = async (mobile: boolean) => {
-    const appId = exportConfirm.appId;
-    setExportConfirm({ open: false, appId: '' });
+    const appId = modals.exportConfirm.appId;
+    modals.setExportConfirm({ open: false, appId: '' });
     const result = await window.deyad.exportApp(appId, mobile ? 'mobile' : 'zip');
     if (result.success && result.path) {
-      setExportResult(`${mobile ? 'Mobile export created at' : 'Exported to'} ${result.path}`);
+      modals.setExportResult(`${mobile ? 'Mobile export created at' : 'Exported to'} ${result.path}`);
       addToast('success', mobile ? 'Mobile export created' : 'Exported as ZIP');
     } else if (!result.success && result.error !== 'Cancelled') {
-      setExportResult(`Export failed: ${result.error}`);
+      modals.setExportResult(`Export failed: ${result.error}`);
       addToast('error', `Export failed: ${result.error}`);
     }
   };
 
   const paletteCommands: Command[] = [
-    { id: 'app.new', name: 'New App', icon: '➕', shortcut: 'Ctrl+N', run: () => setShowNewAppModal(true) },
-    { id: 'app.import', name: 'Import Project', icon: '📂', run: () => setShowImportModal(true) },
-    { id: 'settings', name: 'Settings', icon: '⚙️', run: () => setShowSettings(true) },
+    { id: 'app.new', name: 'New App', icon: '➕', shortcut: 'Ctrl+N', run: () => modals.setShowNewAppModal(true) },
+    { id: 'app.import', name: 'Import Project', icon: '📂', run: () => modals.setShowImportModal(true) },
+    { id: 'settings', name: 'Settings', icon: '⚙️', run: () => modals.setShowSettings(true) },
     ...(selectedApp ? [
-      { id: 'deploy', name: 'Deploy App', icon: '🚀', run: () => setShowDeployModal(true) },
-      { id: 'history', name: 'Version History', icon: '🕐', run: () => setShowVersionHistory(true) },
-      { id: 'tasks', name: 'Task Queue', icon: '📋', run: () => setShowTaskQueue(true) },
+      { id: 'deploy', name: 'Deploy App', icon: '🚀', run: () => modals.setShowDeployModal(true) },
+      { id: 'history', name: 'Version History', icon: '🕐', run: () => modals.setShowVersionHistory(true) },
+      { id: 'tasks', name: 'Task Queue', icon: '📋', run: () => modals.setShowTaskQueue(true) },
       { id: 'tab.editor', name: 'Show Editor', icon: '✏️', run: () => updatePerApp(selectedApp.id, { rightTab: 'editor' }) },
       { id: 'tab.preview', name: 'Show Preview', icon: '👁️', run: () => updatePerApp(selectedApp.id, { rightTab: 'preview' }) },
       { id: 'tab.terminal', name: 'Show Terminal', icon: '💻', run: () => updatePerApp(selectedApp.id, { rightTab: 'terminal' }) },
@@ -527,36 +377,36 @@ function AppInner() {
   return (
     <Suspense fallback={<div className="app-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f172a', color: '#94a3b8' }}>Loading…</div>}>
     <div
-      className={`app-layout mobile-show-${mobilePanel}`}
+      className={`app-layout mobile-show-${layout.mobilePanel}`}
       style={{
-        gridTemplateColumns: `${sidebarWidth}px 4px 1fr 4px ${rightWidth}px`,
+        gridTemplateColumns: `${layout.sidebarWidth}px 4px 1fr 4px ${layout.rightWidth}px`,
       }}
     >
       {/* sidebar */}
-      <aside className={`sidebar ${sidebarVisible ? '' : 'hidden'}`}>
+      <aside className={`sidebar ${layout.sidebarVisible ? '' : 'hidden'}`}>
         <Sidebar
           apps={apps}
           selectedApp={selectedApp}
           onSelectApp={selectApp}
-          onNewApp={() => setShowNewAppModal(true)}
+          onNewApp={() => modals.setShowNewAppModal(true)}
           onDeleteApp={handleDeleteApp}
           onRenameApp={handleRenameApp}
           onDuplicateApp={handleDuplicateApp}
           onExportApp={handleExportApp}
-          onDeployApp={() => setShowDeployModal(true)}
-          onImportApp={() => setShowImportModal(true)}
-          onOpenSettings={() => setShowSettings(true)}
-          onOpenTaskQueue={() => setShowTaskQueue(true)}
-          onOpenVersionHistory={() => setShowVersionHistory(true)}
+          onDeployApp={() => modals.setShowDeployModal(true)}
+          onImportApp={() => modals.setShowImportModal(true)}
+          onOpenSettings={() => modals.setShowSettings(true)}
+          onOpenTaskQueue={() => modals.setShowTaskQueue(true)}
+          onOpenVersionHistory={() => modals.setShowVersionHistory(true)}
           activeTasks={activeTasks}
         />
       </aside>
 
       {/* menu button for narrow screens (hidden while modals open) */}
-      {!(showNewAppModal || showSettings || showImportModal) && (
+      {!(modals.showNewAppModal || modals.showSettings || modals.showImportModal) && (
         <button
           className="btn-toggle-sidebar"
-          onClick={() => setSidebarVisible((v) => !v)}
+          onClick={() => layout.setSidebarVisible((v) => !v)}
           title="Toggle sidebar"
         >
           ☰
@@ -566,7 +416,7 @@ function AppInner() {
       <div
         className="resizer"
         data-side="sidebar"
-        onMouseDown={(e) => startDrag('sidebar', e.clientX)}
+        onMouseDown={(e) => layout.startDrag('sidebar', e.clientX)}
       />
 
       {/* centre: chat panels (kept alive across app switches) or empty state */}
@@ -597,7 +447,7 @@ function AppInner() {
                   onRevert={() => handleRevert(appId)}
                   canRevert={appState.canRevert}
                   initialPrompt={isSelected ? pendingPrompt : null}
-                  onInitialPromptConsumed={() => setPendingPrompt(null)}
+                  onInitialPromptConsumed={() => dispatch({ type: 'SET_PENDING_PROMPT', prompt: null })}
                 />
               </div>
             );
@@ -610,7 +460,7 @@ function AppInner() {
             <h2>Welcome to Deyad</h2>
             <p>A local AI app builder powered exclusively by Ollama.</p>
             <p className="empty-hint">Create a new app to get started →</p>
-            <button className="btn-primary" onClick={() => setShowNewAppModal(true)}>
+            <button className="btn-primary" onClick={() => modals.setShowNewAppModal(true)}>
               + New App
             </button>
           </div>
@@ -621,7 +471,7 @@ function AppInner() {
       <div
         className="resizer"
         data-side="right"
-        onMouseDown={(e) => startDrag('right', e.clientX)}
+        onMouseDown={(e) => layout.startDrag('right', e.clientX)}
       />
 
       {/* right panel (always present so widths are always measurable) */}
@@ -688,8 +538,8 @@ function AppInner() {
                 onSelectFile={(file) => updatePerApp(selectedApp.id, { selectedFile: file })}
                 onOpenFolder={() => window.deyad.openAppFolder(selectedApp.id)}
                 onFileEdit={handleFileEdit}
-                autocompleteEnabled={autocompleteEnabled}
-                completionModel={completionModel || defaultModel}
+                autocompleteEnabled={settings.autocompleteEnabled}
+                completionModel={settings.completionModel || settings.defaultModel}
               />
             ) : cur.rightTab === 'terminal' ? (
               <TerminalPanel appId={selectedApp.id} />
@@ -703,7 +553,7 @@ function AppInner() {
                 onFilesChanged={async () => {
                   const files = await window.deyad.readFiles(selectedApp.id);
                   updatePerApp(selectedApp.id, { appFiles: files });
-                  setPreviewRefreshKey(k => k + 1);
+                  dispatch({ type: 'REFRESH_PREVIEW' });
                 }}
               />
             ) : cur.rightTab === 'search' ? (
@@ -716,32 +566,26 @@ function AppInner() {
             ) : null}
             {/* Keep PreviewPanel mounted so it maintains HMR/WebSocket connection */}
             <div style={{ display: cur.rightTab === 'preview' ? 'contents' : 'none' }}>
-              <PreviewPanel app={selectedApp} onPublish={() => setShowDeployModal(true)} refreshKey={previewRefreshKey} />
+              <PreviewPanel app={selectedApp} onPublish={() => modals.setShowDeployModal(true)} refreshKey={previewRefreshKey} />
             </div>
           </>
         )}
       </div>
 
-      {showNewAppModal && (
+      {modals.showNewAppModal && (
         <NewAppModal
-          onClose={() => setShowNewAppModal(false)}
+          onClose={() => modals.setShowNewAppModal(false)}
           onCreate={handleCreateApp}
         />
       )}
 
-      {showSettings && (
+      {modals.showSettings && (
         <SettingsModal
-          theme={theme}
-          onThemeChange={setTheme}
+          theme={settings.theme}
+          onThemeChange={settings.setTheme}
           onClose={() => {
-            setShowSettings(false);
-            // Reload settings to pick up autocomplete changes
-            window.deyad.getSettings().then((s) => {
-              setAutocompleteEnabled(s.autocompleteEnabled ?? false);
-              setCompletionModel(s.completionModel ?? '');
-              setDefaultModel(s.defaultModel ?? '');
-              if (s.theme) setTheme(s.theme);
-            }).catch((err) => console.warn('getSettings:', err));
+            modals.setShowSettings(false);
+            settings.loadSettings();
           }}
         />
       )}
@@ -755,26 +599,26 @@ function AppInner() {
         />
       )}
 
-      {showImportModal && (
+      {modals.showImportModal && (
         <ImportModal
-          onClose={() => setShowImportModal(false)}
+          onClose={() => modals.setShowImportModal(false)}
           onImport={handleImportApp}
         />
       )}
 
-      {showDeployModal && selectedApp && (
+      {modals.showDeployModal && selectedApp && (
         <DeployModal
           appId={selectedApp.id}
           appName={selectedApp.name}
           appType={selectedApp.appType}
-          onClose={() => setShowDeployModal(false)}
+          onClose={() => modals.setShowDeployModal(false)}
         />
       )}
 
-      {showVersionHistory && selectedApp && (
+      {modals.showVersionHistory && selectedApp && (
         <VersionHistoryPanel
           appId={selectedApp.id}
-          onClose={() => setShowVersionHistory(false)}
+          onClose={() => modals.setShowVersionHistory(false)}
           onRestore={async () => {
             const files = await window.deyad.readFiles(selectedApp.id);
             updatePerApp(selectedApp.id, { appFiles: files, selectedFile: null });
@@ -782,15 +626,15 @@ function AppInner() {
         />
       )}
 
-      {showTaskQueue && selectedApp && (
+      {modals.showTaskQueue && selectedApp && (
         <TaskQueuePanel
           appId={selectedApp.id}
           appName={selectedApp.name}
           appType={selectedApp.appType}
           dbProvider={selectedApp.dbProvider}
           dbStatus={cur.dbStatus}
-          model={defaultModel}
-          onClose={() => setShowTaskQueue(false)}
+          model={settings.defaultModel}
+          onClose={() => modals.setShowTaskQueue(false)}
           onRefreshFiles={async () => {
             const files = await window.deyad.readFiles(selectedApp.id);
             updatePerApp(selectedApp.id, { appFiles: files });
@@ -801,42 +645,42 @@ function AppInner() {
       {/* Mobile bottom navigation */}
       <nav className="mobile-nav">
         <button
-          className={`mobile-nav-btn ${mobilePanel === 'sidebar' ? 'active' : ''}`}
-          onClick={() => setMobilePanel('sidebar')}
+          className={`mobile-nav-btn ${layout.mobilePanel === 'sidebar' ? 'active' : ''}`}
+          onClick={() => layout.setMobilePanel('sidebar')}
         >
           <span className="mobile-nav-icon">☰</span>
           <span className="mobile-nav-label">Apps</span>
         </button>
         <button
-          className={`mobile-nav-btn ${mobilePanel === 'chat' ? 'active' : ''}`}
-          onClick={() => setMobilePanel('chat')}
+          className={`mobile-nav-btn ${layout.mobilePanel === 'chat' ? 'active' : ''}`}
+          onClick={() => layout.setMobilePanel('chat')}
         >
           <span className="mobile-nav-icon">💬</span>
           <span className="mobile-nav-label">Chat</span>
         </button>
         <button
-          className={`mobile-nav-btn ${mobilePanel === 'right' ? 'active' : ''}`}
-          onClick={() => setMobilePanel('right')}
+          className={`mobile-nav-btn ${layout.mobilePanel === 'right' ? 'active' : ''}`}
+          onClick={() => layout.setMobilePanel('right')}
         >
           <span className="mobile-nav-icon">📁</span>
           <span className="mobile-nav-label">{cur.rightTab === 'preview' ? 'Preview' : cur.rightTab === 'terminal' ? 'Term' : cur.rightTab === 'database' ? 'DB' : 'Files'}</span>
         </button>
       </nav>
 
-      {showWizard && (
+      {modals.showWizard && (
         <WelcomeWizard
           onComplete={() => {
-            setShowWizard(false);
+            modals.setShowWizard(false);
             window.deyad.setSettings({ hasCompletedWizard: true }).then((s) => {
-              setDefaultModel(s.defaultModel ?? '');
+              settings.setDefaultModel(s.defaultModel ?? '');
             }).catch((err) => console.warn('setSettings:', err));
           }}
-          onCreateApp={() => setShowNewAppModal(true)}
+          onCreateApp={() => modals.setShowNewAppModal(true)}
         />
       )}
 
       <ConfirmDialog
-        open={exportConfirm.open}
+        open={modals.exportConfirm.open}
         title="Export App"
         message="Create a mobile/PWA export or a plain ZIP?"
         confirmLabel="Mobile/PWA"
@@ -846,19 +690,19 @@ function AppInner() {
       />
 
       <ConfirmDialog
-        open={!!exportResult}
+        open={!!modals.exportResult}
         title="Export"
-        message={exportResult || ''}
+        message={modals.exportResult || ''}
         confirmLabel="OK"
         cancelLabel=""
-        onConfirm={() => setExportResult(null)}
-        onCancel={() => setExportResult(null)}
+        onConfirm={() => modals.setExportResult(null)}
+        onCancel={() => modals.setExportResult(null)}
       />
 
-      {showCommandPalette && (
+      {modals.showCommandPalette && (
         <CommandPalette
           commands={paletteCommands}
-          onClose={() => setShowCommandPalette(false)}
+          onClose={() => modals.setShowCommandPalette(false)}
         />
       )}
     </div>

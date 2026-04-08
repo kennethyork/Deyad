@@ -4,7 +4,7 @@
  * so the user can roll back any changes the agent made.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export interface Snapshot {
   type: 'stash' | 'commit';
@@ -15,9 +15,13 @@ export interface Snapshot {
 
 const snapshots: Snapshot[] = [];
 
+function git(args: string[], cwd: string): string {
+  return execFileSync('git', args, { cwd, stdio: 'pipe', encoding: 'utf-8' }).toString().trim();
+}
+
 function isGitRepo(cwd: string): boolean {
   try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+    git(['rev-parse', '--is-inside-work-tree'], cwd);
     return true;
   } catch {
     return false;
@@ -26,8 +30,8 @@ function isGitRepo(cwd: string): boolean {
 
 function hasChanges(cwd: string): boolean {
   try {
-    const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', stdio: 'pipe' });
-    return status.trim().length > 0;
+    const status = git(['status', '--porcelain'], cwd);
+    return status.length > 0;
   } catch {
     return false;
   }
@@ -42,7 +46,7 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
   if (!isGitRepo(cwd)) return null;
 
   try {
-    const head = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const head = git(['rev-parse', 'HEAD'], cwd);
     let ref = head;
     let type: Snapshot['type'] = 'commit';
 
@@ -50,16 +54,12 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
     if (hasChanges(cwd)) {
       const safeDesc = description.replace(/["\\`$]/g, '_');
       try {
-        execSync(`git stash push -u -m "deyad-snapshot: ${safeDesc}"`, {
-          cwd,
-          stdio: 'pipe',
-          encoding: 'utf-8',
-        });
+        git(['stash', 'push', '-u', '-m', `deyad-snapshot: ${safeDesc}`], cwd);
         // Get the stash ref
-        ref = execSync('git stash list -1 --format=%H', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim() || head;
+        ref = git(['stash', 'list', '-1', '--format=%H'], cwd) || head;
         type = 'stash';
         // Pop it back so working directory is unchanged
-        execSync('git stash pop', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+        git(['stash', 'pop'], cwd);
       } catch {
         // If stash fails, fall back to HEAD ref
         ref = head;
@@ -89,18 +89,14 @@ export function createCheckpoint(cwd: string, message: string): string | null {
 
   try {
     if (!hasChanges(cwd)) {
-      return execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      return git(['rev-parse', 'HEAD'], cwd);
     }
 
     // Stage all and create checkpoint
-    execSync('git add -A', { cwd, stdio: 'pipe' });
+    git(['add', '-A'], cwd);
     const safeMsg = message.replace(/["\\`$]/g, '_');
-    execSync(`git commit --allow-empty -m "deyad-checkpoint: ${safeMsg}"`, {
-      cwd,
-      stdio: 'pipe',
-      encoding: 'utf-8',
-    });
-    const ref = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+    git(['commit', '--allow-empty', '-m', `deyad-checkpoint: ${safeMsg}`], cwd);
+    const ref = git(['rev-parse', 'HEAD'], cwd);
 
     const snapshot: Snapshot = {
       type: 'commit',
@@ -124,7 +120,7 @@ export function rollbackTo(cwd: string, ref: string): boolean {
   if (!/^[0-9a-f]{7,40}$/.test(ref)) return false;
 
   try {
-    execSync(`git reset --hard ${ref}`, { cwd, stdio: 'pipe', encoding: 'utf-8' });
+    git(['reset', '--hard', ref], cwd);
     return true;
   } catch {
     return false;
@@ -166,7 +162,7 @@ export function diffFromSnapshot(cwd: string, ref: string): string {
   if (!isGitRepo(cwd)) return '(not a git repo)';
 
   try {
-    const diff = execSync(`git diff ${ref} --stat`, { cwd, encoding: 'utf-8', stdio: 'pipe' });
+    const diff = git(['diff', ref, '--stat'], cwd);
     return diff || '(no changes)';
   } catch {
     return '(could not generate diff)';

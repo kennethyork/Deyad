@@ -3,7 +3,7 @@
  * Creates a temporary git branch for agent work that can be reviewed before merging.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 export interface SandboxState {
   active: boolean;
@@ -14,9 +14,13 @@ export interface SandboxState {
 
 let sandbox: SandboxState | null = null;
 
+function git(args: string[], cwd: string, encoding?: 'utf-8'): string {
+  return execFileSync('git', args, { cwd, stdio: 'pipe', encoding: encoding ?? 'utf-8' }).toString().trim();
+}
+
 function isGitRepo(cwd: string): boolean {
   try {
-    execSync('git rev-parse --is-inside-work-tree', { cwd, stdio: 'pipe' });
+    git(['rev-parse', '--is-inside-work-tree'], cwd);
     return true;
   } catch {
     return false;
@@ -24,7 +28,7 @@ function isGitRepo(cwd: string): boolean {
 }
 
 function getCurrentBranch(cwd: string): string {
-  return execSync('git branch --show-current', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+  return git(['branch', '--show-current'], cwd);
 }
 
 /**
@@ -50,24 +54,22 @@ export function enterSandbox(cwd: string): { success: boolean; message: string }
     // Stash any pending changes instead of committing them
     let hadStash = false;
     try {
-      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      const status = git(['status', '--porcelain'], cwd);
       if (status) {
-        execSync('git stash push -u -m "deyad: pre-sandbox stash"', {
-          cwd, stdio: 'pipe', encoding: 'utf-8',
-        });
+        git(['stash', 'push', '-u', '-m', 'deyad: pre-sandbox stash'], cwd);
         hadStash = true;
       }
     } catch { /* no changes to stash, that's fine */ }
 
-    const startRef = execSync('git rev-parse HEAD', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const startRef = git(['rev-parse', 'HEAD'], cwd);
 
     // Create and switch to sandbox branch
-    execSync(`git checkout -b ${sandboxBranch}`, { cwd, stdio: 'pipe' });
+    git(['checkout', '-b', sandboxBranch], cwd);
 
     // Restore stashed changes in the sandbox
     if (hadStash) {
       try {
-        execSync('git stash pop', { cwd, stdio: 'pipe', encoding: 'utf-8' });
+        git(['stash', 'pop'], cwd);
       } catch { /* conflicts possible, leave in working dir */ }
     }
 
@@ -95,38 +97,32 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
   try {
     // Commit any remaining changes in sandbox
     try {
-      const status = execSync('git status --porcelain', { cwd, encoding: 'utf-8', stdio: 'pipe' }).trim();
+      const status = git(['status', '--porcelain'], cwd);
       if (status) {
-        execSync('git add -A', { cwd, stdio: 'pipe' });
-        execSync('git commit -m "deyad: sandbox final changes"', {
-          cwd, stdio: 'pipe', encoding: 'utf-8',
-        });
+        git(['add', '-A'], cwd);
+        git(['commit', '-m', 'deyad: sandbox final changes'], cwd);
       }
     } catch { /* nothing to commit */ }
 
     // Get diff summary
-    const diff = execSync(`git diff ${savedSandbox.startRef}..HEAD --stat`, {
-      cwd, encoding: 'utf-8', stdio: 'pipe',
-    });
+    const diff = git(['diff', `${savedSandbox.startRef}..HEAD`, '--stat'], cwd);
 
     let result: { success: boolean; message: string; diff?: string };
 
     if (merge) {
       // Switch back to original branch and merge
-      execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
+      git(['checkout', savedSandbox.originalBranch], cwd);
       try {
-        execSync(`git merge ${savedSandbox.sandboxBranch} --no-edit`, { cwd, stdio: 'pipe', encoding: 'utf-8' });
+        git(['merge', savedSandbox.sandboxBranch, '--no-edit'], cwd);
       } catch (mergeErr) {
         // Merge conflict — parse and present to user
         let conflictInfo = '';
         try {
-          conflictInfo = execSync('git diff --name-only --diff-filter=U', {
-            cwd, encoding: 'utf-8', stdio: 'pipe',
-          }).trim();
+          conflictInfo = git(['diff', '--name-only', '--diff-filter=U'], cwd);
         } catch { /* ignore */ }
 
         // Abort the merge so we don't leave the repo in a broken state
-        try { execSync('git merge --abort', { cwd, stdio: 'pipe' }); } catch { /* ignore */ }
+        try { git(['merge', '--abort'], cwd); } catch { /* ignore */ }
 
         const conflictFiles = conflictInfo ? conflictInfo.split('\n').filter(Boolean) : [];
         const conflictMsg = conflictFiles.length > 0
@@ -135,13 +131,13 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
 
         return { success: false, message: conflictMsg, diff };
       }
-      execSync(`git branch -d ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      git(['branch', '-d', savedSandbox.sandboxBranch], cwd);
 
       result = { success: true, message: `Merged sandbox changes into ${savedSandbox.originalBranch}`, diff };
     } else {
       // Switch back and discard sandbox
-      execSync(`git checkout ${savedSandbox.originalBranch}`, { cwd, stdio: 'pipe' });
-      execSync(`git branch -D ${savedSandbox.sandboxBranch}`, { cwd, stdio: 'pipe' });
+      git(['checkout', savedSandbox.originalBranch], cwd);
+      git(['branch', '-D', savedSandbox.sandboxBranch], cwd);
 
       result = { success: true, message: `Discarded sandbox. Back on ${savedSandbox.originalBranch}`, diff };
     }
