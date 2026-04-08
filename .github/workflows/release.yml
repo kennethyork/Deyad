@@ -55,35 +55,6 @@ jobs:
             dist/*.exe
             dist/checksums-windows.txt
 
-  build-mac:
-    name: Build macOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx electron-builder --mac
-        env:
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Generate checksums
-        run: |
-          cd dist
-          shasum -a 256 *.dmg *.zip 2>/dev/null > checksums-mac.txt || true
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-binaries
-          path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/checksums-mac.txt
-
   build-cli:
     name: Build CLI
     runs-on: ubuntu-latest
@@ -107,7 +78,7 @@ jobs:
 
   publish:
     name: Create GitHub Release
-    needs: [build-linux, build-windows, build-mac, build-cli]
+    needs: [build-linux, build-windows, build-cli]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -126,8 +97,6 @@ jobs:
             artifacts/linux-binaries/*.deb
             artifacts/linux-binaries/*.rpm
             artifacts/windows-binaries/*.exe
-            artifacts/mac-binaries/*.dmg
-            artifacts/mac-binaries/*.zip
             artifacts/cli-package/*.tgz
             artifacts/SHA256SUMS.txt
         env:

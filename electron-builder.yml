@@ -8,17 +8,6 @@ files:
   - "!node_modules/*/{CHANGELOG.md,README.md,*.d.ts}"
 npmRebuild: true
 nodeGypRebuild: false
-mac:
-  target:
-    - dmg
-    - zip
-  category: public.app-category.developer-tools
-  artifactName: "${productName}-${arch}.${ext}"
-  identity: null
-  hardenedRuntime: true
-  gatekeeperAssess: false
-  entitlements: build/entitlements.mac.plist
-  entitlementsInherit: build/entitlements.mac.plist
 linux:
   target:
     - deb
