@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync, execFileSync, spawn } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { minimatch } from 'minimatch';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import type { OllamaTool } from './ollama.js';
