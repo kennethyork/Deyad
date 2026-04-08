@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface DiffLine {
   type: 'added' | 'removed' | 'unchanged';
@@ -84,6 +85,7 @@ function computeDiff(oldText: string, newText: string): DiffLine[] {
 }
 
 export default function DiffModal({ oldFiles, newFiles, onApply, onReject }: Props) {
+  const trapRef = useFocusTrap();
   const diffs = useMemo<FileDiff[]>(() => {
     return Object.entries(newFiles).map(([path, newContent]) => {
       const oldContent = oldFiles[path] || '';
@@ -102,7 +104,7 @@ export default function DiffModal({ oldFiles, newFiles, onApply, onReject }: Pro
 
   return (
     <div className="modal-overlay" onClick={onReject}>
-      <div className="modal diff-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={trapRef} className="modal diff-modal" role="dialog" aria-modal="true" aria-label="Review Changes" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Review Changes</h2>
           <div className="diff-stats">

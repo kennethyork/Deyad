@@ -8,8 +8,12 @@ on:
 
 jobs:
   desktop:
-    name: Desktop — lint, typecheck, test
-    runs-on: ubuntu-latest
+    name: Desktop — lint, typecheck, test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,6 +25,27 @@ jobs:
       - run: npm run typecheck
       - run: npx vitest run --coverage
       - run: npm audit --audit-level=high
+      - name: Upload coverage
+        if: always() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-coverage
+          path: coverage/
+
+  desktop-e2e:
+    name: Desktop — E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          CI: true
 
   cli:
     name: CLI — lint, typecheck, test
@@ -36,6 +61,15 @@ jobs:
           cache: npm
           cache-dependency-path: deyad-cli/deyad-cli/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run typecheck
       - run: npx vitest run --coverage
+      - name: Build CLI
+        run: node build.mjs
       - run: npm audit --audit-level=high
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-coverage
+          path: deyad-cli/deyad-cli/coverage/

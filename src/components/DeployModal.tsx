@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface Props {
   appId: string;
@@ -27,6 +28,7 @@ const PROVIDERS: ProviderInfo[] = [
 ];
 
 export default function DeployModal({ appId, appName, appType, onClose }: Props) {
+  const trapRef = useFocusTrap();
   const [available, setAvailable] = useState<Record<string, boolean>>({});
   const [checking, setChecking] = useState(true);
   const [selected, setSelected] = useState<Provider | null>(null);
@@ -99,7 +101,7 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal deploy-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={trapRef} className="modal deploy-modal" role="dialog" aria-modal="true" aria-label="Deploy" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Deploy {appName}</h2>
           <button className="modal-close" onClick={onClose}>×</button>

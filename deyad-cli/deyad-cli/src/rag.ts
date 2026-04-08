@@ -68,7 +68,8 @@ function chunkFile(filePath: string, cwd: string): CodeChunk[] {
     const stat = fs.statSync(absPath);
     if (stat.size > MAX_FILE_SIZE) return [];
     content = fs.readFileSync(absPath, 'utf-8');
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error(`[rag] chunkFile ${filePath}:`, err);
     return [];
   }
 

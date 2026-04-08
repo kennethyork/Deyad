@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface ImportModalProps {
   onClose: () => void;
@@ -6,6 +7,7 @@ interface ImportModalProps {
 }
 
 export default function ImportModal({ onClose, onImport }: ImportModalProps) {
+  const trapRef = useFocusTrap();
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -21,7 +23,7 @@ export default function ImportModal({ onClose, onImport }: ImportModalProps) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
+      <div ref={trapRef} className="modal" role="dialog" aria-modal="true" aria-label="Import Project" style={{ width: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Import Project</h2>
           <button className="modal-close" onClick={onClose}>&times;</button>

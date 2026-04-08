@@ -166,7 +166,7 @@ export default function ChatPanel({
 
       {/* Messages area — positioned container guarantees scroll */}
       <div className="chat-messages-container">
-        <div ref={messagesRef} className="chat-messages">
+        <div ref={messagesRef} className="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
           {messages.length === 0 && (
           <div className="chat-welcome">
             <div className="chat-welcome-title">Start building with AI</div>

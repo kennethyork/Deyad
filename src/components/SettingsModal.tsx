@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 interface Props {
   onClose: () => void;
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function SettingsModal({ onClose, theme, onThemeChange }: Props) {
+  const trapRef = useFocusTrap();
   const [ollamaHost, setOllamaHost] = useState('http://localhost:11434');
   const [defaultModel, setDefaultModel] = useState('');
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false);
@@ -82,7 +84,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={trapRef} className="modal settings-modal" role="dialog" aria-modal="true" aria-label="Settings" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Settings</h2>
           <button className="modal-close" onClick={onClose}>×</button>

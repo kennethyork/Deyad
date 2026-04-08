@@ -60,8 +60,9 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
         type = 'stash';
         // Pop it back so working directory is unchanged
         git(['stash', 'pop'], cwd);
-      } catch {
+      } catch (err) {
         // If stash fails, fall back to HEAD ref
+        if (process.env['DEYAD_DEBUG']) console.error('[undo] stash failed:', err);
         ref = head;
         type = 'commit';
       }
@@ -75,7 +76,8 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
     };
     snapshots.push(snapshot);
     return snapshot;
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[undo] createSnapshot:', err);
     return null;
   }
 }
@@ -106,7 +108,8 @@ export function createCheckpoint(cwd: string, message: string): string | null {
     };
     snapshots.push(snapshot);
     return ref;
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[undo] createCheckpoint:', err);
     return null;
   }
 }
@@ -122,7 +125,8 @@ export function rollbackTo(cwd: string, ref: string): boolean {
   try {
     git(['reset', '--hard', ref], cwd);
     return true;
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[undo] rollbackTo:', err);
     return false;
   }
 }
@@ -164,7 +168,8 @@ export function diffFromSnapshot(cwd: string, ref: string): string {
   try {
     const diff = git(['diff', ref, '--stat'], cwd);
     return diff || '(no changes)';
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[undo] diffFromSnapshot:', err);
     return '(could not generate diff)';
   }
 }

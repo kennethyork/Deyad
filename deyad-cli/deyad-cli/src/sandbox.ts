@@ -59,7 +59,10 @@ export function enterSandbox(cwd: string): { success: boolean; message: string }
         git(['stash', 'push', '-u', '-m', 'deyad: pre-sandbox stash'], cwd);
         hadStash = true;
       }
-    } catch { /* no changes to stash, that's fine */ }
+    } catch (err) {
+      /* no changes to stash */
+      if (process.env['DEYAD_DEBUG']) console.error('[sandbox] stash push:', err);
+    }
 
     const startRef = git(['rev-parse', 'HEAD'], cwd);
 
@@ -70,7 +73,10 @@ export function enterSandbox(cwd: string): { success: boolean; message: string }
     if (hadStash) {
       try {
         git(['stash', 'pop'], cwd);
-      } catch { /* conflicts possible, leave in working dir */ }
+      } catch (err) {
+      /* stash pop may conflict — leave changes in working dir */
+      if (process.env['DEYAD_DEBUG']) console.error('[sandbox] stash pop:', err);
+    }
     }
 
     sandbox = { active: true, originalBranch, sandboxBranch, startRef };

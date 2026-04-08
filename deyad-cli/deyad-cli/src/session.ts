@@ -158,10 +158,13 @@ export function listSessions(): SessionData[] {
       try {
         const data = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, file), 'utf-8'));
         sessions.push(data);
-      } catch { /* skip corrupt files */ }
+      } catch (err) {
+        if (process.env['DEYAD_DEBUG']) console.error('[session] corrupt file:', file, err);
+      }
     }
     return sessions;
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[session] listSessions:', err);
     return [];
   }
 }
@@ -224,7 +227,8 @@ function deobfuscate(encoded: string): string {
     const data = Buffer.from(encoded.slice(sep + 1), 'hex');
     const decipher = crypto.createDecipheriv(OBFUSCATION_ALGO, getObfuscationKey(), iv);
     return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf-8');
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[session] deobfuscate:', err);
     return encoded; // fallback: return raw value (legacy or corrupted)
   }
 }
@@ -236,7 +240,8 @@ export function memoryRead(key: string): string | null {
   try {
     const entry: MemoryEntry = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
     return deobfuscate(entry.value);
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[session] memoryRead:', key, err);
     return null;
   }
 }
@@ -285,11 +290,13 @@ export function memoryList(): MemoryEntry[] {
     return files.map((f) => {
       try {
         return JSON.parse(fs.readFileSync(path.join(MEMORY_DIR, f), 'utf-8')) as MemoryEntry;
-      } catch {
+      } catch (err) {
+        if (process.env['DEYAD_DEBUG']) console.error('[session] memoryList parse:', f, err);
         return null;
       }
     }).filter((e): e is MemoryEntry => e !== null);
-  } catch {
+  } catch (err) {
+    if (process.env['DEYAD_DEBUG']) console.error('[session] memoryList:', err);
     return [];
   }
 }

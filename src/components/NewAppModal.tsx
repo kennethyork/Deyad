@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 type AppType = 'frontend' | 'fullstack';
 
@@ -49,6 +50,7 @@ const TEMPLATES: Template[] = [
 ];
 
 export default function NewAppModal({ onClose, onCreate }: Props) {
+  const trapRef = useFocusTrap();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [appType, setAppType] = useState<AppType>('frontend');
@@ -84,7 +86,7 @@ export default function NewAppModal({ onClose, onCreate }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div ref={trapRef} className="modal" role="dialog" aria-modal="true" aria-label="New App" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>New App</h2>
           <button className="modal-close" onClick={onClose}>×</button>

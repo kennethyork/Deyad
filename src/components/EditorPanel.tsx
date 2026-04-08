@@ -95,8 +95,8 @@ function FileTree({
       {dirs.map((d) => {
         const label = d.split('/').pop() || d;
         return (
-          <div key={d}>
-            <div className="file-tree-dir" style={{ paddingLeft: `${depth * 12 + 8}px` }}>
+          <div key={d} role="treeitem" aria-expanded={true}>
+            <div className="file-tree-dir" style={{ paddingLeft: `${depth * 12 + 8}px` }} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); } }}>
               {label}
             </div>
             <FileTree
@@ -115,9 +115,13 @@ function FileTree({
         return (
           <div
             key={f}
+            role="treeitem"
+            tabIndex={0}
+            aria-selected={selectedFile === f}
             className={`file-tree-item ${selectedFile === f ? 'active' : ''}`}
             style={{ paddingLeft: `${depth * 12 + 8}px` }}
             onClick={() => onSelectFile(f)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectFile(f); } }}
             title={f}
           >
             <span className="file-icon">{getFileIcon(f)}</span>
@@ -155,8 +159,11 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
     if (!searchQuery.trim()) return files;
     const query = searchQuery.toLowerCase();
     const result: Record<string, string> = {};
-    for (const [path, content] of Object.entries(files)) {
-      if (path.toLowerCase().includes(query) || content.toLowerCase().includes(query)) {
+    const entries = Object.entries(files);
+    // Skip expensive content search for large projects (>200 files)
+    const searchContent = entries.length <= 200;
+    for (const [path, content] of entries) {
+      if (path.toLowerCase().includes(query) || (searchContent && content.toLowerCase().includes(query))) {
         result[path] = content;
       }
     }
@@ -410,7 +417,14 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
         ) : filteredCount === 0 ? (
           <p className="file-tree-empty">No matches</p>
         ) : (
-          <FileTree
+          <>
+            {fileCount > 200 && (
+              <div className="file-tree-warning" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+                Large project ({fileCount} files) — search to find files faster
+              </div>
+            )}
+            <div role="tree" aria-label="File explorer">
+            <FileTree
             tree={tree}
             dir=""
             files={filteredFiles}
@@ -418,6 +432,8 @@ export default function EditorPanel({ files, selectedFile, onSelectFile, onOpenF
             onSelectFile={onSelectFile}
             depth={0}
           />
+          </div>
+          </>
         )}
       </div>
 

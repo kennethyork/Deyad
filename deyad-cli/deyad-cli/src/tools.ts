@@ -29,6 +29,16 @@ export interface ToolCallbacks {
   onDiff?: (filePath: string, diff: string) => void;
 }
 
+export type ToolHandler = (
+  call: ToolCall,
+  cwd: string,
+  resolvedCwd: string,
+  cb?: ToolCallbacks,
+) => Promise<ToolResult>;
+
+/** Extensible tool registry — add/override tools via toolRegistry.set('name', handler) */
+export const toolRegistry = new Map<string, ToolHandler>();
+
 export const TOOLS_DESCRIPTION = `Available tools (use <tool_call><name>TOOL</name><param name="KEY">VALUE</param></tool_call>):
 
 FILE OPERATIONS:
@@ -255,6 +265,24 @@ async function executeToolInner(
   cb?: ToolCallbacks,
 ): Promise<ToolResult> {
   const resolvedCwd = path.resolve(cwd);
+  const handler = toolRegistry.get(call.name);
+  if (!handler) {
+    return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
+  }
+  try {
+    return await handler(call, cwd, resolvedCwd, cb);
+  } catch (error) {
+    return { tool: call.name, success: false, output: String(error) };
+  }
+}
+
+/** Built-in tool implementations — used to populate the registry */
+async function executeBuiltinTool(
+  call: ToolCall,
+  cwd: string,
+  resolvedCwd: string,
+  cb?: ToolCallbacks,
+): Promise<ToolResult> {
   try {
     switch (call.name) {
       case 'list_files': {
@@ -621,6 +649,18 @@ async function executeToolInner(
   } catch (error) {
     return { tool: call.name, success: false, output: String(error) };
   }
+}
+
+// ── Register built-in tools into the extensible registry ──
+const BUILTIN_NAMES = [
+  'list_files', 'read_file', 'write_files', 'edit_file', 'delete_file',
+  'glob_files', 'search_files', 'run_command', 'multi_edit',
+  'git_status', 'git_log', 'git_diff', 'git_branch', 'git_add', 'git_commit', 'git_stash',
+  'fetch_url', 'memory_read', 'memory_write', 'memory_list', 'memory_delete',
+] as const;
+
+for (const name of BUILTIN_NAMES) {
+  toolRegistry.set(name, (call, cwd, resolvedCwd, cb) => executeBuiltinTool(call, cwd, resolvedCwd, cb));
 }
 
 export function getOllamaTools(): OllamaTool[] {
