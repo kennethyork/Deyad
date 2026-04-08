@@ -1,4 +1,18 @@
 import { defineConfig } from 'vite';
 
-// Provide a stub Vite config in the CLI package to avoid resolving a parent-level vite.config.js
-export default defineConfig({});
+export default defineConfig({
+  test: {
+    include: ['tests/**/*.test.{ts,tsx}'],
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.*', 'src/utils/singlepass/**'],
+      thresholds: {
+        statements: 50,
+        branches: 40,
+        functions: 45,
+        lines: 50,
+      },
+    },
+  },
+});

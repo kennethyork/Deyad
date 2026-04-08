@@ -23,7 +23,7 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
+        <div role="alert" style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', height: '100vh', background: '#0f172a',
           color: '#f8fafc', fontFamily: 'sans-serif', textAlign: 'center', gap: '1rem',

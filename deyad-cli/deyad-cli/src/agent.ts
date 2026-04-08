@@ -432,6 +432,6 @@ export async function runAgentLoop(
 
     return { history: messages, changedFiles, stats };
   } finally {
-    process.removeListener('SIGINT', () => abortController.abort());
+    process.removeListener('SIGINT', sigHandler);
   }
 }

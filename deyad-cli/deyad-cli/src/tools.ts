@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync, spawn } from 'node:child_process';
+import { execSync, execFileSync, spawn } from 'node:child_process';
 import { minimatch } from 'minimatch';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import type { OllamaTool } from './ollama.js';
@@ -466,7 +466,7 @@ async function executeToolInner(
       }
       case 'git_status': {
         try {
-          const output = execSync('git status --short', { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['status', '--short'], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || '(clean)' };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -475,7 +475,7 @@ async function executeToolInner(
       case 'git_log': {
         const count = parseInt(call.params['count'] || '10', 10);
         try {
-          const output = execSync(`git log --oneline -${Math.min(count, 50)}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['log', '--oneline', `-${Math.min(count, 50)}`], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || '(no commits)' };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -484,7 +484,9 @@ async function executeToolInner(
       case 'git_diff': {
         const diffPath = call.params['path'] || '';
         try {
-          const output = execSync(`git diff ${diffPath}`.trim(), { cwd, encoding: 'utf-8', timeout: 10000 });
+          const args = ['diff'];
+          if (diffPath) args.push('--', diffPath);
+          const output = execFileSync('git', args, { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || '(no changes)' };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -492,7 +494,7 @@ async function executeToolInner(
       }
       case 'git_branch': {
         try {
-          const output = execSync('git branch -a', { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['branch', '-a'], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || '(no branches)' };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -501,7 +503,7 @@ async function executeToolInner(
       case 'git_add': {
         const addPath = call.params['path'] || '.';
         try {
-          execSync(`git add ${addPath}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          execFileSync('git', ['add', addPath], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: `Staged: ${addPath}` };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -515,16 +517,16 @@ async function executeToolInner(
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
         }
         try {
-          const output = execSync(`git commit -m ${JSON.stringify(msg)}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['commit', '-m', msg], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
         }
       }
       case 'git_stash': {
-        const action = call.params['action'] || 'push';
+        const action = call.params['action'] === 'pop' ? 'pop' : 'push';
         try {
-          const output = execSync(`git stash ${action}`, { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['stash', action], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || `Stash ${action} done.` };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };

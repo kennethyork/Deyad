@@ -68,9 +68,8 @@ function acquireLock(filePath: string): boolean {
         }
       } catch { /* ignore stat errors */ }
 
-      // Wait 50ms before retrying
-      const start = Date.now();
-      while (Date.now() - start < 50) { /* busy wait — no async in sync context */ }
+      // Wait 50ms before retrying (spinhalt avoids busy-wait via Atomics on shared buffer)
+      try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); } catch { const s = Date.now(); while (Date.now() - s < 50) { /* fallback */ } }
     }
   }
   return false;
@@ -246,12 +245,20 @@ export function memoryWrite(key: string, value: string): void {
   ensureDir(MEMORY_DIR);
   const sanitizedKey = sanitizeKey(key);
   const filePath = path.join(MEMORY_DIR, `${sanitizedKey}.json`);
-  const existing = memoryRead(key);
+  
+  // Preserve original createdAt if file exists
+  let existingCreatedAt: string | null = null;
+  try {
+    if (fs.existsSync(filePath)) {
+      const prev: MemoryEntry = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      existingCreatedAt = prev.createdAt;
+    }
+  } catch { /* ignore */ }
   
   const entry: MemoryEntry = {
     key,
     value: obfuscate(value),
-    createdAt: existing ? new Date().toISOString() : new Date().toISOString(),
+    createdAt: existingCreatedAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 

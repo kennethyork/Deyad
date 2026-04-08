@@ -1,4 +1,4 @@
-export const CLI_VERSION = "0.1.31"; // Must be in sync with package.json.
+export const CLI_VERSION = "0.1.32"; // Must be in sync with package.json.
 export const ORIGIN = "deyad_cli_ts";
 
 export type TerminalChatSession = {

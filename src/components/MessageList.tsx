@@ -20,7 +20,7 @@ interface Props {
 
 export default memo(function MessageList({ messages, pendingPlan, streaming, onApprovePlan, onRejectPlan }: Props) {
   return (
-    <>
+    <div aria-live="polite" aria-relevant="additions">
       {messages.map((m) => (
         <div key={m.id} className={`message message-${m.role}`} role="article" aria-label={`${m.role === 'user' ? 'User' : 'Assistant'} message`}>
           <div className="message-avatar" aria-hidden="true">{m.role === 'user' ? '👤' : '🤖'}</div>
@@ -39,10 +39,10 @@ export default memo(function MessageList({ messages, pendingPlan, streaming, onA
             )}
             {pendingPlan && m.content === pendingPlan && (
               <div className="plan-actions">
-                <button className="btn-approve-plan" onClick={onApprovePlan} disabled={streaming}>
+                <button className="btn-approve-plan" onClick={onApprovePlan} disabled={streaming} aria-label="Approve and execute plan">
                   ✓ Approve &amp; Execute
                 </button>
-                <button className="btn-reject-plan" onClick={onRejectPlan} disabled={streaming}>
+                <button className="btn-reject-plan" onClick={onRejectPlan} disabled={streaming} aria-label="Reject plan">
                   ✗ Reject
                 </button>
               </div>
@@ -50,6 +50,6 @@ export default memo(function MessageList({ messages, pendingPlan, streaming, onA
           </div>
         </div>
       ))}
-    </>
+    </div>
   );
 });
