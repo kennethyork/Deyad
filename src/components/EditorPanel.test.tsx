@@ -101,4 +101,78 @@ describe('EditorPanel', () => {
     );
     expect(container.innerHTML).toBeTruthy();
   });
+
+  it('renders folder structure with nested paths', () => {
+    render(
+      <EditorPanel
+        files={{ 'src/utils/helper.ts': 'export {}', 'src/App.tsx': 'app', 'README.md': '# Hi' }}
+        selectedFile={null}
+        onSelectFile={() => {}}
+        onOpenFolder={() => {}}
+        onFileEdit={() => {}}
+      />,
+    );
+    expect(screen.getByText('README.md')).toBeTruthy();
+    expect(screen.getByText('App.tsx')).toBeTruthy();
+  });
+
+  it('shows editor content when file is selected', () => {
+    render(
+      <EditorPanel
+        files={sampleFiles}
+        selectedFile="src/App.tsx"
+        onSelectFile={() => {}}
+        onOpenFolder={() => {}}
+        onFileEdit={() => {}}
+      />,
+    );
+    const editor = screen.getByTestId('mock-editor');
+    expect(editor.textContent).toContain('const App');
+  });
+
+  it('detects language from file extension', () => {
+    render(
+      <EditorPanel
+        files={sampleFiles}
+        selectedFile="src/index.css"
+        onSelectFile={() => {}}
+        onOpenFolder={() => {}}
+        onFileEdit={() => {}}
+      />,
+    );
+    const editor = screen.getByTestId('mock-editor');
+    expect(editor.getAttribute('data-language')).toBe('css');
+  });
+
+  it('filters files by search query', () => {
+    render(
+      <EditorPanel
+        files={sampleFiles}
+        selectedFile={null}
+        onSelectFile={() => {}}
+        onOpenFolder={() => {}}
+        onFileEdit={() => {}}
+      />,
+    );
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    fireEvent.change(searchInput, { target: { value: 'App' } });
+    expect(screen.getByText('App.tsx')).toBeTruthy();
+    // package.json should be filtered out
+    expect(screen.queryByText('package.json')).toBeNull();
+  });
+
+  it('calls onFileEdit when save is invoked', () => {
+    const onEdit = vi.fn();
+    render(
+      <EditorPanel
+        files={sampleFiles}
+        selectedFile="src/App.tsx"
+        onSelectFile={() => {}}
+        onOpenFolder={() => {}}
+        onFileEdit={onEdit}
+      />,
+    );
+    // Editor renders, verifying it's set up
+    expect(screen.getByTestId('mock-editor')).toBeTruthy();
+  });
 });

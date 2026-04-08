@@ -1,6 +1,73 @@
 import path from 'node:path';
 import fs from 'node:fs';
 
+// ── Advisory file locking ─────────────────────────────────────────────────────
+const LOCK_TIMEOUT_MS = 5_000;
+const LOCK_STALE_MS = 30_000;
+
+/**
+ * Acquire an advisory lock using mkdir (atomic on POSIX & Windows).
+ * Returns true if acquired, false on timeout.
+ */
+export function acquireLock(filePath: string): boolean {
+  const lockPath = filePath + '.lock';
+  const deadline = Date.now() + LOCK_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    try {
+      fs.mkdirSync(lockPath);
+      fs.writeFileSync(path.join(lockPath, 'pid'), String(process.pid), 'utf-8');
+      return true;
+    } catch {
+      // Lock exists — check if stale
+      try {
+        const pidFile = path.join(lockPath, 'pid');
+        if (fs.existsSync(pidFile)) {
+          const stat = fs.statSync(pidFile);
+          if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+            releaseLock(filePath);
+            continue;
+          }
+        }
+      } catch { /* ignore stat errors */ }
+      // Brief spin-wait
+      const start = Date.now();
+      while (Date.now() - start < 50) { /* spin */ }
+    }
+  }
+  return false;
+}
+
+/**
+ * Release an advisory file lock.
+ */
+export function releaseLock(filePath: string): void {
+  const lockPath = filePath + '.lock';
+  try {
+    const pidFile = path.join(lockPath, 'pid');
+    if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+    fs.rmdirSync(lockPath);
+  } catch { /* already released */ }
+}
+
+/**
+ * Atomic write: write content to a temp file then rename into place.
+ * With advisory locking to prevent multi-instance corruption.
+ */
+export function atomicWriteFileSync(filePath: string, content: string): void {
+  const tmpPath = filePath + `.tmp-${process.pid}`;
+  const locked = acquireLock(filePath);
+  try {
+    fs.writeFileSync(tmpPath, content, 'utf-8');
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    throw err;
+  } finally {
+    if (locked) releaseLock(filePath);
+  }
+}
+
 /**
  * Validates and sanitizes an appId to prevent path-traversal attacks.
  * AppIds are generated as `{timestamp}-{slug}` — they must not contain
@@ -57,14 +124,14 @@ export function loadSettings(settingsPath: string): DeyadSettings {
 }
 
 export function saveSettings(settingsPath: string, settings: DeyadSettings): void {
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+  atomicWriteFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 // ── Snapshot utility ──────────────────────────────────────────────────────────
 
 export function saveSnapshot(snapshotsDir: string, appId: string, files: Record<string, string>): void {
   const filePath = path.join(snapshotsDir, `${safeAppId(appId)}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(files), 'utf-8');
+  atomicWriteFileSync(filePath, JSON.stringify(files));
 }
 
 export function loadSnapshot(snapshotsDir: string, appId: string): Record<string, string> | null {

@@ -60,4 +60,67 @@ describe('SettingsModal', () => {
     expect(screen.queryByText(/pgAdmin/i)).toBeNull();
     expect(screen.queryByLabelText(/pgadmin/i)).toBeNull();
   });
+
+  it('tests connection and shows success', async () => {
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    fireEvent.click(screen.getByText('Test'));
+    await waitFor(() => {
+      expect(window.deyad.setSettings).toHaveBeenCalled();
+      expect(window.deyad.listModels).toHaveBeenCalled();
+    });
+  });
+
+  it('tests connection and shows error on failure', async () => {
+    Object.assign(window.deyad, {
+      listModels: vi.fn().mockRejectedValue(new Error('Connection refused')),
+    });
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    fireEvent.click(screen.getByText('Test'));
+    await waitFor(() => {
+      // Should show error state
+      expect(window.deyad.setSettings).toHaveBeenCalled();
+    });
+  });
+
+  it('loads settings on mount', async () => {
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => {
+      expect(window.deyad.getSettings).toHaveBeenCalled();
+    });
+  });
+
+  it('calls onThemeChange when theme button clicked', async () => {
+    const onThemeChange = vi.fn();
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={onThemeChange} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    // click the light theme button (text includes emoji)
+    const lightBtn = screen.getByText(/Light/);
+    fireEvent.click(lightBtn);
+    expect(onThemeChange).toHaveBeenCalledWith('light');
+  });
+
+  it('closes when overlay is clicked', async () => {
+    const onClose = vi.fn();
+    const { container } = render(<SettingsModal onClose={onClose} theme="dark" onThemeChange={() => {}} />);
+    const overlay = container.querySelector('.modal-overlay');
+    fireEvent.click(overlay!);
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('updates host input value', async () => {
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    const input = screen.getByDisplayValue('http://localhost:11434');
+    fireEvent.change(input, { target: { value: 'http://localhost:12345' } });
+    expect((input as HTMLInputElement).value).toBe('http://localhost:12345');
+  });
+
+  it('shows Saved feedback after saving', async () => {
+    render(<SettingsModal onClose={() => {}} theme="dark" onThemeChange={() => {}} />);
+    await waitFor(() => expect(screen.getByDisplayValue('http://localhost:11434')).toBeTruthy());
+    fireEvent.click(screen.getByText('Save Settings'));
+    await waitFor(() => expect(screen.getByText(/Saved|✓/)).toBeTruthy());
+  });
 });

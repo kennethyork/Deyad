@@ -72,4 +72,79 @@ describe('EnvVarsPanel', () => {
     // Should render without crashing
     expect(container.innerHTML).toBeTruthy();
   });
+
+  it('switches active file when clicking a tab', async () => {
+    Object.assign(window.deyad, { envRead: vi.fn().mockResolvedValue({
+      '.env': { KEY1: 'val1' },
+      '.env.local': { KEY2: 'val2' },
+    }) });
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('.env.local')).toBeTruthy());
+    fireEvent.click(screen.getByText('.env.local'));
+    await waitFor(() => {
+      expect(screen.getByText('KEY2')).toBeTruthy();
+    });
+  });
+
+  it('deletes a variable when delete is clicked', async () => {
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    const removeButtons = screen.getAllByText('×');
+    fireEvent.click(removeButtons[0]);
+    await waitFor(() => {
+      expect(window.deyad.envWrite).toHaveBeenCalled();
+    });
+  });
+
+  it('does not add a variable when key is empty', async () => {
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    fireEvent.click(screen.getByText('Add'));
+    // envWrite should not be called again beyond initial load
+    expect(window.deyad.envWrite).not.toHaveBeenCalled();
+  });
+
+  it('creates new env file when + is clicked', async () => {
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    // First click shows input
+    fireEvent.click(screen.getByText('+'));
+    const input = screen.getByPlaceholderText('.env.local');
+    expect(input).toBeTruthy();
+  });
+
+  it('validates new env file name must start with .env', async () => {
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    fireEvent.click(screen.getByText('+'));
+    const input = screen.getByPlaceholderText('.env.local');
+    fireEvent.change(input, { target: { value: 'config.yml' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => {
+      expect(screen.getByText(/must start with .env/)).toBeTruthy();
+    });
+  });
+
+  it('shows saved status after successful write', async () => {
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    const removeButtons = screen.getAllByText('×');
+    fireEvent.click(removeButtons[0]);
+    await waitFor(() => {
+      expect(screen.getByText(/Saved|✓/)).toBeTruthy();
+    });
+  });
+
+  it('shows error status on write failure', async () => {
+    Object.assign(window.deyad, {
+      envWrite: vi.fn().mockResolvedValue({ success: false, error: 'Permission denied' }),
+    });
+    render(<EnvVarsPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByText('DATABASE_URL')).toBeTruthy());
+    const removeButtons = screen.getAllByText('×');
+    fireEvent.click(removeButtons[0]);
+    await waitFor(() => {
+      expect(screen.getByText(/Permission denied/)).toBeTruthy();
+    });
+  });
 });

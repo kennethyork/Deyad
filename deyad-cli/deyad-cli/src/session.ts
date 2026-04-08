@@ -87,6 +87,27 @@ function releaseLock(filePath: string): void {
   } catch { /* lock already released */ }
 }
 
+/**
+ * Recover a corrupt session from its backup file.
+ * Returns the recovered session or null if unrecoverable.
+ */
+export function recoverSession(filePath: string): SessionData | null {
+  const backupPath = filePath + '.bak';
+  try {
+    if (!fs.existsSync(backupPath)) return null;
+    const raw = fs.readFileSync(backupPath, 'utf-8');
+    const data = JSON.parse(raw) as SessionData;
+    // Restore main file from backup
+    fs.writeFileSync(filePath, raw, 'utf-8');
+    if (process.env['DEYAD_DEBUG']) {
+      console.error('[session] recovered from backup:', path.basename(filePath));
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 function generateId(): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
@@ -127,6 +148,7 @@ export function saveSession(session: SessionData): void {
   session.updatedAt = new Date().toISOString();
   const filePath = path.join(SESSIONS_DIR, `${session.id}.json`);
   const tmpPath = filePath + '.tmp';
+  const backupPath = filePath + '.bak';
 
   if (!acquireLock(filePath)) {
     // Timeout — fall back to direct write rather than losing data
@@ -134,6 +156,10 @@ export function saveSession(session: SessionData): void {
     return;
   }
   try {
+    // Create backup of existing file before overwriting
+    if (fs.existsSync(filePath)) {
+      try { fs.copyFileSync(filePath, backupPath); } catch { /* best effort */ }
+    }
     fs.writeFileSync(tmpPath, JSON.stringify(session, null, 2), 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
@@ -156,10 +182,19 @@ export function listSessions(): SessionData[] {
     const sessions: SessionData[] = [];
     for (const file of files.slice(0, MAX_SESSIONS)) {
       try {
-        const data = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, file), 'utf-8'));
+        const filePath = path.join(SESSIONS_DIR, file);
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        const data = JSON.parse(raw);
         sessions.push(data);
       } catch (err) {
-        if (process.env['DEYAD_DEBUG']) console.error('[session] corrupt file:', file, err);
+        // Corrupt session — attempt recovery from backup
+        const filePath = path.join(SESSIONS_DIR, file);
+        const recovered = recoverSession(filePath);
+        if (recovered) {
+          sessions.push(recovered);
+        } else if (process.env['DEYAD_DEBUG']) {
+          console.error('[session] corrupt file (unrecoverable):', file, err);
+        }
       }
     }
     return sessions;

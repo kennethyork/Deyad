@@ -7,6 +7,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
 
+/** Maximum characters of lint output before truncation. Override with DEYAD_MAX_LINT env. */
+const MAX_LINT_CHARS = parseInt(process.env['DEYAD_MAX_LINT'] || '5000', 10);
+
 export interface LintResult {
   linter: string;
   errors: string;
@@ -135,8 +138,8 @@ export function runLint(cwd: string, changedFiles: string[]): LintResult[] {
       const combined = [stdout, stderr].filter(Boolean).join('\n');
 
       // Truncate long lint output
-      const truncated = combined.length > 3000
-        ? combined.slice(0, 3000) + '\n... (truncated)'
+      const truncated = combined.length > MAX_LINT_CHARS
+        ? combined.slice(0, MAX_LINT_CHARS) + `\n... (truncated at ${MAX_LINT_CHARS} chars)`
         : combined;
 
       results.push({

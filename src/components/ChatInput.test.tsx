@@ -69,4 +69,59 @@ describe('ChatInput', () => {
     render(<ChatInput {...baseProps} />);
     expect(screen.getByTitle(/Attach image/i)).toBeTruthy();
   });
+
+  it('calls onSend on Enter key (not Shift+Enter)', () => {
+    const onSend = vi.fn();
+    render(<ChatInput {...baseProps} input="hello" onSend={onSend} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: false });
+    expect(onSend).toHaveBeenCalled();
+  });
+
+  it('does not call onSend on Shift+Enter', () => {
+    const onSend = vi.fn();
+    render(<ChatInput {...baseProps} input="hello" onSend={onSend} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
+    expect(onSend).not.toHaveBeenCalled();
+  });
+
+  it('shows stop button when streaming', () => {
+    const onStop = vi.fn();
+    render(<ChatInput {...baseProps} streaming={true} onStop={onStop} />);
+    const stopBtn = screen.getByText('■');
+    expect(stopBtn).toBeTruthy();
+    fireEvent.click(stopBtn);
+    expect(onStop).toHaveBeenCalled();
+  });
+
+  it('handles drag over state', () => {
+    const { container } = render(<ChatInput {...baseProps} />);
+    const area = container.querySelector('.chat-input-area')!;
+    fireEvent.dragOver(area, { preventDefault: () => {} });
+    expect(area.className).toContain('drag-over');
+    fireEvent.dragLeave(area);
+    expect(area.className).not.toContain('drag-over');
+  });
+
+  it('handles drop of image file', () => {
+    const setImage = vi.fn();
+    const { container } = render(<ChatInput {...baseProps} setImageAttachment={setImage} />);
+    const area = container.querySelector('.chat-input-area')!;
+    const file = new File(['bytes'], 'test.png', { type: 'image/png' });
+    const dataTransfer = { files: [file], preventDefault: () => {} };
+    fireEvent.drop(area, { dataTransfer, preventDefault: () => {} });
+    // FileReader is async; just verify no crash
+    expect(area).toBeTruthy();
+  });
+
+  it('shows image placeholder text when attachment exists', () => {
+    render(<ChatInput {...baseProps} imageAttachment="data:image/png;base64,abc" />);
+    expect(screen.getByPlaceholderText(/Describe what to build from this image/)).toBeTruthy();
+  });
+
+  it('has correct aria-label on form', () => {
+    const { container } = render(<ChatInput {...baseProps} />);
+    expect(container.querySelector('[aria-label="Chat input"]')).toBeTruthy();
+  });
 });

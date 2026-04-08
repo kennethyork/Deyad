@@ -1,9 +1,31 @@
-import { app, BrowserWindow, session, Menu, shell, dialog } from 'electron';
+import { app, BrowserWindow, session, Menu, shell, dialog, ipcMain } from 'electron';
 import fixPath from 'fix-path';
+import log from 'electron-log/main';
+
+// ── Persistent logging via electron-log ───────────────────────────────────────
+// Logs are written to:
+//   Linux:   ~/.config/deyad/logs/
+//   macOS:   ~/Library/Logs/deyad/
+//   Windows: %USERPROFILE%\AppData\Roaming\deyad\logs\
+log.initialize();
+log.transports.file.maxSize = 5 * 1024 * 1024; // 5 MB per log file
+log.transports.file.format = '{y}-{m}-{d} {h}:{i}:{s}.{ms} [{level}] {text}';
+log.transports.console.level = 'warn'; // don't spam dev console
+
+// Redirect console.error/warn so all warnings hit the log file too
+Object.assign(console, log.functions);
 
 // Fix PATH so commands (docker, podman, node, npm, git, ollama) are found
 // when the app is launched from a desktop shortcut instead of a terminal.
 fixPath();
+
+// ── Global error handlers — catch any uncaught errors in the main process ────
+process.on('uncaughtException', (err) => {
+  log.error('[uncaughtException]', err);
+});
+process.on('unhandledRejection', (reason) => {
+  log.error('[unhandledRejection]', reason);
+});
 
 // Prevent Electron main crashes when stdout/stderr are closed (EPIPE)
 process.stdout?.on?.('error', (err: NodeJS.ErrnoException) => {
@@ -47,8 +69,46 @@ try {
    
   const mod = require('update-electron-app');
   const updateElectronApp = mod.updateElectronApp ?? mod.default ?? mod;
-  updateElectronApp({ updateInterval: '1 hour' });
-} catch (err) { console.debug('auto-updater not available in dev — ignore:', err); }
+  updateElectronApp({
+    updateInterval: '1 hour',
+    logger: log,
+  });
+} catch (err) { log.debug('auto-updater not available in dev — ignore:', err); }
+
+// Forward auto-update events to renderer for progress UI
+try {
+  const { autoUpdater } = require('electron-updater');
+  autoUpdater.logger = log;
+  autoUpdater.on?.('checking-for-update', () => {
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:checking'));
+  });
+  autoUpdater.on?.('update-available', (info: { version: string }) => {
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:available', info.version));
+  });
+  autoUpdater.on?.('update-not-available', () => {
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:not-available'));
+  });
+  autoUpdater.on?.('download-progress', (progress: { percent: number }) => {
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:progress', progress.percent));
+  });
+  autoUpdater.on?.('update-downloaded', (info: { version: string }) => {
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:downloaded', info.version));
+  });
+  autoUpdater.on?.('error', (err: Error) => {
+    log.error('[auto-updater]', err);
+    BrowserWindow.getAllWindows().forEach(w =>
+      w.webContents.send('update:error', err.message));
+  });
+  // IPC: allow renderer to trigger install-and-restart
+  ipcMain.handle('update:install', () => {
+    autoUpdater.quitAndInstall();
+  });
+} catch { /* electron-updater not available in dev */ }
 
 if (started) { app.quit(); }
 

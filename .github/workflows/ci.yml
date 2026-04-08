@@ -31,6 +31,15 @@ jobs:
         with:
           name: desktop-coverage
           path: coverage/
+      - name: Bundle size tracking
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          npm run build:all
+          echo "## Desktop Bundle Sizes" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          du -sh .vite/build/*.js 2>/dev/null >> $GITHUB_STEP_SUMMARY || true
+          find .vite/renderer -name '*.js' -o -name '*.css' 2>/dev/null | xargs ls -lhS 2>/dev/null | head -20 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
   desktop-e2e:
     name: Desktop — E2E (Playwright)
@@ -66,6 +75,12 @@ jobs:
       - run: npx vitest run --coverage
       - name: Build CLI
         run: node build.mjs
+      - name: CLI bundle size
+        run: |
+          echo "## CLI Bundle Size" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          ls -lhS dist/*.js >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
       - run: npm audit --audit-level=high
       - name: Upload coverage
         if: always()

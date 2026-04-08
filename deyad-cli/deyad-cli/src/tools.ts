@@ -12,6 +12,38 @@ import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import type { OllamaTool } from './ollama.js';
 
+// ── Configurable limits ───────────────────────────────────────────────────────
+/** Maximum file size in bytes before truncation in read_file. Override with DEYAD_MAX_READ env. */
+export const MAX_READ_BYTES = parseInt(process.env['DEYAD_MAX_READ'] || '200000', 10);
+/** Maximum characters of auto-lint output. Override with DEYAD_MAX_LINT env. */
+export const MAX_LINT_CHARS = parseInt(process.env['DEYAD_MAX_LINT'] || '5000', 10);
+/** Maximum characters of run_command output. Override with DEYAD_MAX_CMD env. */
+export const MAX_CMD_CHARS = parseInt(process.env['DEYAD_MAX_CMD'] || '10000', 10);
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+/** Maximum tool calls per minute (safety guard against infinite loops). */
+const RATE_LIMIT_PER_MIN = parseInt(process.env['DEYAD_RATE_LIMIT'] || '120', 10);
+const toolCallTimestamps: number[] = [];
+
+/**
+ * Check rate limit. Returns true if within limit, false if exceeded.
+ */
+export function checkRateLimit(): boolean {
+  const now = Date.now();
+  // Remove timestamps older than 1 minute
+  while (toolCallTimestamps.length > 0 && toolCallTimestamps[0]! < now - 60_000) {
+    toolCallTimestamps.shift();
+  }
+  if (toolCallTimestamps.length >= RATE_LIMIT_PER_MIN) return false;
+  toolCallTimestamps.push(now);
+  return true;
+}
+
+/** Reset rate limit state (for testing). */
+export function resetRateLimit(): void {
+  toolCallTimestamps.length = 0;
+}
+
 export interface ToolCall {
   name: string;
   params: Record<string, string>;
@@ -254,6 +286,9 @@ export async function executeTool(
   cwd: string,
   cb?: ToolCallbacks,
 ): Promise<ToolResult> {
+  if (!checkRateLimit()) {
+    return { tool: call.name, success: false, output: 'Rate limit exceeded (too many tool calls per minute). Slow down.' };
+  }
   const result = await executeToolInner(call, cwd, cb);
   auditLog(call.name, call.params, result);
   return result;
@@ -296,11 +331,13 @@ async function executeBuiltinTool(
         if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         const content = fs.readFileSync(absPath, 'utf-8');
-        if (content.length > 200000) {
-          // Keep first 150KB + last 10KB so head and tail context are preserved
-          const head = content.slice(0, 150000);
-          const tail = content.slice(-10000);
-          return { tool: call.name, success: true, output: head + '\n\n... (truncated ' + Math.round(content.length / 1024) + 'KB file) ...\n\n' + tail };
+        if (content.length > MAX_READ_BYTES) {
+          // Keep first portion + last 10KB so head and tail context are preserved
+          const headSize = Math.floor(MAX_READ_BYTES * 0.75);
+          const tailSize = Math.min(10000, Math.floor(MAX_READ_BYTES * 0.125));
+          const head = content.slice(0, headSize);
+          const tail = content.slice(-tailSize);
+          return { tool: call.name, success: true, output: head + `\n\n... (truncated ${Math.round(content.length / 1024)}KB file, showing first ${Math.round(headSize/1024)}KB + last ${Math.round(tailSize/1024)}KB) ...\n\n` + tail };
         }
         return { tool: call.name, success: true, output: content };
       }
@@ -457,7 +494,7 @@ async function executeBuiltinTool(
           const output = isSimple
             ? execFileSync((parsed as string[])[0]!, (parsed as string[]).slice(1), execOpts)
             : execSync(command, execOpts);
-          const truncated = output.length > 10000 ? output.slice(0, 10000) + '\n... (truncated)' : output;
+          const truncated = output.length > MAX_CMD_CHARS ? output.slice(0, MAX_CMD_CHARS) + `\n... (truncated at ${MAX_CMD_CHARS} chars)` : output;
           return { tool: call.name, success: true, output: truncated || '(no output)' };
         } catch (err: unknown) {
           const e = err as { stdout?: string; stderr?: string; status?: number; message?: string };

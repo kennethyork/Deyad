@@ -19,7 +19,10 @@ import {
   formatSuccess, formatTokenBadge, getPrompt,
 } from './tui.js';
 
-const VERSION = '0.1.32';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
+const VERSION = pkg.version;
 
 function printUsage(): void {
   console.log(`
@@ -39,13 +42,57 @@ function printUsage(): void {
     ${c.yellow('-p, --print <prompt>')}   Run prompt non-interactively and print result
     ${c.yellow('-a, --auto')}             Full-auto mode (sandbox + no confirmations)
     ${c.yellow('--resume')}               Resume the most recent session for this directory
+    ${c.yellow('--completions <shell>')}  Output shell completion script (bash, zsh, fish)
     ${c.yellow('-v, --version')}          Show version
 `);
+}
+
+function generateCompletions(shell: string): string {
+  switch (shell) {
+    case 'bash':
+      return `# deyad bash completions — add to ~/.bashrc
+_deyad_completions() {
+  local cur opts
+  COMPREPLY=()
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  opts="-h --help -v --version -m --model -p --print -a --auto --resume --no-resume --completions"
+  COMPREPLY=( $(compgen -W "\${opts}" -- "\${cur}") )
+}
+complete -F _deyad_completions deyad`;
+    case 'zsh':
+      return `# deyad zsh completions — add to ~/.zshrc
+_deyad() {
+  _arguments \\
+    '-h[Show help]' '--help[Show help]' \\
+    '-v[Show version]' '--version[Show version]' \\
+    '-m[Specify model]:model:' '--model[Specify model]:model:' \\
+    '-p[Print mode]:prompt:' '--print[Print mode]:prompt:' \\
+    '-a[Full-auto mode]' '--auto[Full-auto mode]' \\
+    '--resume[Resume last session]' \\
+    '--no-resume[Start fresh session]' \\
+    '--completions[Output completions]:shell:(bash zsh fish)' \\
+    '*:prompt:'
+}
+compdef _deyad deyad`;
+    case 'fish':
+      return `# deyad fish completions — save to ~/.config/fish/completions/deyad.fish
+complete -c deyad -s h -l help -d 'Show help'
+complete -c deyad -s v -l version -d 'Show version'
+complete -c deyad -s m -l model -r -d 'Specify model'
+complete -c deyad -s p -l print -r -d 'Print mode'
+complete -c deyad -s a -l auto -d 'Full-auto mode'
+complete -c deyad -l resume -d 'Resume last session'
+complete -c deyad -l no-resume -d 'Start fresh session'
+complete -c deyad -l completions -r -a 'bash zsh fish' -d 'Output completions'`;
+    default:
+      return `Unknown shell: ${shell}. Supported: bash, zsh, fish`;
+  }
 }
 
 interface ParsedArgs {
   help: boolean;
   version: boolean;
+  completions: string | undefined;
   model: string | undefined;
   print: string | undefined;
   prompt: string | undefined;
@@ -57,6 +104,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const args: ParsedArgs = {
     help: false,
     version: false,
+    completions: undefined,
     model: undefined,
     print: undefined,
     prompt: undefined,
@@ -71,6 +119,9 @@ function parseArgs(argv: string[]): ParsedArgs {
       args.help = true;
     } else if (arg === '-v' || arg === '--version') {
       args.version = true;
+    } else if (arg === '--completions') {
+      i++;
+      args.completions = argv[i];
     } else if (arg === '-m' || arg === '--model') {
       i++;
       args.model = argv[i];
@@ -155,6 +206,10 @@ async function main(): Promise<void> {
   }
   if (args.version) {
     console.log(`deyad ${VERSION}`);
+    process.exit(0);
+  }
+  if (args.completions) {
+    console.log(generateCompletions(args.completions));
     process.exit(0);
   }
 

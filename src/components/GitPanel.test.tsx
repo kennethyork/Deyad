@@ -77,4 +77,100 @@ describe('GitPanel', () => {
       expect(pushBtn).toBeTruthy();
     });
   });
+
+  it('sets remote URL on save', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    const input = screen.getByDisplayValue('https://github.com/user/repo.git');
+    fireEvent.change(input, { target: { value: 'https://github.com/user/new-repo.git' } });
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => {
+      expect(window.deyad.gitRemoteSet).toHaveBeenCalledWith('app1', 'https://github.com/user/new-repo.git');
+    });
+  });
+
+  it('commits with message via terminal', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    const commitInput = screen.getByPlaceholderText(/Commit message/i);
+    fireEvent.change(commitInput, { target: { value: 'Initial commit' } });
+    const commitBtn = screen.getByRole('button', { name: /Commit/i });
+    fireEvent.click(commitBtn);
+    await waitFor(() => {
+      expect(window.deyad.createTerminal).toHaveBeenCalledWith('app1');
+    });
+  });
+
+  it('creates a new branch', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    const branchInput = screen.getByPlaceholderText(/branch/i);
+    fireEvent.change(branchInput, { target: { value: 'feature-x' } });
+    fireEvent.click(screen.getByText(/Create/));
+    await waitFor(() => {
+      expect(window.deyad.gitBranchCreate).toHaveBeenCalledWith('app1', 'feature-x');
+    });
+  });
+
+  it('shows success message after push', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    fireEvent.click(screen.getByText(/Push/));
+    await waitFor(() => {
+      expect(screen.getByText(/Pushed to remote/)).toBeTruthy();
+    });
+  });
+
+  it('shows success message after pull', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    fireEvent.click(screen.getByText(/Pull/));
+    await waitFor(() => {
+      expect(screen.getByText(/Pulled from remote/)).toBeTruthy();
+    });
+  });
+
+  it('calls onFilesChanged after successful pull', async () => {
+    const onFiles = vi.fn();
+    render(<GitPanel appId="app1" onFilesChanged={onFiles} />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    fireEvent.click(screen.getByText(/Pull/));
+    await waitFor(() => {
+      expect(onFiles).toHaveBeenCalled();
+    });
+  });
+
+  it('shows push error on failure', async () => {
+    Object.assign(window.deyad, {
+      gitPush: vi.fn().mockResolvedValue({ success: false, error: 'Auth failed' }),
+    });
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    fireEvent.click(screen.getByText(/Push/));
+    await waitFor(() => {
+      expect(screen.getByText(/Auth failed/)).toBeTruthy();
+    });
+  });
+
+  it('commits on Enter key in commit input', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    const commitInput = screen.getByPlaceholderText(/Commit message/i);
+    fireEvent.change(commitInput, { target: { value: 'fix bug' } });
+    fireEvent.keyDown(commitInput, { key: 'Enter' });
+    await waitFor(() => {
+      expect(window.deyad.createTerminal).toHaveBeenCalled();
+    });
+  });
+
+  it('sets remote on Enter key in URL input', async () => {
+    render(<GitPanel appId="app1" />);
+    await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
+    const input = screen.getByDisplayValue('https://github.com/user/repo.git');
+    fireEvent.change(input, { target: { value: 'https://github.com/x/y.git' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => {
+      expect(window.deyad.gitRemoteSet).toHaveBeenCalled();
+    });
+  });
 });

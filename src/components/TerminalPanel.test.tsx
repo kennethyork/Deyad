@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import TerminalPanel from './TerminalPanel';
 
@@ -26,5 +26,27 @@ describe('TerminalPanel', () => {
     // Initial tab should be created
     await Promise.resolve();
     expect(window.deyad.createTerminal).toHaveBeenCalledWith('foo');
+  });
+
+  it('subscribes to terminal data and exit events', () => {
+    render(<TerminalPanel appId="foo" />);
+    expect(window.deyad.onTerminalData).toHaveBeenCalled();
+    expect(window.deyad.onTerminalExit).toHaveBeenCalled();
+    expect(window.deyad.onTerminalClear).toHaveBeenCalled();
+  });
+
+  it('creates new tab when + button is clicked', async () => {
+    const { container } = render(<TerminalPanel appId="foo" />);
+    await Promise.resolve();
+    const addBtn = container.querySelector('.terminal-tab-add')!;
+    fireEvent.click(addBtn);
+    // Should call createTerminal again
+    await Promise.resolve();
+    expect(window.deyad.createTerminal).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders without appId', () => {
+    const { container } = render(<TerminalPanel />);
+    expect(container.querySelector('.terminal-panel')).toBeTruthy();
   });
 });

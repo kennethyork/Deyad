@@ -325,6 +325,8 @@ export async function runAgentLoop(
   const stats: TokenStats = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   const sigHandler = () => { abortController.abort(); };
   process.on('SIGINT', sigHandler);
+  process.on('SIGTERM', sigHandler);
+  process.on('SIGHUP', sigHandler);
 
   try {
     const context = await buildContext(cwd);
@@ -461,5 +463,7 @@ export async function runAgentLoop(
     return { history: messages, changedFiles, stats };
   } finally {
     process.removeListener('SIGINT', sigHandler);
+    process.removeListener('SIGTERM', sigHandler);
+    process.removeListener('SIGHUP', sigHandler);
   }
 }

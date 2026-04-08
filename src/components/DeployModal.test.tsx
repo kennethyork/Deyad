@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { render, screen, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import DeployModal from './DeployModal';
 
@@ -60,5 +60,98 @@ describe('DeployModal', () => {
   it('subscribes to deploy logs on mount', () => {
     render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
     expect(window.deyad.onDeployLog).toHaveBeenCalled();
+  });
+
+  it('selects a provider and deploys frontend', async () => {
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Vercel')).toBeTruthy());
+    fireEvent.click(screen.getByText('Vercel'));
+    fireEvent.click(screen.getByText('Deploy Now'));
+    await waitFor(() => {
+      expect(window.deyad.deploy).toHaveBeenCalledWith('app1', 'vercel');
+    });
+  });
+
+  it('shows fullstack providers for fullstack apps', async () => {
+    render(<DeployModal appId="app1" appName="Test" appType="fullstack" onClose={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByText('Railway')).toBeTruthy();
+      expect(screen.getByText('Fly.io')).toBeTruthy();
+    });
+  });
+
+  it('deploys fullstack with deployFullstack', async () => {
+    Object.assign(window.deyad, {
+      deployCheck: vi.fn().mockResolvedValue({ netlify: false, vercel: false, surge: false, railway: true, flyio: false }),
+    });
+    render(<DeployModal appId="app1" appName="Test" appType="fullstack" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Railway')).toBeTruthy());
+    fireEvent.click(screen.getByText('Railway'));
+    fireEvent.click(screen.getByText('Deploy Now'));
+    await waitFor(() => {
+      expect(window.deyad.deployFullstack).toHaveBeenCalledWith('app1', 'railway');
+    });
+  });
+
+  it('shows deploy result on success', async () => {
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Vercel')).toBeTruthy());
+    fireEvent.click(screen.getByText('Vercel'));
+    fireEvent.click(screen.getByText('Deploy Now'));
+    await waitFor(() => {
+      expect(screen.getByText(/Deployed successfully/)).toBeTruthy();
+    });
+  });
+
+  it('shows deploy error on failure', async () => {
+    Object.assign(window.deyad, {
+      deploy: vi.fn().mockResolvedValue({ success: false, error: 'Auth required' }),
+    });
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Vercel')).toBeTruthy());
+    fireEvent.click(screen.getByText('Vercel'));
+    fireEvent.click(screen.getByText('Deploy Now'));
+    await waitFor(() => {
+      expect(screen.getByText(/Auth required/)).toBeTruthy();
+    });
+  });
+
+  it('shows install hint when no CLIs are available', async () => {
+    Object.assign(window.deyad, {
+      deployCheck: vi.fn().mockResolvedValue({ netlify: false, vercel: false, surge: false, railway: false, flyio: false }),
+    });
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByText(/No deploy CLIs detected/)).toBeTruthy();
+    });
+  });
+
+  it('initializes Capacitor for mobile', async () => {
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Vercel')).toBeTruthy());
+    fireEvent.click(screen.getByText('Initialize'));
+    await waitFor(() => {
+      expect(window.deyad.capacitorInit).toHaveBeenCalledWith('app1');
+    });
+  });
+
+  it('detects mobile devices', async () => {
+    Object.assign(window.deyad, {
+      capacitorListDevices: vi.fn().mockResolvedValue({ success: true, devices: [{ id: 'emu1', name: 'Pixel 6' }] }),
+    });
+    render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={() => {}} />);
+    await waitFor(() => expect(screen.getByText('Vercel')).toBeTruthy());
+    fireEvent.click(screen.getByText('Detect Devices'));
+    await waitFor(() => {
+      expect(window.deyad.capacitorListDevices).toHaveBeenCalled();
+    });
+  });
+
+  it('closes overlay when clicking outside', async () => {
+    const onClose = vi.fn();
+    const { container } = render(<DeployModal appId="app1" appName="Test" appType="frontend" onClose={onClose} />);
+    const overlay = container.querySelector('.modal-overlay');
+    fireEvent.click(overlay!);
+    expect(onClose).toHaveBeenCalled();
   });
 });

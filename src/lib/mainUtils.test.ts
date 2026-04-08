@@ -11,6 +11,9 @@ import {
   loadSnapshot,
   deleteSnapshot,
   DEFAULT_SETTINGS,
+  acquireLock,
+  releaseLock,
+  atomicWriteFileSync,
   type DeyadSettings,
 } from './mainUtils';
 
@@ -133,5 +136,65 @@ describe('snapshot utilities', () => {
     expect(() => saveSnapshot(tmpDir, '../escape', {})).toThrow('Invalid app ID');
     expect(() => loadSnapshot(tmpDir, '../escape')).toThrow('Invalid app ID');
     expect(() => deleteSnapshot(tmpDir, '../escape')).toThrow('Invalid app ID');
+  });
+});
+
+// ── File Locking ──────────────────────────────────────────────────────────────
+
+describe('acquireLock / releaseLock', () => {
+  it('acquires and releases a lock', () => {
+    const target = path.join(tmpDir, 'test-file.json');
+    expect(acquireLock(target)).toBe(true);
+    // Lock dir should exist
+    expect(fs.existsSync(target + '.lock')).toBe(true);
+    releaseLock(target);
+    expect(fs.existsSync(target + '.lock')).toBe(false);
+  });
+
+  it('releaseLock is safe to call when no lock exists', () => {
+    const target = path.join(tmpDir, 'no-lock.json');
+    expect(() => releaseLock(target)).not.toThrow();
+  });
+});
+
+// ── Atomic Writes ─────────────────────────────────────────────────────────────
+
+describe('atomicWriteFileSync', () => {
+  it('writes content atomically', () => {
+    const target = path.join(tmpDir, 'atomic-test.json');
+    atomicWriteFileSync(target, '{"hello":"world"}');
+    expect(fs.readFileSync(target, 'utf-8')).toBe('{"hello":"world"}');
+  });
+
+  it('does not leave temp files on success', () => {
+    const target = path.join(tmpDir, 'clean.json');
+    atomicWriteFileSync(target, 'data');
+    const files = fs.readdirSync(tmpDir);
+    expect(files.filter(f => f.includes('.tmp'))).toHaveLength(0);
+  });
+
+  it('overwrites existing file atomically', () => {
+    const target = path.join(tmpDir, 'overwrite.json');
+    fs.writeFileSync(target, 'old', 'utf-8');
+    atomicWriteFileSync(target, 'new');
+    expect(fs.readFileSync(target, 'utf-8')).toBe('new');
+  });
+
+  it('saveSettings uses atomic writes', () => {
+    const p = path.join(tmpDir, 'settings-atomic.json');
+    const custom: DeyadSettings = { ...DEFAULT_SETTINGS, defaultModel: 'llama3' };
+    saveSettings(p, custom);
+    // No lock dirs or tmp files should remain
+    const files = fs.readdirSync(tmpDir);
+    expect(files.filter(f => f.includes('.lock') || f.includes('.tmp'))).toHaveLength(0);
+    const loaded = loadSettings(p);
+    expect(loaded.defaultModel).toBe('llama3');
+  });
+
+  it('saveSnapshot uses atomic writes', () => {
+    saveSnapshot(tmpDir, 'atomic-app', { 'a.js': 'console.log()' });
+    const files = fs.readdirSync(tmpDir);
+    expect(files.filter(f => f.includes('.lock') || f.includes('.tmp'))).toHaveLength(0);
+    expect(loadSnapshot(tmpDir, 'atomic-app')).toEqual({ 'a.js': 'console.log()' });
   });
 });

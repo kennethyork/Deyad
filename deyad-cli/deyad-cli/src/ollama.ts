@@ -3,6 +3,27 @@
  * No external dependencies, uses native fetch.
  */
 
+// ── Retry configuration ──────────────────────────────────────────────────────
+/** Maximum retries for transient errors (timeouts, 429, 503). */
+export const MAX_RETRIES = 3;
+/** Base delay in ms for exponential backoff (doubled each retry). */
+export const BACKOFF_BASE_MS = 1_000;
+
+/** Returns true for HTTP status codes that are worth retrying. */
+export function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 503 || status === 502 || status === 504;
+}
+
+/** Returns true for error messages that indicate transient failures. */
+export function isRetryableError(msg: string): boolean {
+  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|network|timeout|aborted/i.test(msg);
+}
+
+/** Sleep helper for backoff delays. */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export interface OllamaToolCall {
   function: {
     name: string;
@@ -112,17 +133,39 @@ export async function streamChat(
     ...(tools && tools.length > 0 ? { tools } : {}),
   };
 
-  const resp = await fetch(`${baseUrl}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal,
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`Ollama error ${resp.status}: ${text}`);
-  }
+  const resp = await (async () => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        const delay = BACKOFF_BASE_MS * Math.pow(2, attempt - 1);
+        await sleep(delay);
+      }
+      try {
+        const r = await fetch(`${baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal,
+        });
+        if (r.ok) return r;
+        if (isRetryableStatus(r.status) && attempt < MAX_RETRIES) {
+          lastError = new Error(`Ollama error ${r.status}`);
+          continue;
+        }
+        const text = await r.text().catch(() => '');
+        throw new Error(`Ollama error ${r.status}: ${text}`);
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (isRetryableError(msg) && attempt < MAX_RETRIES) {
+          lastError = err instanceof Error ? err : new Error(msg);
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw lastError || new Error('Ollama request failed after retries');
+  })();
 
   if (!resp.body) throw new Error('No response body from Ollama');
 
