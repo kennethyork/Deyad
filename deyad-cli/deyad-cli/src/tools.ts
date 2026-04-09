@@ -115,11 +115,15 @@ BROWSER:
 export function parseToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
 
+  /** Sanitise a parsed tool name — strip XML artefacts from malformed model output. */
+  const sanitizeName = (raw: string): string => raw.replace(/<[^>]*>?/g, '').replace(/[^a-zA-Z0-9_-]/g, '').trim();
+
   // Format 1: <tool_call><name>...</name><param name="...">...</param></tool_call>
   const pattern1 = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
   let match: RegExpExecArray | null;
   while ((match = pattern1.exec(text)) !== null) {
-    const name = match[1]!.trim();
+    const name = sanitizeName(match[1]!);
+    if (!name) continue;
     const body = match[2] ?? '';
     const params: Record<string, string> = {};
     const paramPattern = /<param\s+name="([^"]+)">([\s\S]*?)<\/param>/g;
@@ -134,7 +138,8 @@ export function parseToolCalls(text: string): ToolCall[] {
   // (used by qwen and some other models)
   const pattern2 = /<function=([^>]+)>([\s\S]*?)<\/function>/g;
   while ((match = pattern2.exec(text)) !== null) {
-    const name = match[1]!.trim();
+    const name = sanitizeName(match[1]!);
+    if (!name) continue;
     const body = match[2] ?? '';
     const params: Record<string, string> = {};
     const paramPattern2 = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/g;
@@ -151,11 +156,13 @@ export function parseToolCalls(text: string): ToolCall[] {
     try {
       const parsed = JSON.parse(match[1]!.trim());
       if (parsed.name) {
+        const name = sanitizeName(parsed.name);
+        if (!name) continue;
         const params: Record<string, string> = {};
         for (const [k, v] of Object.entries(parsed.parameters ?? parsed.params ?? {})) {
           params[k] = String(v);
         }
-        calls.push({ name: parsed.name, params });
+        calls.push({ name, params });
       }
     } catch { /* ignore malformed JSON */ }
   }

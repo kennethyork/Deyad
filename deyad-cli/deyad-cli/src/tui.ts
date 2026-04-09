@@ -230,11 +230,18 @@ export function formatToolEnd(_name: string, success: boolean, output: string): 
 
   const icon = success ? c.green('✓') : c.red('✗');
   const statusLabel = success ? c.green('completed') : c.red('failed');
-  const preview = output.split('\n').slice(0, 3).map((l) => truncate(l, innerW));
+  const allLines = output.split('\n');
+  const maxPreview = 20;
+  const preview = allLines.slice(0, maxPreview).map((l) => truncate(l, innerW));
   
   const bodyLines = preview.map((line) => {
     return `${CYAN}${BOX.vertical}${RESET} ${padRight(c.dim(line), innerW)} ${CYAN}${BOX.vertical}${RESET}`;
   });
+
+  if (allLines.length > maxPreview) {
+    const moreMsg = c.dim(`… ${allLines.length - maxPreview} more lines`);
+    bodyLines.push(`${CYAN}${BOX.vertical}${RESET} ${padRight(moreMsg, innerW)} ${CYAN}${BOX.vertical}${RESET}`);
+  }
 
   const footer = `${CYAN}${BOX.bottomLeft}${BOX.horizontal}${RESET} ${icon} ${statusLabel} ${CYAN}${BOX.horizontal.repeat(Math.max(0, w - visibleLength(`${icon} ${statusLabel}`) - 5))}${BOX.bottomRight}${RESET}`;
 
