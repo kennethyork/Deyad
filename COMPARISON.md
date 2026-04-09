@@ -6,31 +6,32 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 
 ## Feature Matrix
 
-| Feature | **Deyad** | **Dyad** | **Bolt.new** | **Lovable** | **Cursor** | **Windsurf** | **Replit** | **v0** |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Pricing** | Free forever | Freemium ($20–$79/mo) | Freemium ($20+/mo) | Freemium ($20+/mo) | $20/mo | $15/mo | Freemium ($25+/mo) | Freemium ($20+/mo) |
-| **Runs locally** | ✅ | ✅ | ❌ cloud | ❌ cloud | ✅ | ✅ | ❌ cloud | ❌ cloud |
-| **Data privacy** | ✅ code never leaves machine | Partial (cloud API keys) | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
-| **Own your AI** | ✅ Ollama (any model) | Partial (BYO API key) | ❌ locked to their API | ❌ locked | Partial (API keys) | Partial (API keys) | ❌ | ❌ |
-| **Full-stack scaffold** | ✅ React+Express+Prisma+SQLite | ✅ Supabase | ✅ | ✅ | ❌ editor only | ❌ editor only | ✅ | ❌ frontend only |
-| **Database management** | ✅ SQLite + Prisma Studio | ✅ Supabase | ❌ | ✅ Supabase | ❌ | ❌ | ✅ PostgreSQL | ❌ |
-| **Live preview** | ✅ embedded Vite | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **Agent loop (auto-fix)** | ✅ 30-iter with error recovery | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **Code editor** | ✅ Monaco (VS Code engine) | ✅ visual editor | Basic | Basic | ✅ VS Code fork | ✅ VS Code fork | ✅ Monaco | ❌ |
-| **Terminal** | ✅ full PTY + multi-tab | ❌ | ✅ WebContainer | ❌ | ✅ | ✅ | ✅ | ❌ |
-| **Git integration** | ✅ full (branch, push, GitHub) | ✅ GitHub deploy | ❌ | ❌ basic | ✅ | ✅ | ✅ | ❌ |
-| **Deploy targets** | ✅ 7 (Vercel, Netlify, Railway, Fly, Surge, VPS+SSL, Desktop) | ✅ GitHub + Vercel | ✅ Netlify/Vercel | ✅ Netlify/Vercel | ❌ | ❌ | ✅ Replit hosting | ✅ Vercel |
-| **VPS deploy + SSL** | ✅ SSH+rsync+certbot | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Desktop app export** | ✅ Electron builds | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Mobile (Capacitor)** | ✅ iOS/Android | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Vision (screenshot → code)** | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Diff review before apply** | ✅ | ❌ | ❌ auto-apply | ❌ auto-apply | ✅ | ✅ | ❌ | ❌ |
-| **Offline capable** | ✅ | ❌ needs API keys | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
-| **Plugin system** | ✅ | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
-| **Env var management** | ✅ multi-file | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| **Open source** | ✅ MIT | ✅ source-available (non-competing) | ❌ | ❌ | ❌ | ❌ | Partial | ❌ |
-| **Security scanning** | ❌ | ✅ built-in | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Voice input** | ❌ | ✅ speech-to-text | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Feature | **Deyad** | **Claude Code** | **Dyad** | **Bolt.new** | **Lovable** | **Cursor** | **Windsurf** | **Replit** | **v0** |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Pricing** | Free forever | Usage-based / Max $20+/mo | Freemium ($20–$79/mo) | Freemium ($20+/mo) | Freemium ($20+/mo) | $20/mo | $15/mo | Freemium ($25+/mo) | Freemium ($20+/mo) |
+| **Runs locally** | ✅ | ❌ cloud | ✅ | ❌ cloud | ❌ cloud | ✅ | ✅ | ❌ cloud | ❌ cloud |
+| **Data privacy** | ✅ code never leaves machine | ❌ code sent to Anthropic | Partial (cloud API keys) | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
+| **Own your AI** | ✅ Ollama (any model) | ❌ Claude only | Partial (BYO API key) | ❌ locked to their API | ❌ locked | Partial (API keys) | Partial (API keys) | ❌ | ❌ |
+| **Full-stack scaffold** | ✅ React+Express+Prisma+SQLite | ❌ no scaffold | ✅ Supabase | ✅ | ✅ | ❌ editor only | ❌ editor only | ✅ | ❌ frontend only |
+| **Database management** | ✅ SQLite + Prisma Studio | ❌ | ✅ Supabase | ❌ | ✅ Supabase | ❌ | ❌ | ✅ PostgreSQL | ❌ |
+| **Live preview** | ✅ embedded Vite | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| **Agent loop (auto-fix)** | ✅ 30-iter with error recovery | ✅ strong agentic loop | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Code editor** | ✅ Monaco (VS Code engine) | ❌ terminal only | ✅ visual editor | Basic | Basic | ✅ VS Code fork | ✅ VS Code fork | ✅ Monaco | ❌ |
+| **Terminal** | ✅ full PTY + multi-tab | ✅ IS a terminal | ❌ | ✅ WebContainer | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Git integration** | ✅ full (branch, push, GitHub) | ✅ git operations | ✅ GitHub deploy | ❌ | ❌ basic | ✅ | ✅ | ✅ | ❌ |
+| **Deploy targets** | ✅ 7 (Vercel, Netlify, Railway, Fly, Surge, VPS+SSL, Desktop) | ❌ no deploy | ✅ GitHub + Vercel | ✅ Netlify/Vercel | ✅ Netlify/Vercel | ❌ | ❌ | ✅ Replit hosting | ✅ Vercel |
+| **VPS deploy + SSL** | ✅ SSH+rsync+certbot | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Desktop app export** | ✅ Electron builds | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Mobile (Capacitor)** | ✅ iOS/Android | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Vision (screenshot → code)** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Diff review before apply** | ✅ | ✅ | ❌ | ❌ auto-apply | ❌ auto-apply | ✅ | ✅ | ❌ | ❌ |
+| **Offline capable** | ✅ | ❌ | ❌ needs API keys | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
+| **MCP extensibility** | ✅ | ✅ | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
+| **Plugin system** | ✅ | ✅ MCP servers | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
+| **Env var management** | ✅ multi-file | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
+| **Open source** | ✅ MIT | ❌ source-available | ✅ source-available (non-competing) | ❌ | ❌ | ❌ | ❌ | Partial | ❌ |
+| **Security scanning** | ❌ | ❌ | ✅ built-in | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Voice input** | ❌ | ❌ | ✅ speech-to-text | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ---
 
@@ -67,6 +68,40 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 - Anyone who wants to **deploy anywhere** — not just Vercel/Netlify
 - Developers who need **database management** built into their workflow
 - Users building **desktop or mobile apps**, not just web apps
+
+---
+
+## Deyad vs. Claude Code — Head-to-Head
+
+Claude Code is the closest comparison to Deyad CLI — both are terminal-based agentic coding tools. The key difference is sovereignty.
+
+| | **Deyad** | **Claude Code** |
+| --- | --- | --- |
+| Price | Free forever | Usage-based API or Max plan ($20+/mo) |
+| AI models | Ollama (free, local, any model) | Claude only (Anthropic cloud) |
+| Offline | ✅ yes | ❌ requires internet |
+| Privacy | ✅ prompts & code stay local | ❌ sent to Anthropic servers |
+| Terminal agent | ✅ agentic REPL (30 iterations) | ✅ agentic terminal |
+| File read/write | ✅ | ✅ |
+| Shell commands | ✅ | ✅ |
+| Error auto-fix | ✅ | ✅ |
+| Git operations | ✅ auto-commit | ✅ git commands |
+| MCP extensibility | ✅ | ✅ |
+| Vision (image input) | ✅ | ✅ |
+| Diff review | ✅ | ✅ |
+| GUI / Desktop app | ✅ Electron app with Monaco editor | ❌ terminal only |
+| Live preview | ✅ embedded Vite | ❌ |
+| Database management | ✅ SQLite + Prisma Studio | ❌ |
+| Deploy (7 targets) | ✅ | ❌ |
+| Desktop/mobile export | ✅ Electron + Capacitor | ❌ |
+| Full-stack scaffold | ✅ React+Express+Prisma | ❌ works on existing codebases |
+| FIM code completion | ✅ via Ollama | ❌ |
+| Open source | ✅ MIT | ❌ source-available |
+| Model quality | Local models (varies by hardware) | Claude 4 / Sonnet (state of the art) |
+
+**Where Deyad wins:** Free, offline, private, has a GUI + live preview + database + deploy + scaffold. You own everything and pay nothing.
+
+**Where Claude Code wins:** Model quality. Claude is one of the best coding models available. If you have a fast GPU and run 70B+ models, the gap narrows — but Claude still has an edge on complex reasoning tasks.
 
 ---
 
