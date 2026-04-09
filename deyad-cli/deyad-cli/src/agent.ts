@@ -31,6 +31,9 @@ const MAX_ITERATIONS = 50;
 /** Maximum retries for nudging a non-acting model to use tools. */
 const MAX_NUDGE_RETRIES = 2;
 
+/** Maximum consecutive identical tool call sequences before forcing the model to stop. */
+const MAX_REPEATED_TOOL_CALLS = 3;
+
 /** Tools that only read data and can safely run in parallel. */
 export const READ_ONLY_TOOLS = new Set([
   'list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url',
@@ -345,8 +348,12 @@ export async function runAgentLoop(
 
     let iteration = 0;
     let hasPerformedAction = false;
-
-    const MAX_ITERATIONS = 50;
+    let lastToolCallSignature = '';
+    let repeatedToolCallCount = 0;
+    /** Track how many times each read-only tool has been called to detect weak-model looping. */
+    const readOnlyToolCallCounts = new Map<string, number>();
+    /** Maximum times a single read-only tool can be called before we force the model to stop. */
+    const MAX_READONLY_TOOL_REPEATS = 5;
 
     while (!abortController.signal.aborted) {
       if (iteration >= MAX_ITERATIONS) {
@@ -407,6 +414,41 @@ export async function runAgentLoop(
         const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
         messages.push({ role: 'assistant', content: assistantContent });
         return { history: messages, changedFiles, stats };
+      }
+
+      // ── Detect repeated tool calls (weak model looping) ──────────
+      const currentToolSig = toolCalls.map(tc => `${tc.name}:${JSON.stringify(tc.params)}`).join('|');
+      const forceStop = (() => {
+        // Exact duplicate detection
+        if (currentToolSig === lastToolCallSignature) {
+          repeatedToolCallCount++;
+          if (repeatedToolCallCount >= MAX_REPEATED_TOOL_CALLS) return true;
+        } else {
+          lastToolCallSignature = currentToolSig;
+          repeatedToolCallCount = 1;
+        }
+        // Per-tool read-only call count — catch models calling list_files with different params
+        for (const tc of toolCalls) {
+          if (READ_ONLY_TOOLS.has(tc.name)) {
+            const cnt = (readOnlyToolCallCounts.get(tc.name) || 0) + 1;
+            readOnlyToolCallCounts.set(tc.name, cnt);
+            if (cnt >= MAX_READONLY_TOOL_REPEATS) return true;
+          }
+        }
+        return false;
+      })();
+
+      if (forceStop) {
+        const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
+        messages.push({ role: 'assistant', content: assistantContent });
+        messages.push({
+          role: 'user',
+          content: 'You are repeating tool calls. Stop calling tools and give your final answer based on the information you already have.',
+        });
+        iteration++;
+        lastToolCallSignature = '';
+        repeatedToolCallCount = 0;
+        continue;
       }
 
       // ── Push assistant message ──────────────────────────────────────
