@@ -145,7 +145,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return args;
 }
 
-async function runOnce(
+export async function runOnce(
   model: string,
   prompt: string,
   cwd: string,
@@ -172,12 +172,12 @@ async function runOnce(
       if (!silent) console.log('\n' + formatToolStart(name, params));
     },
     onToolResult: (r) => {
+      console.log(formatToolEnd(r.tool, r.success, r.output));
       if (!silent) {
-        console.log(formatToolEnd(r.tool, r.success, r.output));
+        spinner.update('Thinking...');
+        spinner.start();
+        spinnerActive = true;
       }
-      spinner.update('Thinking...');
-      spinner.start();
-      spinnerActive = true;
     },
     onDiff: () => {},
     onDone: (summary) => {
@@ -624,7 +624,9 @@ async function main(): Promise<void> {
   ask();
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
