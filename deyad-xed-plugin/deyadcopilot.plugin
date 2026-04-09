@@ -1,0 +1,9 @@
+[Plugin]
+Loader=python3
+Module=deyadcopilot
+IAge=3
+Name=Deyad Copilot
+Description=AI code completions powered by Ollama (local). Press Tab to accept ghost text suggestions.
+Authors=Kenneth York
+Copyright=Copyright @ 2025 Kenneth York
+Version=0.1.0

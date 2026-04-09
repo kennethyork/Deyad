@@ -1,0 +1,88 @@
+{
+  "name": "deyad-copilot",
+  "displayName": "Deyad Copilot",
+  "description": "Local AI code completions powered by Ollama — your private Copilot replacement",
+  "version": "0.1.0",
+  "publisher": "deyad",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages", "Machine Learning"],
+  "keywords": ["copilot", "ai", "autocomplete", "ollama", "local", "code completion"],
+  "license": "Apache-2.0",
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kennethyork/Deyad"
+  },
+  "contributes": {
+    "configuration": {
+      "title": "Deyad Copilot",
+      "properties": {
+        "deyadCopilot.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable inline completions"
+        },
+        "deyadCopilot.endpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama API endpoint"
+        },
+        "deyadCopilot.model": {
+          "type": "string",
+          "default": "qwen2.5-coder:7b",
+          "description": "Ollama model to use for completions (FIM-capable recommended: qwen2.5-coder, deepseek-coder, codellama, starcoder2)"
+        },
+        "deyadCopilot.maxTokens": {
+          "type": "number",
+          "default": 256,
+          "description": "Maximum tokens to generate per completion"
+        },
+        "deyadCopilot.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "description": "Temperature for generation (lower = more deterministic)"
+        },
+        "deyadCopilot.debounceMs": {
+          "type": "number",
+          "default": 300,
+          "description": "Debounce delay in milliseconds before triggering completion"
+        },
+        "deyadCopilot.contextLines": {
+          "type": "number",
+          "default": 50,
+          "description": "Number of lines of context to send before and after cursor"
+        },
+        "deyadCopilot.fimEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use Fill-in-the-Middle (FIM) when the model supports it"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "deyadCopilot.toggle",
+        "title": "Deyad Copilot: Toggle On/Off"
+      },
+      {
+        "command": "deyadCopilot.selectModel",
+        "title": "Deyad Copilot: Select Model"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.4.0"
+  }
+}
