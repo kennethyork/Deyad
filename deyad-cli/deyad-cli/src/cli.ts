@@ -108,7 +108,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     print: undefined,
     prompt: undefined,
     auto: false,
-    resume: true,
+    resume: false,
   };
   const positional: string[] = [];
   let i = 0;
@@ -314,7 +314,17 @@ async function main(): Promise<void> {
   // Load or create session
   let session = loadOrCreateSession(cwd, model);
   if (args.resume && session.history.length > 0) {
-    console.log(c.dim(`  Resuming session ${session.id} (${session.taskCount} tasks, ${session.history.length} messages)`));
+    // Auto-compact large sessions to keep context manageable
+    if (session.history.length > 20) {
+      const keep = session.history.slice(-10);
+      session.history = [
+        { role: 'system' as const, content: `[Earlier conversation compacted — ${session.history.length - 10} messages summarized]` },
+        ...keep,
+      ];
+      console.log(c.dim(`  Resuming session ${session.id} (compacted ${session.taskCount} tasks to ${session.history.length} messages)`));
+    } else {
+      console.log(c.dim(`  Resuming session ${session.id} (${session.taskCount} tasks, ${session.history.length} messages)`));
+    }
   }
   pruneSessions();
 
