@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automation &amp; CI — Deyad Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Deyad</a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/#comparison">Compare</a>
+    <a href="/docs/" class="active">Docs</a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn-sm">GitHub</a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <h3>Getting Started</h3>
+    <a href="/docs/">Overview</a>
+    <h3>Usage</h3>
+    <a href="/docs/interactive-mode.html">Interactive Mode</a>
+    <a href="/docs/automation-and-ci.html" class="active">Automation &amp; CI</a>
+    <h3>Configuration</h3>
+    <a href="/docs/global-config.html">Global Config</a>
+    <a href="/docs/providers.html">AI Providers</a>
+  </aside>
+
+  <main class="content">
+    <h1>Automation &amp; CI Guide</h1>
+    <p class="subtitle">Use Deyad in scripts, pipelines, and GitHub Actions for automated code generation and maintenance.</p>
+
+    <h2>Non-Interactive Mode</h2>
+    <p>Use the <code>-p</code> (print) flag to run Deyad in scripts. It executes the prompt and prints the result to stdout — no interactive UI.</p>
+    <pre><code># One-shot task
+deyad -p "update the README with the new feature description"
+
+# Pipe output
+deyad -p "summarize the changes in the last 5 commits" &gt; summary.txt</code></pre>
+
+    <h2>Auto-Confirm Mode</h2>
+    <p>Use <code>-y</code> to skip all confirmation prompts. The agent will automatically apply file changes and run commands.</p>
+    <pre><code>deyad -y "fix all linting errors in src/"</code></pre>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Description</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OLLAMA_HOST</code></td><td>Ollama API endpoint</td><td><code>http://localhost:11434</code></td></tr>
+        <tr><td><code>DEYAD_MODEL</code></td><td>Default model override</td><td><code>qwen3:32b</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Example: GitHub Action</h2>
+    <p>Automate changelog updates after every push to <code>main</code>:</p>
+    <pre><code>name: Automated Changelog
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Pull model
+        run: ollama pull qwen3:8b
+
+      - name: Install Deyad CLI
+        run: |
+          git clone https://github.com/kennethyork/Deyad.git /tmp/deyad
+          cd /tmp/deyad/deyad-cli/deyad-cli
+          npm install &amp;&amp; node build.mjs &amp;&amp; npm link
+
+      - name: Update changelog
+        run: deyad -y -p "Update CHANGELOG.md based on the latest commits"
+
+      - name: Commit changes
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "chore: automated changelog update" || echo "No changes"
+          git push</code></pre>
+
+    <h2>Best Practices</h2>
+    <ul>
+      <li><strong>Use scoped prompts</strong> — Instead of "refactor the whole repo", use "fix linting errors in <code>src/utils.ts</code>".</li>
+      <li><strong>Sandbox your environment</strong> — Run in Docker or a disposable VM to prevent accidental destructive commands.</li>
+      <li><strong>Check the output</strong> — Always review CI logs to verify the agent behaved as expected.</li>
+      <li><strong>Pin your model</strong> — Use <code>-m model:tag</code> for reproducible results across runs.</li>
+    </ul>
+  </main>
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://github.com/kennethyork/Deyad">Deyad</a> &middot; MIT License &middot; Built with Ollama</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Mode — Deyad Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Deyad</a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/#comparison">Compare</a>
+    <a href="/docs/" class="active">Docs</a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn-sm">GitHub</a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <h3>Getting Started</h3>
+    <a href="/docs/">Overview</a>
+    <h3>Usage</h3>
+    <a href="/docs/interactive-mode.html" class="active">Interactive Mode</a>
+    <a href="/docs/automation-and-ci.html">Automation &amp; CI</a>
+    <h3>Configuration</h3>
+    <a href="/docs/global-config.html">Global Config</a>
+    <a href="/docs/providers.html">AI Providers</a>
+  </aside>
+
+  <main class="content">
+    <h1>Interactive Mode Guide</h1>
+    <p class="subtitle">The REPL is the heart of Deyad CLI — a continuous conversation with your AI agent.</p>
+
+    <h2>Starting the REPL</h2>
+    <p>Run <code>deyad</code> without arguments to enter interactive mode:</p>
+    <pre><code>deyad</code></pre>
+
+    <h2>Key Features</h2>
+    <ul>
+      <li><strong>Streaming Responses</strong> — Watch the agent's response as it's generated in real-time.</li>
+      <li><strong>Tool Execution Visibility</strong> — See exactly which tools the agent invokes (file read, shell command, git, etc.).</li>
+      <li><strong>Live Diffs</strong> — Review file changes before they're applied.</li>
+      <li><strong>Session Persistence</strong> — Conversations are automatically saved and can be resumed.</li>
+    </ul>
+
+    <h2>Keyboard Shortcuts</h2>
+    <table>
+      <thead>
+        <tr><th>Shortcut</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>Ctrl+C</code> (once)</td><td>Interrupt the current agent turn / tool execution</td></tr>
+        <tr><td><code>Ctrl+C</code> (twice)</td><td>Exit the REPL</td></tr>
+        <tr><td><code>Ctrl+L</code></td><td>Clear the terminal screen</td></tr>
+        <tr><td><code>Up/Down</code></td><td>Navigate command history</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Slash Commands</h2>
+    <table>
+      <thead>
+        <tr><th>Command</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>/help</code></td><td>Show all commands</td></tr>
+        <tr><td><code>/model &lt;name&gt;</code></td><td>Switch to a different Ollama model</td></tr>
+        <tr><td><code>/add &lt;file&gt;</code></td><td>Add a file to the conversation context</td></tr>
+        <tr><td><code>/drop &lt;file&gt;</code></td><td>Remove a file from context</td></tr>
+        <tr><td><code>/diff</code></td><td>Show all uncommitted changes</td></tr>
+        <tr><td><code>/undo</code></td><td>Revert the agent's last file changes</td></tr>
+        <tr><td><code>/run &lt;cmd&gt;</code></td><td>Run a shell command directly</td></tr>
+        <tr><td><code>/compact</code></td><td>Show token count and message stats</td></tr>
+        <tr><td><code>/clear</code></td><td>Reset the conversation history</td></tr>
+        <tr><td><code>/sandbox</code></td><td>Toggle sandbox mode (restricts writes)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tips for Success</h2>
+    <ul>
+      <li><strong>Be specific</strong> — Instead of "fix this", try "fix the error in <code>src/utils.ts</code> on line 45".</li>
+      <li><strong>Use context</strong> — The agent has RAG access to your codebase. Refer to files by name.</li>
+      <li><strong>Iterate</strong> — If the agent makes a mistake, tell it: "That's not right, try [alternative approach]".</li>
+      <li><strong>Use /add</strong> — Explicitly add important files so the agent has them in context.</li>
+    </ul>
+  </main>
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://github.com/kennethyork/Deyad">Deyad</a> &middot; MIT License &middot; Built with Ollama</p>
+</footer>
+
+</body>
+</html>

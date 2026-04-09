@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Providers — Deyad Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Deyad</a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/#comparison">Compare</a>
+    <a href="/docs/" class="active">Docs</a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn-sm">GitHub</a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <h3>Getting Started</h3>
+    <a href="/docs/">Overview</a>
+    <h3>Usage</h3>
+    <a href="/docs/interactive-mode.html">Interactive Mode</a>
+    <a href="/docs/automation-and-ci.html">Automation &amp; CI</a>
+    <h3>Configuration</h3>
+    <a href="/docs/global-config.html">Global Config</a>
+    <a href="/docs/providers.html" class="active">AI Providers</a>
+  </aside>
+
+  <main class="content">
+    <h1>AI Providers</h1>
+    <p class="subtitle">Deyad supports multiple AI backends. Ollama is the default and recommended provider for fully local inference.</p>
+
+    <h2>Supported Providers</h2>
+    <table>
+      <thead>
+        <tr><th>Provider</th><th>Local</th><th>API Key</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Ollama</strong></td><td>✅</td><td>No</td><td>Default. Fully local. No data leaves your machine.</td></tr>
+        <tr><td>OpenAI</td><td>❌</td><td>Yes</td><td>GPT-4o, GPT-4.1, o3, etc.</td></tr>
+        <tr><td>Gemini</td><td>❌</td><td>Yes</td><td>Google Gemini models</td></tr>
+        <tr><td>OpenRouter</td><td>❌</td><td>Yes</td><td>Aggregator — access many models via one API</td></tr>
+        <tr><td>xAI</td><td>❌</td><td>Yes</td><td>Grok models</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Ollama (Default)</h2>
+    <p>No configuration needed. Deyad connects to <code>http://localhost:11434</code> by default.</p>
+
+    <h3>Install Ollama</h3>
+    <pre><code>curl -fsSL https://ollama.com/install.sh | sh</code></pre>
+
+    <h3>Pull a Model</h3>
+    <pre><code># Recommended default
+ollama pull qwen3:8b
+
+# Larger model for more capable reasoning
+ollama pull qwen3.5:27b
+
+# Code completion model (used for FIM)
+ollama pull qwen2.5-coder:7b</code></pre>
+
+    <h3>Custom Ollama Host</h3>
+    <pre><code># Connect to a remote Ollama instance
+export OLLAMA_HOST=http://192.168.1.100:11434</code></pre>
+
+    <h2>OpenAI</h2>
+    <pre><code>export OPENAI_API_KEY=sk-...
+deyad -m gpt-4o "your prompt"</code></pre>
+
+    <h2>Gemini</h2>
+    <pre><code>export GEMINI_API_KEY=...
+deyad -m gemini-2.5-pro "your prompt"</code></pre>
+
+    <h2>OpenRouter</h2>
+    <pre><code>export OPENROUTER_API_KEY=sk-or-...
+deyad -m openrouter/anthropic/claude-sonnet-4 "your prompt"</code></pre>
+
+    <h2>xAI</h2>
+    <pre><code>export XAI_API_KEY=xai-...
+deyad -m grok-3 "your prompt"</code></pre>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead>
+        <tr><th>Variable</th><th>Provider</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>OLLAMA_HOST</code></td><td>Ollama</td><td>Base URL (default: <code>http://localhost:11434</code>)</td></tr>
+        <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI</td><td>API key for OpenAI</td></tr>
+        <tr><td><code>GEMINI_API_KEY</code></td><td>Gemini</td><td>API key for Google Gemini</td></tr>
+        <tr><td><code>OPENROUTER_API_KEY</code></td><td>OpenRouter</td><td>API key for OpenRouter</td></tr>
+        <tr><td><code>XAI_API_KEY</code></td><td>xAI</td><td>API key for xAI / Grok</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Tips</h2>
+    <ul>
+      <li><strong>Stay local:</strong> Ollama keeps all data on your machine — no API keys, no network calls, no telemetry.</li>
+      <li><strong>Model size matters:</strong> Larger models (27B+) produce better reasoning and tool use, but require more VRAM.</li>
+      <li><strong>Mix providers:</strong> Use Ollama for day-to-day work and a cloud provider for complex tasks.</li>
+      <li><strong>FIM model:</strong> Set a separate fill-in-the-middle model for code completions in the Xed plugin or editor integrations.</li>
+    </ul>
+  </main>
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://github.com/kennethyork/Deyad">Deyad</a> &middot; MIT License &middot; Built with Ollama</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Global Configuration — Deyad Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Deyad</a>
+  <div class="nav-links">
+    <a href="/#features">Features</a>
+    <a href="/#comparison">Compare</a>
+    <a href="/docs/" class="active">Docs</a>
+    <a href="https://github.com/kennethyork/Deyad" class="btn-sm">GitHub</a>
+  </div>
+</nav>
+
+<div class="docs-layout">
+  <aside class="sidebar">
+    <h3>Getting Started</h3>
+    <a href="/docs/">Overview</a>
+    <h3>Usage</h3>
+    <a href="/docs/interactive-mode.html">Interactive Mode</a>
+    <a href="/docs/automation-and-ci.html">Automation &amp; CI</a>
+    <h3>Configuration</h3>
+    <a href="/docs/global-config.html" class="active">Global Config</a>
+    <a href="/docs/providers.html">AI Providers</a>
+  </aside>
+
+  <main class="content">
+    <h1>Global Configuration</h1>
+    <p class="subtitle">Set your default model, preferences, and persistent agent instructions that apply across all projects.</p>
+
+    <h2>Configuration Directory</h2>
+    <p>Deyad stores global configuration in <code>~/.deyad/</code>. This directory is created automatically on first run.</p>
+
+    <h2>Configuration Files</h2>
+    <table>
+      <thead>
+        <tr><th>File</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>~/.deyad/config.json</code></td><td>Structured settings — model, approval mode, etc.</td></tr>
+        <tr><td><code>~/.deyad/instructions.md</code></td><td>Persistent natural-language instructions for the agent</td></tr>
+        <tr><td><code>~/.deyad/audit.log</code></td><td>Tool execution audit log (auto-generated)</td></tr>
+        <tr><td><code>~/.deyad/sessions/</code></td><td>Saved conversation sessions</td></tr>
+      </tbody>
+    </table>
+
+    <h2>config.json</h2>
+    <p>Create or edit this file to set your defaults:</p>
+    <pre><code>{
+  "model": "qwen3.5:27b",
+  "autoConfirm": false
+}</code></pre>
+
+    <h3>Options</h3>
+    <table>
+      <thead>
+        <tr><th>Key</th><th>Type</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>model</code></td><td>string</td><td>Default Ollama model name</td></tr>
+        <tr><td><code>autoConfirm</code></td><td>boolean</td><td>Skip confirmation prompts by default</td></tr>
+      </tbody>
+    </table>
+
+    <h2>instructions.md</h2>
+    <p>This file lets you define persistent rules and preferences for the agent. It's included in every conversation's system prompt.</p>
+
+    <h3>Example</h3>
+    <pre><code># Global Agent Instructions
+
+- Always use TypeScript for new files.
+- When refactoring, ensure all existing tests still pass.
+- Prefer functional components and hooks in React.
+- Use npm, not yarn.
+- Always explain complex regex in a comment.</code></pre>
+
+    <h2>Project-Level Overrides</h2>
+    <p>You can override global settings per-project by placing a <code>DEYAD.md</code> (or <code>.deyad.md</code>) file in your project root. Project instructions take priority over global ones.</p>
+
+    <h3>Example DEYAD.md</h3>
+    <pre><code># Project Instructions
+
+This is a React + Express + SQLite project.
+- Backend is in src/server/, frontend in src/client/.
+- Use Vitest for testing.
+- All API routes should validate input with zod.</code></pre>
+
+    <h2>Command-Line Overrides</h2>
+    <p>Flags always take precedence over config files:</p>
+    <pre><code># Override model for one command
+deyad -m qwen3:8b "quick task"
+
+# Override auto-confirm
+deyad -y "apply all fixes"</code></pre>
+  </main>
+</div>
+
+<footer>
+  <p>&copy; 2026 <a href="https://github.com/kennethyork/Deyad">Deyad</a> &middot; MIT License &middot; Built with Ollama</p>
+</footer>
+
+</body>
+</html>
