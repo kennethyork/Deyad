@@ -18,7 +18,9 @@ import type { ToolResult, ToolCallbacks } from './tools.js';
 import type { ToolCall } from './tools.js';
 import { runLint, formatLintErrors } from './lint.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
-import { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
+import { compactConversation } from './compaction.js';
+import { initMCP, closeMCP } from './mcp.js';
+import { closeBrowser } from './browser.js';
 
 // Re-export compaction symbols so existing consumers are not broken
 export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
@@ -38,6 +40,7 @@ const MAX_REPEATED_TOOL_CALLS = 3;
 export const READ_ONLY_TOOLS = new Set([
   'list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url',
   'git_status', 'git_log', 'git_diff', 'git_branch',
+  'browser', // read-only browser actions (navigate, screenshot, get_text, console)
 ]);
 
 /** Tools that modify files/state and must run sequentially. */
@@ -332,6 +335,9 @@ export async function runAgentLoop(
   process.on('SIGHUP', sigHandler);
 
   try {
+    // Initialize MCP servers (if configured)
+    await initMCP(cwd);
+
     const context = await buildContext(cwd);
 
     // RAG: retrieve relevant codebase chunks for the user's query
@@ -504,6 +510,8 @@ export async function runAgentLoop(
 
     return { history: messages, changedFiles, stats };
   } finally {
+    closeBrowser();
+    closeMCP();
     process.removeListener('SIGINT', sigHandler);
     process.removeListener('SIGTERM', sigHandler);
     process.removeListener('SIGHUP', sigHandler);

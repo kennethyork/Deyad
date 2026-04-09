@@ -11,6 +11,8 @@ import { minimatch } from 'minimatch';
 import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import type { OllamaTool } from './ollama.js';
+import { executeBrowserAction } from './browser.js';
+import { isMCPTool, executeMCPTool, getMCPOllamaTools, getMCPToolsDescription } from './mcp.js';
 
 // ── Configurable limits ───────────────────────────────────────────────────────
 /** Maximum file size in bytes before truncation in read_file. Override with DEYAD_MAX_READ env. */
@@ -105,7 +107,10 @@ MEMORY:
 - memory_write: save a persistent note (survives restarts). Params: key, value
 - memory_list: list all saved memory keys
 - memory_delete: delete a memory note. Params: key
-`;
+
+BROWSER:
+- browser: headless browser automation. Params: action (navigate|screenshot|click|type|get_text|console|close), url (for navigate), selector (for click/type), text (for type)
+` + getMCPToolsDescription();
 
 export function parseToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
@@ -302,6 +307,13 @@ async function executeToolInner(
   const resolvedCwd = path.resolve(cwd);
   const handler = toolRegistry.get(call.name);
   if (!handler) {
+    // Check if it's an MCP tool
+    if (isMCPTool(call.name)) {
+      const result = await executeMCPTool(call.name, call.params);
+      const toolResult: ToolResult = { tool: call.name, success: result.success, output: result.output };
+      auditLog(call.name, call.params, toolResult);
+      return toolResult;
+    }
     return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
   }
   try {
@@ -680,6 +692,13 @@ async function executeBuiltinTool(
         return { tool: call.name, success: deleted, output: deleted ? `Deleted: ${key}` : `Not found: ${key}` };
       }
 
+      case 'browser': {
+        const action = call.params['action'];
+        if (!action) return { tool: call.name, success: false, output: 'Missing "action" param. Use: navigate, screenshot, click, type, get_text, console, close' };
+        const result = await executeBrowserAction(action, call.params, cwd);
+        return { tool: call.name, success: result.success, output: result.output };
+      }
+
       default:
         return { tool: call.name, success: false, output: `Unknown tool: ${call.name}` };
     }
@@ -694,10 +713,18 @@ const BUILTIN_NAMES = [
   'glob_files', 'search_files', 'run_command', 'multi_edit',
   'git_status', 'git_log', 'git_diff', 'git_branch', 'git_add', 'git_commit', 'git_stash',
   'fetch_url', 'memory_read', 'memory_write', 'memory_list', 'memory_delete',
+  'browser',
 ] as const;
 
 for (const name of BUILTIN_NAMES) {
   toolRegistry.set(name, (call, cwd, resolvedCwd, cb) => executeBuiltinTool(call, cwd, resolvedCwd, cb));
+}
+
+// ── MCP tool handler — routes calls to external MCP servers ──
+/** Register MCP tools discovered at startup. Call after initMCP(). */
+export function registerMCPTools(): void {
+  // MCP tools are handled via the toolRegistry fallback in executeToolInner.
+  // This function exists to be called after initMCP() resolves.
 }
 
 export function getOllamaTools(): OllamaTool[] {
@@ -722,5 +749,7 @@ export function getOllamaTools(): OllamaTool[] {
     { type: 'function', function: { name: 'memory_write', description: 'Save a persistent note', parameters: { type: 'object', properties: { key: { type: 'string', description: 'Memory key' }, value: { type: 'string', description: 'Value to store' } }, required: ['key', 'value'] } } },
     { type: 'function', function: { name: 'memory_list', description: 'List all memory keys', parameters: { type: 'object', properties: {} } } },
     { type: 'function', function: { name: 'memory_delete', description: 'Delete a memory note', parameters: { type: 'object', properties: { key: { type: 'string', description: 'Memory key' } }, required: ['key'] } } },
+    { type: 'function', function: { name: 'browser', description: 'Headless browser automation — navigate, screenshot, click, type, get page text, read console logs', parameters: { type: 'object', properties: { action: { type: 'string', description: 'Action to perform', enum: ['navigate', 'screenshot', 'click', 'type', 'get_text', 'console', 'close'] }, url: { type: 'string', description: 'URL (for navigate)' }, selector: { type: 'string', description: 'CSS selector (for click/type)' }, text: { type: 'string', description: 'Text to type (for type action)' } }, required: ['action'] } } },
+    ...getMCPOllamaTools(),
   ];
 }

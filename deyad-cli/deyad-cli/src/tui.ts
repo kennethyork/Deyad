@@ -264,8 +264,9 @@ function getToolIcon(name: string): string {
     memory_write: '🧠',
     memory_list: '🧠',
     memory_delete: '🧠',
+    browser: '🌐',
   };
-  return icons[name] || '⚡';
+  return icons[name] || (name.startsWith('mcp__') ? '🔌' : '⚡');
 }
 
 // ── Diff Display ──
