@@ -22,6 +22,11 @@ import { compactConversation } from './compaction.js';
 import { initMCP, closeMCP } from './mcp.js';
 import { closeBrowser } from './browser.js';
 
+/** Strip <think>...</think> blocks from text so thinking never enters history. */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
 // Re-export compaction symbols so existing consumers are not broken
 export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
 
@@ -406,8 +411,7 @@ export async function runAgentLoop(
       if (toolCalls.length === 0) {
         const userMessageText = typeof userMessage === 'string' ? userMessage : userMessage.content;
         if (isActionableRequest(userMessageText) && !hasPerformedAction && iteration < MAX_NUDGE_RETRIES) {
-          const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-          messages.push({ role: 'assistant', content: assistantContent });
+          messages.push({ role: 'assistant', content: stripThinkTags(turnResponse) });
           messages.push({
             role: 'user',
             content: 'Your response did not contain any tool calls. You MUST use tools to take action. Start by reading relevant files.',
@@ -417,8 +421,7 @@ export async function runAgentLoop(
         }
         const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
         callbacks.onDone(summary);
-        const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        messages.push({ role: 'assistant', content: assistantContent });
+        messages.push({ role: 'assistant', content: stripThinkTags(turnResponse) });
         return { history: messages, changedFiles, stats };
       }
 
@@ -445,8 +448,7 @@ export async function runAgentLoop(
       })();
 
       if (forceStop) {
-        const assistantContent = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        messages.push({ role: 'assistant', content: assistantContent });
+        messages.push({ role: 'assistant', content: stripThinkTags(turnResponse) });
         messages.push({
           role: 'user',
           content: 'You are repeating tool calls. Stop calling tools and give your final answer based on the information you already have.',
@@ -457,12 +459,11 @@ export async function runAgentLoop(
         continue;
       }
 
-      // ── Push assistant message ──────────────────────────────────────
+      // ── Push assistant message (never store thinking in history — saves context) ──
       if (usedNativeTools) {
         messages.push({ role: 'assistant', content: turnResponse, tool_calls: nativeToolCalls });
       } else {
-        const combined = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        messages.push({ role: 'assistant', content: combined });
+        messages.push({ role: 'assistant', content: stripThinkTags(turnResponse) });
       }
 
       // ── Dispatch tools ──────────────────────────────────────────────
@@ -495,8 +496,7 @@ export async function runAgentLoop(
       const resultMessages = formatToolResultMessages(results, usedNativeTools);
 
       if (!usedNativeTools) {
-        const combined = turnThinking ? turnThinking + '\n' + turnResponse : turnResponse;
-        if (isDone(combined)) {
+        if (isDone(turnResponse) || isDone(turnThinking)) {
           const summary = stripToolMarkup(turnResponse) || stripToolMarkup(turnThinking);
           callbacks.onDone(summary);
           messages.push(...resultMessages);

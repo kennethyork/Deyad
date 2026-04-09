@@ -23,6 +23,76 @@ const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
 const VERSION = pkg.version;
 
+/**
+ * Streaming filter that suppresses <think>...</think> blocks from token output.
+ * Buffers partial tags and only emits non-thinking content.
+ */
+class ThinkFilter {
+  private insideThink = false;
+  private buf = '';
+  private output: (s: string) => void;
+
+  constructor(output: (s: string) => void) {
+    this.output = output;
+  }
+
+  write(token: string): void {
+    this.buf += token;
+
+    while (this.buf.length > 0) {
+      if (this.insideThink) {
+        const closeIdx = this.buf.indexOf('</think>');
+        if (closeIdx === -1) {
+          // Still inside thinking — discard everything but keep last 8 chars
+          // in case '</think>' straddles a chunk boundary
+          if (this.buf.length > 8) this.buf = this.buf.slice(-8);
+          return;
+        }
+        // Found close tag — skip everything through it
+        this.buf = this.buf.slice(closeIdx + 8);
+        this.insideThink = false;
+        continue;
+      }
+
+      const openIdx = this.buf.indexOf('<think>');
+      if (openIdx === -1) {
+        // No open tag — check if buf ends with a partial '<think>' prefix
+        const partial = this.partialTagAt(this.buf);
+        if (partial > 0) {
+          this.output(this.buf.slice(0, this.buf.length - partial));
+          this.buf = this.buf.slice(this.buf.length - partial);
+          return;
+        }
+        this.output(this.buf);
+        this.buf = '';
+        return;
+      }
+
+      // Emit content before the open tag, then enter thinking mode
+      if (openIdx > 0) this.output(this.buf.slice(0, openIdx));
+      this.buf = this.buf.slice(openIdx + 7);
+      this.insideThink = true;
+    }
+  }
+
+  /** Returns length of a partial '<think>' prefix at end of str, or 0. */
+  private partialTagAt(s: string): number {
+    const tag = '<think>';
+    for (let len = Math.min(tag.length - 1, s.length); len > 0; len--) {
+      if (s.endsWith(tag.slice(0, len))) return len;
+    }
+    return 0;
+  }
+
+  flush(): void {
+    if (!this.insideThink && this.buf.length > 0) {
+      this.output(this.buf);
+    }
+    this.buf = '';
+    this.insideThink = false;
+  }
+}
+
 function printUsage(): void {
   console.log(`
   ${c.brandBold('Deyad CLI')} ${c.dim('v' + VERSION)} — local AI coding agent powered by Ollama
@@ -152,11 +222,12 @@ export async function runOnce(
 ): Promise<void> {
   const spinner = new Spinner('Thinking...');
   let spinnerActive = false;
+  const thinkFilter = new ThinkFilter((s) => { if (!silent) process.stdout.write(s); });
 
   const callbacks: AgentCallbacks = {
     onToken: (t) => {
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
-      if (!silent) process.stdout.write(t);
+      thinkFilter.write(t);
     },
     onThinkingToken: (_t) => {
       // Show spinner while model is thinking (don't print thinking tokens)
@@ -586,11 +657,12 @@ async function main(): Promise<void> {
 
       const replSpinner = new Spinner('Thinking...');
       let replSpinnerActive = false;
+      const replThinkFilter = new ThinkFilter((s) => process.stdout.write(s));
 
       const callbacks: AgentCallbacks = {
         onToken: (t) => {
           if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
-          process.stdout.write(t);
+          replThinkFilter.write(t);
         },
         onThinkingToken: () => {
           if (!replSpinnerActive) {
