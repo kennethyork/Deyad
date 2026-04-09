@@ -1,8 +1,8 @@
 [Plugin]
 Loader=python3
-Module=deyadcopilot
+Module=deyad_xed_plugin
 IAge=3
-Name=Deyad Copilot
+Name=Deyad XED Plugin
 Description=AI code completions powered by Ollama (local). Press Tab to accept ghost text suggestions.
 Authors=Kenneth York
 Copyright=Copyright @ 2025 Kenneth York

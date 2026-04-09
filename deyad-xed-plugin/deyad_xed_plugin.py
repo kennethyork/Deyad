@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-#  deyadcopilot.py - AI code completions powered by Ollama for Xed
+#  deyad_xed_plugin.py - AI code completions powered by Ollama for Xed
 #
 #  Copyright (C) 2025 Kenneth York
 #
@@ -36,8 +36,8 @@ FIM_ENABLED = True
 GHOST_TAG = "deyad-ghost-text"
 
 
-class DeyadCopilotPlugin(GObject.Object, Xed.ViewActivatable):
-    __gtype_name__ = "DeyadCopilot"
+class DeyadXedPlugin(GObject.Object, Xed.ViewActivatable):
+    __gtype_name__ = "DeyadXedPlugin"
 
     view = GObject.Property(type=Xed.View)
 
