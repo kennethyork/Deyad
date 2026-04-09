@@ -25,7 +25,6 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
 
   try {
     const head = git(['rev-parse', 'HEAD'], cwd);
-    let ref = head;
     let type: Snapshot['type'] = 'commit';
 
     // If there are uncommitted changes, create a stash entry to preserve them
@@ -33,15 +32,12 @@ export function createSnapshot(cwd: string, description: string): Snapshot | nul
       const safeDesc = description.replace(/["\\`$]/g, '_');
       try {
         git(['stash', 'push', '-u', '-m', `deyad-snapshot: ${safeDesc}`], cwd);
-        // Get the stash ref
-        ref = git(['stash', 'list', '-1', '--format=%H'], cwd) || head;
         type = 'stash';
         // Pop it back so working directory is unchanged
         git(['stash', 'pop'], cwd);
       } catch (err) {
         // If stash fails, fall back to HEAD ref
         if (process.env['DEYAD_DEBUG']) console.error('[undo] stash failed:', err);
-        ref = head;
         type = 'commit';
       }
     }

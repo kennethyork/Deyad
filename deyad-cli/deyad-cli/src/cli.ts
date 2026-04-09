@@ -8,12 +8,11 @@ import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
 import { loadOrCreateSession, saveSession, pruneSessions, memoryList } from './session.js';
-import type { SessionData } from './session.js';
-import { createSnapshot, undoLast, getSnapshots, diffFromSnapshot } from './undo.js';
+import { createSnapshot, undoLast, getSnapshots } from './undo.js';
 import { enterSandbox, exitSandbox, isSandboxed } from './sandbox.js';
-import { buildIndex, getIndexStats, invalidateIndex } from './rag.js';
+import { buildIndex, getIndexStats } from './rag.js';
 import {
-  c, box, divider, Spinner,
+  c, divider, Spinner,
   printBanner, formatToolStart, formatToolEnd, formatDiff,
   formatConfirm, formatStatus, formatHelp, formatError,
   formatSuccess, formatTokenBadge, getPrompt,
@@ -624,7 +623,8 @@ async function main(): Promise<void> {
   ask();
 }
 
-if (import.meta.main) {
+const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
+if (isMain) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
