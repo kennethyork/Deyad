@@ -574,23 +574,44 @@ async function main(): Promise<void> {
       // ── Create snapshot before task, then run agent ──
       createSnapshot(cwd, `before task: ${input.slice(0, 50)}`);
 
+      const replSpinner = new Spinner('Thinking...');
+      let replSpinnerActive = false;
+
       const callbacks: AgentCallbacks = {
-        onToken: (t) => process.stdout.write(t),
+        onToken: (t) => {
+          if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          process.stdout.write(t);
+        },
         onThinkingToken: () => {
-          // Reasoning models think silently — user sees streamed content tokens
+          if (!replSpinnerActive) {
+            replSpinner.update('Reasoning...');
+            replSpinner.start();
+            replSpinnerActive = true;
+          }
         },
         onToolStart: (name, params) => {
+          if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
           console.log('');
           console.log(formatToolStart(name, params));
         },
         onToolResult: (r) => {
           console.log(formatToolEnd(r.tool, r.success, r.output));
+          replSpinner.update('Thinking...');
+          replSpinner.start();
+          replSpinnerActive = true;
         },
         onDiff: (path, diff) => {
+          if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
           console.log(formatDiff(path, diff));
         },
-        onDone: () => { console.log(''); },
-        onError: (e) => console.error(formatError(String(e))),
+        onDone: () => {
+          if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          console.log('');
+        },
+        onError: (e) => {
+          if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          console.error(formatError(String(e)));
+        },
         confirm: async (question) => {
           return new Promise((resolve) => {
             rl.question(formatConfirm(question), (answer) => {
@@ -599,6 +620,8 @@ async function main(): Promise<void> {
           });
         },
       };
+
+      replSpinner.start(); replSpinnerActive = true;
 
       try {
         const result = await runAgentLoop(model, input, cwd, callbacks, history);
