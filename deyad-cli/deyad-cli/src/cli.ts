@@ -623,8 +623,22 @@ async function main(): Promise<void> {
   ask();
 }
 
-const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
-if (isMain) {
+import { realpathSync } from 'node:fs';
+
+function checkIsMain(): boolean {
+  if (!process.argv[1]) return false;
+  const scriptPath = process.argv[1].replace(/\\/g, '/');
+  // Direct match (node dist/cli.js)
+  if (import.meta.url.endsWith(scriptPath)) return true;
+  // Resolve symlinks (global npm install creates a symlink)
+  try {
+    const resolved = realpathSync(scriptPath).replace(/\\/g, '/');
+    if (import.meta.url.endsWith(resolved)) return true;
+  } catch { /* ignore */ }
+  return false;
+}
+
+if (checkIsMain()) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
