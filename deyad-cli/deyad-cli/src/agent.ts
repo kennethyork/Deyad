@@ -36,7 +36,14 @@ export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from
 const MAX_ITERATIONS = 50;
 
 /** Maximum retries for nudging a non-acting model to use tools. */
-const MAX_NUDGE_RETRIES = 2;
+const MAX_NUDGE_RETRIES = 3;
+
+/** Escalating nudge messages to get the model to use tools. */
+const NUDGE_MESSAGES = [
+  'You MUST use tools. Do not explain — act. Start with list_files or read_file.',
+  'STOP talking. Use a tool call RIGHT NOW. Example:\n<tool_call>\n<name>list_files</name>\n</tool_call>',
+  'FINAL WARNING: Output a <tool_call> tag immediately or I will terminate this session.',
+];
 
 /** Maximum consecutive identical tool call sequences before forcing the model to stop. */
 const MAX_REPEATED_TOOL_CALLS = 3;
@@ -369,7 +376,7 @@ export async function runAgentLoop(
           messages.push({ role: 'assistant', content: stripThinkTags(turnResponse) });
           messages.push({
             role: 'user',
-            content: 'Your response did not contain any tool calls. You MUST use tools to take action. Start by reading relevant files.',
+            content: NUDGE_MESSAGES[Math.min(iteration, NUDGE_MESSAGES.length - 1)]!,
           });
           iteration++;
           continue;

@@ -410,7 +410,12 @@ async function main(): Promise<void> {
 
   printBanner(VERSION, model, cwd, isSandboxed());
 
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    history: [] as string[],
+    historySize: 100,
+  } as readline.ReadLineOptions);
   let history: OllamaMessage[] = args.resume ? session.history : [];
   let totalTokens = args.resume ? session.totalTokens : 0;
   let taskCount = args.resume ? session.taskCount : 0;
