@@ -102,7 +102,7 @@ export function parseToolCallsFromTurn(
 ): { toolCalls: ToolCall[]; usedNativeTools: boolean } {
   if (nativeToolCalls.length > 0) {
     const toolCalls = nativeToolCalls.map((tc) => ({
-      name: tc.function.name,
+      name: tc.function.name.replace(/<[^>]*>?/g, '').replace(/[^a-zA-Z0-9_-]/g, '').trim(),
       params: Object.fromEntries(
         Object.entries(tc.function.arguments).map(([k, v]) => [k, String(v)]),
       ),

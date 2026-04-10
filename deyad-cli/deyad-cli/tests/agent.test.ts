@@ -208,6 +208,14 @@ describe('parseToolCallsFromTurn', () => {
     const { toolCalls } = parseToolCallsFromTurn([], 'Hello, I can help!', '');
     expect(toolCalls).toHaveLength(0);
   });
+
+  it('sanitizes malformed native tool names with XML artifacts', () => {
+    const nativeCalls = [
+      { function: { name: 'glob_files</name', arguments: { pattern: '*.txt' } } },
+    ];
+    const { toolCalls } = parseToolCallsFromTurn(nativeCalls, '', '');
+    expect(toolCalls[0]!.name).toBe('glob_files');
+  });
 });
 
 describe('formatToolResultMessages', () => {
