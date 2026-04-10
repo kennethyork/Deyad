@@ -334,6 +334,10 @@ export async function runAgentLoop(
       }
       compactConversation(messages);
       const nativeTools = getOllamaTools();
+      // Use thinking for the first iteration (planning) but disable for follow-ups
+      // (processing tool results). This gives quality reasoning on the initial task
+      // while keeping follow-up tool-result processing fast.
+      const iterThink = think !== undefined ? think : (iteration === 0 ? undefined : false);
       let result;
       try {
         result = await streamChat(
@@ -344,7 +348,7 @@ export async function runAgentLoop(
           abortController.signal,
           callbacks.onThinkingToken,
           nativeTools,
-          think,
+          iterThink,
         );
       } catch (err: unknown) {
         const errMsg = String((err as Error).message || err);

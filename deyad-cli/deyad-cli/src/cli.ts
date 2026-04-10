@@ -110,7 +110,7 @@ function printUsage(): void {
     ${c.yellow('-m, --model <model>')}    Ollama model (default: DEYAD_MODEL env or first available)
     ${c.yellow('-p, --print <prompt>')}   Run prompt non-interactively and print result
     ${c.yellow('-a, --auto')}             Full-auto mode (sandbox + no confirmations)
-    ${c.yellow('--think')}                Enable extended reasoning (slower but better for complex tasks)
+    ${c.yellow('--no-think')}             Disable reasoning (faster but less accurate)
     ${c.yellow('--resume')}               Resume the most recent session for this directory
     ${c.yellow('--completions <shell>')}  Output shell completion script (bash, zsh, fish)
     ${c.yellow('-v, --version')}          Show version
@@ -125,7 +125,7 @@ _deyad_completions() {
   local cur opts
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
-  opts="-h --help -v --version -m --model -p --print -a --auto --think --resume --no-resume --completions"
+  opts="-h --help -v --version -m --model -p --print -a --auto --no-think --resume --no-resume --completions"
   COMPREPLY=( $(compgen -W "\${opts}" -- "\${cur}") )
 }
 complete -F _deyad_completions deyad`;
@@ -168,7 +168,7 @@ interface ParsedArgs {
   prompt: string | undefined;
   auto: boolean;
   resume: boolean;
-  think: boolean;
+  noThink: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -181,7 +181,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     prompt: undefined,
     auto: false,
     resume: false,
-    think: false,
+    noThink: false,
   };
   const positional: string[] = [];
   let i = 0;
@@ -206,8 +206,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       args.resume = true;
     } else if (arg === '--no-resume') {
       args.resume = false;
-    } else if (arg === '--think') {
-      args.think = true;
+    } else if (arg === '--no-think') {
+      args.noThink = true;
     } else if (!arg.startsWith('-')) {
       positional.push(arg);
     }
@@ -315,7 +315,7 @@ async function main(): Promise<void> {
   // --print mode: run once and exit
   const printPrompt = args.print;
   if (printPrompt !== undefined) {
-    await runOnce(model, printPrompt, cwd, true, args.think);
+    await runOnce(model, printPrompt, cwd, true, args.noThink ? false : undefined);
     process.exit(0);
   }
 
@@ -363,7 +363,7 @@ async function main(): Promise<void> {
     };
 
     autoSpinner.start(); autoSpinnerActive = true;
-    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, args.think ? undefined : false);
+    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, args.noThink ? false : undefined);
     if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
 
     console.log('');
@@ -386,7 +386,7 @@ async function main(): Promise<void> {
 
   // One-shot prompt mode
   if (args.prompt) {
-    await runOnce(model, args.prompt, cwd, false, args.think);
+    await runOnce(model, args.prompt, cwd, false, args.noThink ? false : undefined);
     process.exit(0);
   }
 
@@ -723,7 +723,7 @@ async function main(): Promise<void> {
       replSpinner.start(); replSpinnerActive = true;
 
       try {
-        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, args.think ? undefined : false);
+        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, args.noThink ? false : undefined);
         history = result.history;
         totalTokens += result.stats.totalTokens;
         taskCount++;
