@@ -105,6 +105,7 @@ export async function streamChat(
   signal?: AbortSignal,
   onThinkingToken?: (token: string) => void,
   tools?: OllamaTool[],
+  think?: boolean,
 ): Promise<StreamChatResult> {
   const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
 
@@ -120,18 +121,24 @@ export async function streamChat(
     );
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     model,
     messages,
     stream: true,
     options: {
-      temperature: options.temperature ?? 0.7,
+      temperature: options.temperature ?? 0.3,
       top_p: options.top_p ?? 0.9,
       repeat_penalty: options.repeat_penalty ?? 1.1,
       ...(options.num_ctx ? { num_ctx: options.num_ctx } : {}),
     },
     ...(tools && tools.length > 0 ? { tools } : {}),
   };
+
+  // Disable thinking by default for reasoning models (qwen3.5, etc.)
+  // This dramatically reduces latency — thinking adds 5-30s of chain-of-thought.
+  if (think !== undefined) {
+    body.think = think;
+  }
 
   const resp = await (async () => {
     let lastError: Error | null = null;
