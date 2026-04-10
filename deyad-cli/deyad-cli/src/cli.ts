@@ -253,11 +253,6 @@ export async function runOnce(
     },
     onToolResult: (r) => {
       console.log(formatToolEnd(r.tool, r.success, r.output));
-      if (!silent) {
-        spinner.update('Thinking...');
-        spinner.start();
-        spinnerActive = true;
-      }
     },
     onDiff: () => {},
     onDone: (summary) => {
@@ -696,9 +691,6 @@ async function main(): Promise<void> {
         },
         onToolResult: (r) => {
           console.log(formatToolEnd(r.tool, r.success, r.output));
-          replSpinner.update('Thinking...');
-          replSpinner.start();
-          replSpinnerActive = true;
         },
         onDiff: (path, diff) => {
           if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
