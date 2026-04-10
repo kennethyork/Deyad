@@ -193,12 +193,15 @@ function parseArgs(argv: string[]): ParsedArgs {
       args.version = true;
     } else if (arg === '--completions') {
       i++;
+      if (i >= argv.length) { process.stderr.write('Error: --completions requires a value (bash|zsh|fish)\n'); process.exit(1); }
       args.completions = argv[i];
     } else if (arg === '-m' || arg === '--model') {
       i++;
+      if (i >= argv.length) { process.stderr.write('Error: --model requires a value\n'); process.exit(1); }
       args.model = argv[i];
     } else if (arg === '-p' || arg === '--print') {
       i++;
+      if (i >= argv.length) { process.stderr.write('Error: --print requires a value\n'); process.exit(1); }
       args.print = argv[i];
     } else if (arg === '-a' || arg === '--auto') {
       args.auto = true;

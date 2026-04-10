@@ -500,8 +500,12 @@ async function executeBuiltinTool(
         try {
           // Parse command with shell-quote; use execFileSync for simple commands
           // to avoid shell injection, fall back to execSync for shell operators
-          const parsed = shellParse(command);
-          const isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
+          let parsed: ReturnType<typeof shellParse> = [];
+          let isSimple = false;
+          try {
+            parsed = shellParse(command);
+            isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
+          } catch { /* malformed input — fall through to execSync */ }
           const execOpts = {
             cwd,
             encoding: 'utf-8' as const,
@@ -567,7 +571,8 @@ async function executeBuiltinTool(
       case 'git_log': {
         const count = parseInt(call.params['count'] || '10', 10);
         try {
-          const output = execFileSync('git', ['log', '--oneline', `-${Math.min(count, 50)}`], { cwd, encoding: 'utf-8', timeout: 10000 });
+          const safeCount = Math.max(1, Math.min(isNaN(count) ? 10 : count, 50));
+          const output = execFileSync('git', ['log', '--oneline', `-${safeCount}`], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: output || '(no commits)' };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -595,7 +600,7 @@ async function executeBuiltinTool(
       case 'git_add': {
         const addPath = call.params['path'] || '.';
         try {
-          execFileSync('git', ['add', addPath], { cwd, encoding: 'utf-8', timeout: 10000 });
+          execFileSync('git', ['add', '--', addPath], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output: `Staged: ${addPath}` };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
@@ -609,7 +614,7 @@ async function executeBuiltinTool(
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
         }
         try {
-          const output = execFileSync('git', ['commit', '-m', msg], { cwd, encoding: 'utf-8', timeout: 10000 });
+          const output = execFileSync('git', ['commit', '-m', msg, '--'], { cwd, encoding: 'utf-8', timeout: 10000 });
           return { tool: call.name, success: true, output };
         } catch (err: unknown) {
           return { tool: call.name, success: false, output: String((err as Error).message) };
