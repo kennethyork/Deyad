@@ -239,6 +239,7 @@ export async function runOnce(
     },
     onToolStart: (name, params) => {
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      thinkFilter.flush();
       if (!silent) console.log('\n' + formatToolStart(name, params));
     },
     onToolResult: (r) => {
@@ -252,11 +253,13 @@ export async function runOnce(
     onDiff: () => {},
     onDone: (summary) => {
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      thinkFilter.flush();
       if (silent && summary) console.log(summary);
       if (!silent) console.log('');
     },
     onError: (e) => {
       if (spinnerActive) { spinner.stop(); spinnerActive = false; }
+      thinkFilter.flush();
       console.error(formatError(e));
     },
     confirm: async () => true,
@@ -673,6 +676,7 @@ async function main(): Promise<void> {
         },
         onToolStart: (name, params) => {
           if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          replThinkFilter.flush();
           console.log('');
           console.log(formatToolStart(name, params));
         },
@@ -688,10 +692,12 @@ async function main(): Promise<void> {
         },
         onDone: () => {
           if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          replThinkFilter.flush();
           console.log('');
         },
         onError: (e) => {
           if (replSpinnerActive) { replSpinner.stop(); replSpinnerActive = false; }
+          replThinkFilter.flush();
           console.error(formatError(String(e)));
         },
         confirm: async (question) => {
