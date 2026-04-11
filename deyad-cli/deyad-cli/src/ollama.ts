@@ -137,7 +137,7 @@ export async function streamChat(
   // Disable thinking by default for reasoning models (qwen3.5, etc.)
   // This dramatically reduces latency — thinking adds 5-30s of chain-of-thought.
   if (think !== undefined) {
-    body.think = think;
+    (body as any)['think'] = think;
   }
 
   const resp = await (async () => {

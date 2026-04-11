@@ -9,12 +9,12 @@ interface ChatHeaderProps {
   onDbToggle: () => void;
   planningMode: boolean;
   agentMode: boolean;
-  setMode: React.Dispatch<React.SetStateAction<string>>;
+  setMode: React.Dispatch<React.SetStateAction<"chat" | "planning" | "agent">>;
   canRevert: boolean;
   onRevert: () => void;
   models: string[];
   selectedModel: string;
-  setModelState: React.Dispatch<React.SetStateAction<{ selectedModel: string }>>;
+  setModelState: React.Dispatch<React.SetStateAction<{ models: string[]; selectedModel: string }>>;
   streaming: boolean;
 }
 

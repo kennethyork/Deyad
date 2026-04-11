@@ -413,12 +413,11 @@ describe('TaskQueue', () => {
     const filesChangedCb = vi.fn();
     taskQueue.setOnFilesChanged(filesChangedCb);
 
-    let capturedCallbacks: Record<string, (...args: unknown[]) => void> = {};
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
-      capturedCallbacks = cbs;
+    let capturedOnDone: (() => void) | null = null;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      capturedOnDone = opts.callbacks.onDone;
       // Simulate immediate completion
-      setTimeout(() => cbs.onDone(), 10);
+      setTimeout(() => capturedOnDone?.(), 10);
       return vi.fn();
     });
 
@@ -442,8 +441,8 @@ describe('TaskQueue', () => {
   });
 
   it('onError callback marks task as error', async () => {
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      const cbs = opts.callbacks;
       setTimeout(() => cbs.onError('something broke'), 10);
       return vi.fn();
     });
@@ -465,8 +464,8 @@ describe('TaskQueue', () => {
   });
 
   it('onContent callback updates task output', async () => {
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      const cbs = opts.callbacks;
       setTimeout(() => {
         cbs.onContent('Hello world');
         cbs.onDone();
@@ -490,8 +489,8 @@ describe('TaskQueue', () => {
   });
 
   it('onToolStart and onToolResult add steps', async () => {
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      const cbs = opts.callbacks;
       setTimeout(() => {
         cbs.onToolStart('run_command', { command: 'npm test' });
         cbs.onToolResult({ success: true, tool: 'run_command', output: 'All tests passed' });
@@ -523,8 +522,8 @@ describe('TaskQueue', () => {
 
   it('onToolResult truncates long output', async () => {
     const longOutput = 'x'.repeat(200);
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      const cbs = opts.callbacks;
       setTimeout(() => {
         cbs.onToolResult({ success: true, tool: 'run_command', output: longOutput });
         cbs.onDone();
@@ -549,8 +548,8 @@ describe('TaskQueue', () => {
   });
 
   it('onToolStart with generic tool name uses just the name', async () => {
-    mockRunAgentLoop.mockImplementation((opts: Record<string, unknown>) => {
-      const cbs = opts.callbacks as Record<string, (...args: unknown[]) => void>;
+    mockRunAgentLoop.mockImplementation((opts) => {
+      const cbs = opts.callbacks;
       setTimeout(() => {
         cbs.onToolStart('write_files', { path: 'src/index.ts' });
         cbs.onDone();

@@ -1,0 +1,22 @@
+name: practice-thinking
+description: Practice the thinking/reasoning capability with Ollama models
+model: qwen3.5
+think: true
+
+prompts:
+  - "What is the capital of France?"
+  - "Calculate: 15 * 23 + 42 / 6"
+  - "Explain why the sky is blue in simple terms"
+  - "Write a function to check if a number is prime"
+  - "What are the key differences between React and Vue?"
+
+instructions: |
+  This task demonstrates the thinking capability of advanced AI models.
+  
+  The model will:
+  1. Think through the problem (chain-of-thought)
+  2. Generate the final answer
+  
+  You can see both the thinking process and the final answer.
+  
+  Try running with different models to see how they think!
