@@ -255,7 +255,8 @@ RULES:
 - Act immediately. Do NOT explain — just use tools.
 - ALWAYS close XML tags: </tool_call>, </param>, </name>.
 - One tool call per <tool_call> block. Multiple blocks allowed.
-- For edit_file, include 3+ context lines in old_string.
+- ALWAYS read_file before using edit_file. Never edit blind.
+- For edit_file, include 3+ context lines in old_string. Prefer small edits over rewriting files.
 - If a tool fails, read the error and retry with a fix.
 - After completing the task, output <done/>.
 `;
@@ -517,6 +518,9 @@ export async function runAgentLoop(
       );
       hasPerformedAction = true;
 
+      // ── Send tool results back ──────────────────────────────────────
+      const resultMessages = formatToolResultMessages(results, usedNativeTools);
+
       // ── Post-write: refresh context + auto-lint ─────────────────────
       if (filesChanged) {
         invalidateIndex();
@@ -530,14 +534,13 @@ export async function runAgentLoop(
 
         const lintMsg = runAutoLint(cwd, changedFiles, callbacks);
         if (lintMsg) {
+          // Push tool results FIRST so model knows what succeeded, then lint errors
+          messages.push(...resultMessages);
           messages.push({ role: 'user' as const, content: lintMsg });
           iteration++;
           continue;
         }
       }
-
-      // ── Send tool results back ──────────────────────────────────────
-      const resultMessages = formatToolResultMessages(results, usedNativeTools);
 
       if (!usedNativeTools) {
         if (isDone(turnResponse) || isDone(turnThinking)) {
