@@ -211,9 +211,12 @@ export function formatToolResultMessages(
   return [{ role: 'user' as const, content: resultsText }];
 }
 
-function getSystemPrompt(cwd: string): string {
+function getSystemPrompt(cwd: string, hasHistory = false): string {
+  const sessionNote = hasHistory
+    ? '\nYou are resuming a previous session. Review the conversation history for context — don\'t repeat work already done.\n'
+    : '';
   return `You are Deyad, an expert AI coding agent. Project: ${cwd}
-
+${sessionNote}
 ${TOOLS_DESCRIPTION}
 
 TOOL FORMAT (ALWAYS close every tag):
@@ -323,7 +326,7 @@ export async function runAgentLoop(
     const ragContext = formatRAGContext(ragResults);
 
     const messages: OllamaMessage[] = [
-      { role: 'system', content: getSystemPrompt(cwd) },
+      { role: 'system', content: getSystemPrompt(cwd, history.length > 0) },
       { role: 'system', content: `Project context:\n\n${context}${ragContext}` },
       ...history,
       typeof userMessage === 'string' ? { role: 'user', content: userMessage } : userMessage,

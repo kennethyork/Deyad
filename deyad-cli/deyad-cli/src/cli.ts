@@ -105,7 +105,7 @@ function printUsage(): void {
     ${c.cyan('$ deyad --print "explain this"')}   Print response and exit
     ${c.cyan('$ deyad --auto "refactor utils"')}  Full-auto sandbox mode
     ${c.cyan('$ deyad --auto-approve "fix bug"')} Auto-approve changes (no confirmations)
-    ${c.cyan('$ deyad --resume')}                 Resume last session
+    ${c.cyan('$ deyad --no-resume')}              Start a fresh session
 
   ${c.bold('Options')}
     ${c.yellow('-h, --help')}             Show this help
@@ -114,7 +114,7 @@ function printUsage(): void {
     ${c.yellow('-a, --auto')}             Full-auto mode (sandbox + no confirmations)
     ${c.yellow('--auto-approve')}         Auto-approve all changes (no confirmations)
     ${c.yellow('--no-think')}             Disable reasoning (faster but less accurate)
-    ${c.yellow('--resume')}               Resume the most recent session for this directory
+    ${c.yellow('--no-resume')}            Start a fresh session (default: resumes last session)
     ${c.yellow('--completions <shell>')}  Output shell completion script (bash, zsh, fish)
     ${c.yellow('-v, --version')}          Show version
     ${c.yellow('--config')}               Show config path (~/.deyad/config.json)
@@ -189,7 +189,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     prompt: undefined,
     auto: false,
     autoApprove: undefined,
-    resume: false,
+    resume: true,
     noThink: false,
     showConfig: false,
   };
