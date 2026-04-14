@@ -650,7 +650,7 @@ async function main(): Promise<void> {
       }
 
       // ── Git auto commit+push command ──
-      if (input === '/git') {
+      if (input === '/git' || input === 'git') {
         try {
           const { execFileSync } = await import('node:child_process');
           // Stage everything
