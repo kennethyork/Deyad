@@ -10,8 +10,7 @@
  *   "servers": {
  *     "my-server": {
  *       "command": "npx",
- *       "args": ["-y", "@my/mcp-server"],
- *       "env": { "API_KEY": "..." }
+ *       "args": ["-y", "@my/mcp-server"]
  *     }
  *   }
  * }
