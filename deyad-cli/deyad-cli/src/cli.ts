@@ -11,6 +11,7 @@ import { loadOrCreateSession, saveSession, pruneSessions, memoryList } from './s
 import { createSnapshot, undoLast, getSnapshots } from './undo.js';
 import { enterSandbox, exitSandbox, isSandboxed } from './sandbox.js';
 import { buildIndex, getIndexStats } from './rag.js';
+import { loadConfig, saveConfig, getConfigPath } from './config.js';
 import {
   c, divider, Spinner,
   printBanner, formatToolStart, formatToolEnd, formatDiff,
@@ -103,6 +104,7 @@ function printUsage(): void {
     ${c.cyan('$ deyad --model codestral')}        Specify model
     ${c.cyan('$ deyad --print "explain this"')}   Print response and exit
     ${c.cyan('$ deyad --auto "refactor utils"')}  Full-auto sandbox mode
+    ${c.cyan('$ deyad --auto-approve "fix bug"')} Auto-approve changes (no confirmations)
     ${c.cyan('$ deyad --resume')}                 Resume last session
 
   ${c.bold('Options')}
@@ -110,10 +112,12 @@ function printUsage(): void {
     ${c.yellow('-m, --model <model>')}    Ollama model (default: DEYAD_MODEL env or first available)
     ${c.yellow('-p, --print <prompt>')}   Run prompt non-interactively and print result
     ${c.yellow('-a, --auto')}             Full-auto mode (sandbox + no confirmations)
+    ${c.yellow('--auto-approve')}         Auto-approve all changes (no confirmations)
     ${c.yellow('--no-think')}             Disable reasoning (faster but less accurate)
     ${c.yellow('--resume')}               Resume the most recent session for this directory
     ${c.yellow('--completions <shell>')}  Output shell completion script (bash, zsh, fish)
     ${c.yellow('-v, --version')}          Show version
+    ${c.yellow('--config')}               Show config path (~/.deyad/config.json)
 `);
 }
 
@@ -125,7 +129,7 @@ _deyad_completions() {
   local cur opts
   COMPREPLY=()
   cur="\${COMP_WORDS[COMP_CWORD]}"
-  opts="-h --help -v --version -m --model -p --print -a --auto --no-think --resume --no-resume --completions"
+  opts="-h --help -v --version -m --model -p --print -a --auto --auto-approve --no-think --resume --no-resume --completions"
   COMPREPLY=( $(compgen -W "\${opts}" -- "\${cur}") )
 }
 complete -F _deyad_completions deyad`;
@@ -138,6 +142,7 @@ _deyad() {
     '-m[Specify model]:model:' '--model[Specify model]:model:' \\
     '-p[Print mode]:prompt:' '--print[Print mode]:prompt:' \\
     '-a[Full-auto mode]' '--auto[Full-auto mode]' \\
+    '--auto-approve[Auto-approve all changes]' \\
     '--resume[Resume last session]' \\
     '--no-resume[Start fresh session]' \\
     '--completions[Output completions]:shell:(bash zsh fish)' \\
@@ -151,6 +156,7 @@ complete -c deyad -s v -l version -d 'Show version'
 complete -c deyad -s m -l model -r -d 'Specify model'
 complete -c deyad -s p -l print -r -d 'Print mode'
 complete -c deyad -s a -l auto -d 'Full-auto mode'
+complete -c deyad -l auto-approve -d 'Auto-approve all changes'
 complete -c deyad -l resume -d 'Resume last session'
 complete -c deyad -l no-resume -d 'Start fresh session'
 complete -c deyad -l completions -r -a 'bash zsh fish' -d 'Output completions'`;
@@ -167,8 +173,10 @@ interface ParsedArgs {
   print: string | undefined;
   prompt: string | undefined;
   auto: boolean;
+  autoApprove: boolean | undefined;
   resume: boolean;
   noThink: boolean;
+  showConfig: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -180,8 +188,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     print: undefined,
     prompt: undefined,
     auto: false,
+    autoApprove: undefined,
     resume: false,
     noThink: false,
+    showConfig: false,
   };
   const positional: string[] = [];
   let i = 0;
@@ -205,6 +215,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       args.print = argv[i];
     } else if (arg === '-a' || arg === '--auto') {
       args.auto = true;
+    } else if (arg === '--auto-approve') {
+      args.autoApprove = true;
+    } else if (arg === '--config') {
+      args.showConfig = true;
     } else if (arg === '--resume') {
       args.resume = true;
     } else if (arg === '--no-resume') {
@@ -228,6 +242,14 @@ export async function runOnce(
   cwd: string,
   silent: boolean,
   think = false,
+  options?: {
+    temperature?: number;
+    contextSize?: number;
+    ollamaHost?: string;
+    maxIterations?: number;
+    allowedTools?: string[];
+    restrictedTools?: string[];
+  },
 ): Promise<void> {
   const spinner = new Spinner('Thinking...');
   let spinnerActive = false;
@@ -270,7 +292,7 @@ export async function runOnce(
   };
 
   if (!silent) { spinner.start(); spinnerActive = true; }
-  await runAgentLoop(model, prompt, cwd, callbacks, [], undefined, think ? undefined : false);
+  await runAgentLoop(model, prompt, cwd, callbacks, [], undefined, think ? undefined : false, options);
   if (spinnerActive) { spinner.stop(); spinnerActive = false; }
 }
 
@@ -283,6 +305,17 @@ async function main(): Promise<void> {
   }
   if (args.version) {
     console.log(`deyad ${VERSION}`);
+    process.exit(0);
+  }
+  if (args.showConfig) {
+    console.log(`Config path: ${getConfigPath()}`);
+    const config = loadConfig();
+    if (Object.keys(config).length > 0) {
+      console.log('');
+      console.log(JSON.stringify(config, null, 2));
+    } else {
+      console.log('No config found.');
+    }
     process.exit(0);
   }
   if (args.completions) {
@@ -302,18 +335,32 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  let model: string = args.model ?? process.env['DEYAD_MODEL'] ?? models[0]!;
+  // Load global config
+  const globalConfig = loadConfig();
+
+  let model: string = args.model ?? process.env['DEYAD_MODEL'] ?? globalConfig.model ?? models[0]!;
   if (!models.includes(model)) {
     console.error(formatError(`Model "${model}" not found. Available: ${models.join(', ')}`));
     process.exit(1);
   }
+
+  // Merge config options with CLI flags (CLI takes precedence)
+  const autoApprove = args.autoApprove ?? globalConfig.autoApprove ?? false;
+  const noThink = args.noThink ?? globalConfig.noThink ?? false;
+  const temperature = globalConfig.temperature ?? 0.3;
+  const contextSize = globalConfig.contextSize ?? 8192;
+  const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
+  const maxIterations = globalConfig.maxIterations ?? 30;
+  const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
+  const allowedTools = globalConfig.allowedTools ?? [];
+  const restrictedTools = globalConfig.restrictedTools ?? [];
 
   const cwd = process.cwd();
 
   // --print mode: run once and exit
   const printPrompt = args.print;
   if (printPrompt !== undefined) {
-    await runOnce(model, printPrompt, cwd, true, args.noThink ? false : undefined);
+    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
     process.exit(0);
   }
 
@@ -361,7 +408,7 @@ async function main(): Promise<void> {
     };
 
     autoSpinner.start(); autoSpinnerActive = true;
-    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, args.noThink ? false : undefined);
+    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
     if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
 
     console.log('');
@@ -384,7 +431,7 @@ async function main(): Promise<void> {
 
   // One-shot prompt mode
   if (args.prompt) {
-    await runOnce(model, args.prompt, cwd, false, args.noThink ? false : undefined);
+    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
     process.exit(0);
   }
 
@@ -405,6 +452,13 @@ async function main(): Promise<void> {
     }
   }
   pruneSessions();
+
+  // Show config status if autoApprove is enabled
+  if (autoApprove) {
+    console.log(c.dim(`  Config: ${getConfigPath()}`));
+    console.log(formatSuccess(`  Auto-approve enabled`));
+    console.log('');
+  }
 
   printBanner(VERSION, model, cwd, isSandboxed());
 
@@ -707,6 +761,9 @@ async function main(): Promise<void> {
           console.error(formatError(String(e)));
         },
         confirm: async (question) => {
+          if (autoApprove) {
+            return true;
+          }
           return new Promise((resolve) => {
             rl.question(formatConfirm(question), (answer) => {
               resolve(answer.trim().toLowerCase().startsWith('y'));
@@ -718,7 +775,7 @@ async function main(): Promise<void> {
       replSpinner.start(); replSpinnerActive = true;
 
       try {
-        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, args.noThink ? false : undefined);
+        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
         history = result.history;
         totalTokens += result.stats.totalTokens;
         taskCount++;

@@ -68,11 +68,11 @@ A comprehensive evaluation of Deyad against industry leaders Bolt.new and Claude
 | Criteria | Deyad | Bolt.new | Claude Code |
 |----------|-------|----------|-------------|
 | Plugin system | ✅ Native plugins | ❌ None | ✅ MCP servers |
-| MCP support | ❌ Not yet | ❌ No | ✅ Yes |
-| Custom tools | ✅ Via plugins | ❌ No | ✅ Via MCP |
+| MCP support | ✅ Via .deyad/mcp.json | ❌ No | ✅ Yes |
+| Custom tools | ✅ Via plugins + MCP | ❌ No | ✅ Via MCP |
 | API access | ✅ Full control | ❌ Sandboxed | ✅ Shell access |
 
-**Score: 85/100** - Good extensibility but missing MCP support that Claude Code has.
+**Score: 90/100** - Excellent extensibility with native plugins and MCP support.
 
 ---
 
@@ -175,7 +175,7 @@ A comprehensive evaluation of Deyad against industry leaders Bolt.new and Claude
 ❌ **Model Quality** - Local models slightly behind cloud models  
 ❌ **Setup Friction** - Requires Ollama + Docker installation  
 ❌ **Security Scanning** - No automated vulnerability detection  
-❌ **MCP Support** - Missing Model Context Protocol  
+✅ **MCP Support** - Model Context Protocol via `.deyad/mcp.json`  
 ❌ **Community Size** - Smaller than established competitors  
 ❌ **Collaboration** - No real-time multiplayer editing  
 
@@ -184,7 +184,7 @@ A comprehensive evaluation of Deyad against industry leaders Bolt.new and Claude
 ## Recommendations for Improvement
 
 ### High Priority (Q1 2026)
-1. **Add MCP support** - Integrate Model Context Protocol for tool extensibility
+1. **Expand MCP ecosystem** - Add more pre-configured MCP server templates
 2. **Add security scanning** - Built-in dependency audit and secret detection
 3. **Improve onboarding** - One-click setup wizard for Ollama + Docker
 
@@ -226,7 +226,7 @@ A comprehensive evaluation of Deyad against industry leaders Bolt.new and Claude
 
 **Deyad is an exceptional open-source AI app builder that competes credibly with VC-backed tools while offering superior privacy, zero cost, and unmatched deployment flexibility.**
 
-The only gaps are model quality (cloud models still win) and some missing enterprise features (security scanning, MCP). For most developers, Deyad's trade-offs are worth it for the privacy and cost benefits.
+The only gaps are model quality (cloud models still win) and some missing enterprise features (security scanning). For most developers, Deyad's trade-offs are worth it for the privacy and cost benefits.
 
 **Recommendation: Strong Buy for privacy-focused, budget-conscious, or offline-first developers.**
 

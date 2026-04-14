@@ -291,6 +291,14 @@ export async function runAgentLoop(
   history: OllamaMessage[] = [],
   ollamaOptions?: OllamaOptions,
   think?: boolean,
+  options?: {
+    temperature?: number;
+    contextSize?: number;
+    ollamaHost?: string;
+    maxIterations?: number;
+    allowedTools?: string[];
+    restrictedTools?: string[];
+  },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
   const changedFiles: string[] = [];
@@ -299,6 +307,11 @@ export async function runAgentLoop(
   process.on('SIGINT', sigHandler);
   process.on('SIGTERM', sigHandler);
   process.on('SIGHUP', sigHandler);
+
+  // Use provided options or defaults
+  const maxIterations = options?.maxIterations ?? 50;
+  const allowedTools = options?.allowedTools ?? [];
+  const restrictedTools = options?.restrictedTools ?? [];
 
   try {
     // Initialize MCP servers (if configured)
@@ -318,6 +331,13 @@ export async function runAgentLoop(
       typeof userMessage === 'string' ? { role: 'user', content: userMessage } : userMessage,
     ];
 
+    // Apply Ollama options from config
+    const ollamaOpts: OllamaOptions = {
+      ...(ollamaOptions || {}),
+      ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options?.contextSize !== undefined ? { num_ctx: options.contextSize } : {}),
+    };
+
     let iteration = 0;
     let hasPerformedAction = false;
     let lastToolCallSignature = '';
@@ -328,12 +348,22 @@ export async function runAgentLoop(
     const MAX_READONLY_TOOL_REPEATS = 5;
 
     while (!abortController.signal.aborted) {
-      if (iteration >= MAX_ITERATIONS) {
-        callbacks.onError(`Reached maximum iterations (${MAX_ITERATIONS}). Stopping.`);
+      if (iteration >= maxIterations) {
+        callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
         break;
       }
       compactConversation(messages);
       const nativeTools = getOllamaTools();
+      // Filter tools based on allowed/restricted lists
+      const filteredTools = nativeTools.filter(tool => {
+        if (restrictedTools.length > 0 && restrictedTools.includes(tool.function.name)) {
+          return false;
+        }
+        if (allowedTools.length > 0 && !allowedTools.includes(tool.function.name)) {
+          return false;
+        }
+        return true;
+      });
       // Use thinking for the first iteration (planning) but disable for follow-ups
       // (processing tool results). This gives quality reasoning on the initial task
       // while keeping follow-up tool-result processing fast.
@@ -344,11 +374,12 @@ export async function runAgentLoop(
           model,
           messages,
           callbacks.onToken,
-          ollamaOptions,
+          ollamaOpts,
           abortController.signal,
           callbacks.onThinkingToken,
-          nativeTools,
+          filteredTools,
           iterThink,
+          options?.ollamaHost,
         );
       } catch (err: unknown) {
         const errMsg = String((err as Error).message || err);

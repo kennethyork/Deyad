@@ -106,17 +106,18 @@ export async function streamChat(
   onThinkingToken?: (token: string) => void,
   tools?: OllamaTool[],
   think?: boolean,
+  baseUrl?: string,
 ): Promise<StreamChatResult> {
-  const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+  const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
 
   // Health check: verify Ollama is reachable before starting the stream
   try {
-    const ping = await fetch(`${baseUrl}/api/tags`, { signal: signal ?? AbortSignal.timeout(5000) });
+    const ping = await fetch(`${ollamaHost}/api/tags`, { signal: signal ?? AbortSignal.timeout(5000) });
     if (!ping.ok) throw new Error(`Ollama returned ${ping.status}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `Cannot reach Ollama at ${baseUrl} — ${msg}.\n` +
+      `Cannot reach Ollama at ${ollamaHost} — ${msg}.\n` +
       `Make sure Ollama is running: ollama serve`
     );
   }
@@ -148,7 +149,7 @@ export async function streamChat(
         await sleep(delay);
       }
       try {
-        const r = await fetch(`${baseUrl}/api/chat`, {
+        const r = await fetch(`${ollamaHost}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -272,9 +273,9 @@ function isEmbeddingModel(name: string): boolean {
   return EMBEDDING_MODEL_PREFIXES.some((prefix) => lower.startsWith(prefix));
 }
 
-export async function listModels(): Promise<string[]> {
-  const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
-  const resp = await fetch(`${baseUrl}/api/tags`);
+export async function listModels(baseUrl?: string): Promise<string[]> {
+  const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+  const resp = await fetch(`${ollamaHost}/api/tags`);
   if (!resp.ok) throw new Error(`Failed to list models: ${resp.status}`);
   const data = await resp.json() as { models?: Array<{ name?: string }> };
   return (data.models || [])
@@ -283,10 +284,10 @@ export async function listModels(): Promise<string[]> {
     .filter((name) => !isEmbeddingModel(name));
 }
 
-export async function checkOllama(): Promise<boolean> {
+export async function checkOllama(baseUrl?: string): Promise<boolean> {
   try {
-    const baseUrl = process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
-    const resp = await fetch(`${baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+    const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3000) });
     return resp.ok;
   } catch {
     return false;

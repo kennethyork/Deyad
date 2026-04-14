@@ -30,11 +30,11 @@ This document compares the system prompts and agent architecture between **Deyad
 - ✅ **Atomic operations** - `multi_edit` for batch changes
 - ✅ **Completion tracking** - `<done/>` signal for workflow management
 - ✅ **Local-first** - No API key required, runs entirely offline
+- ✅ **MCP support** - Model Context Protocol for external tool integration
 
 **Weaknesses:**
 - ❌ **Verbose tool format** - XML adds token overhead
 - ❌ **Limited context window** - Depends on local model capabilities
-- ❌ **No MCP support** - Missing Model Context Protocol integration
 
 ---
 
@@ -78,7 +78,7 @@ This document compares the system prompts and agent architecture between **Deyad
 | **Web** | ✅ `fetch_url` | ❌ No built-in |
 | **Browser** | ✅ Headless automation (navigate, screenshot, click) | ❌ No built-in |
 | **Memory** | ✅ Persistent notes (`memory_read`, `memory_write`) | ❌ No built-in |
-| **MCP** | ❌ Not yet | ✅ Native support |
+| **MCP** | ✅ Via `.deyad/mcp.json` | ✅ Native support |
 | **Local Models** | ✅ Any Ollama model | ❌ Cloud-only |
 
 ---
@@ -168,7 +168,7 @@ Use tools when needed, but also explain your reasoning.
 - ✅ **Native plugins** - Custom tool integration
 - ✅ **Full API access** - Complete control over tools
 - ✅ **Custom models** - Swap any Ollama model
-- ❌ **No MCP** - Missing Model Context Protocol
+- ✅ **MCP support** - Via `.deyad/mcp.json` configuration
 
 ### Claude Code
 - ✅ **MCP support** - Model Context Protocol for extensibility
@@ -189,7 +189,6 @@ Use tools when needed, but also explain your reasoning.
 
 ### Choose Claude Code If:
 - ✅ You want **best-in-class reasoning** (Claude 4)
-- ✅ You need **MCP support** for enterprise integrations
 - ✅ You prefer **cloud-based** workflows
 - ✅ You need **large context windows** (200K tokens)
 - ✅ You're willing to pay for **premium features**
@@ -210,8 +209,7 @@ Use tools when needed, but also explain your reasoning.
 1. **Reasoning quality** - Claude 4 > local 70B models
 2. **Context window** - 200K vs 8K-128K
 3. **Setup time** - 1 min vs 5 min
-4. **MCP support** - Native vs missing
-5. **Enterprise features** - SOC 2, GDPR vs none
+4. **Enterprise features** - SOC 2, GDPR vs none
 
 ### **Overall Score:**
 - **Deyad CLI:** 92/100 (Exceptional for local-first development)

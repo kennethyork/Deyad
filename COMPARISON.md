@@ -26,8 +26,8 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 | **Vision (screenshot → code)** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | **Diff review before apply** | ✅ | ✅ | ❌ | ❌ auto-apply | ❌ auto-apply | ✅ | ✅ | ❌ | ❌ |
 | **Offline capable** | ✅ | ❌ | ❌ needs API keys | ❌ | ❌ | Partial | Partial | ❌ | ❌ |
-| **MCP extensibility** | ✅ | ✅ | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
-| **Plugin system** | ✅ | ✅ MCP servers | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
+| **MCP extensibility** | ✅ via .deyad/mcp.json | ✅ | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
+| **Plugin system** | ✅ native + MCP | ✅ MCP servers | ✅ MCP servers | ❌ | ❌ | ✅ extensions | ✅ extensions | ❌ | ❌ |
 | **Env var management** | ✅ multi-file | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
 | **Open source** | ✅ MIT | ❌ source-available | ✅ source-available (non-competing) | ❌ | ❌ | ❌ | ❌ | Partial | ❌ |
 | **Security scanning** | ❌ | ❌ | ✅ built-in | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -54,7 +54,7 @@ A detailed comparison of Deyad against the leading AI app builders (as of March 
 3. **Collaboration** — Replit has real-time multiplayer editing. Deyad is single-user.
 4. **Ecosystem polish** — Cursor/Windsurf have years of VC funding, large teams, and extension marketplaces. Dyad has 20k GitHub stars and a large community.
 5. **Managed hosting** — Replit and Bolt bundle cloud hosting. Deyad deploys to external providers.
-6. **MCP extensibility** — Dyad supports MCP servers for tool extensibility. Deyad has a plugin system but not MCP.
+6. **MCP extensibility** — Dyad supports MCP servers for tool extensibility. Deyad also supports MCP via `.deyad/mcp.json` configuration.
 7. **Security scanning** — Dyad has built-in security review. Deyad relies on manual review.
 8. **Voice input** — Dyad supports speech-to-text prompting. Deyad is keyboard-only.
 
@@ -119,7 +119,7 @@ Dyad is the closest competitor to Deyad — both are local, open-source Electron
 | Deploy targets | 7 (incl. VPS+SSL, desktop, mobile) | 2 (GitHub + Vercel) |
 | Desktop/mobile export | ✅ Electron + Capacitor | ❌ |
 | Database | Self-hosted PG + pgAdmin | Supabase (cloud) |
-| MCP servers | ❌ | ✅ |
+| MCP servers | ✅ via .deyad/mcp.json | ✅ |
 | Security scanning | ❌ | ✅ |
 | Voice input | ❌ | ✅ |
 | License | MIT | Source-available (non-competing) |

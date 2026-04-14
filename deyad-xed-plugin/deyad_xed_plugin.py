@@ -31,6 +31,7 @@ DEBOUNCE_MS = 500
 CONTEXT_LINES = 50           # lines of context above/below cursor
 MIN_PREFIX_CHARS = 8         # don't trigger on very short prefixes
 FIM_ENABLED = True
+ALWAYS_ACCEPT = False        # if True, auto-insert completions (no ghost text)
 # ──────────────────────────────────────────────────────────────────────
 
 GHOST_TAG = "deyad-ghost-text"
