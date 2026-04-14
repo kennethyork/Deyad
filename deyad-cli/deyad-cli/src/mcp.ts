@@ -142,7 +142,7 @@ class MCPConnection {
     const resp = await this.send('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'deyad-cli', version: '0.5.1' },
+      clientInfo: { name: 'deyad-cli', version: '0.5.2' },
     });
     if (resp.error) throw new Error(`MCP init failed: ${resp.error.message}`);
 
