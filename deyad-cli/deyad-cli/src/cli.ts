@@ -3,7 +3,7 @@ import 'dotenv/config';
 
 import * as readline from 'node:readline';
 import * as path from 'node:path';
-import { checkOllama, listModels } from './ollama.js';
+import { checkOllama, listModels, streamChat } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
@@ -644,6 +644,78 @@ async function main(): Promise<void> {
           }
         } catch (e) {
           console.log(formatError('Not a git repository or git not available.'));
+        }
+        ask();
+        return;
+      }
+
+      // ── Git auto commit+push command ──
+      if (input === '/git') {
+        try {
+          const { execFileSync } = await import('node:child_process');
+          // Stage everything
+          execFileSync('git', ['add', '-A'], { cwd, timeout: 10000 });
+
+          // Check if there's anything to commit
+          const status = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf-8', timeout: 10000 }).trim();
+          if (!status) {
+            console.log(c.dim('  Nothing to commit. Working tree clean.'));
+            ask();
+            return;
+          }
+
+          // Get diff stat for commit message generation
+          const diffStat = execFileSync('git', ['diff', '--cached', '--stat'], { cwd, encoding: 'utf-8', timeout: 10000 }).trim();
+          const diffContent = execFileSync('git', ['diff', '--cached'], { cwd, encoding: 'utf-8', timeout: 60000 });
+          const diffForPrompt = diffContent.length > 4000 ? diffContent.slice(0, 4000) + '\n...(truncated)' : diffContent;
+
+          // Generate commit message via model
+          const commitSpinner = new Spinner('Generating commit message...');
+          commitSpinner.start();
+          let commitMsg = '';
+          try {
+            const result = await streamChat(
+              model,
+              [
+                { role: 'system', content: 'You are a git commit message generator. Output ONLY the commit message — no explanation, no quotes, no markdown. Use conventional commit format (feat:, fix:, chore:, refactor:, docs:, etc). Keep it under 72 chars. If multiple changes, summarize the most important one.' },
+                { role: 'user', content: `Generate a commit message for:\n\n${diffStat}\n\n${diffForPrompt}` },
+              ],
+              (token) => { commitMsg += token; },
+              { temperature: 0.1 },
+              undefined,
+              undefined,
+              undefined,
+              false, // no thinking
+              ollamaHost,
+            );
+            commitMsg = (commitMsg || result.content).trim().replace(/^["'`]+|["'`]+$/g, '').split('\n')[0]!.trim();
+          } catch {
+            // Fallback: generate from stat
+            const lines = diffStat.split('\n');
+            commitMsg = `chore: update ${lines.length > 1 ? lines.length - 1 + ' files' : lines[0]?.trim() || 'files'}`;
+          }
+          commitSpinner.stop();
+
+          if (!commitMsg) commitMsg = 'chore: update files';
+
+          // Commit
+          console.log(`  ${c.cyan('commit')} ${commitMsg}`);
+          execFileSync('git', ['commit', '-m', commitMsg], { cwd, timeout: 10000 });
+
+          // Push
+          const pushSpinner = new Spinner('Pushing...');
+          pushSpinner.start();
+          try {
+            execFileSync('git', ['push'], { cwd, timeout: 30000 });
+            pushSpinner.stop();
+            console.log(formatSuccess('Staged, committed, and pushed.'));
+          } catch {
+            pushSpinner.stop();
+            console.log(formatSuccess('Committed locally.'));
+            console.log(c.dim('  Push failed — no remote configured or network error. Run git push manually.'));
+          }
+        } catch (e) {
+          console.log(formatError(`Git error: ${(e as Error).message}`));
         }
         ask();
         return;

@@ -331,6 +331,7 @@ export function formatHelp(): string {
         ['/status', 'Show session stats'],
         ['/compact', 'Force conversation compaction'],
         ['/diff', 'Show git changes (unstaged/staged)'],
+        ['/git', 'Stage, commit (AI message), and push'],
         ['/tokens', 'Detailed token usage breakdown'],
         ['/index', 'Rebuild RAG codebase index'],
         ['/init', 'Create DEYAD.md project instructions'],
