@@ -147,32 +147,39 @@ export async function dispatchTools(
     return READ_ONLY_TOOLS.has(call.name);
   };
 
-  const allReadOnly = toolCalls.every(isReadOnly);
-  if (allReadOnly && toolCalls.length > 1) {
-    for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
-    results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));
-    for (const r of results) {
+  // Split into read-only and write groups for optimal dispatch:
+  // reads run in parallel first, then writes run sequentially.
+  const readCalls = toolCalls.filter(isReadOnly);
+  const writeCalls = toolCalls.filter(c => !isReadOnly(c));
+
+  // Phase 1: dispatch all read-only tools in parallel
+  if (readCalls.length > 0) {
+    for (const call of readCalls) callbacks.onToolStart(call.name, call.params);
+    const readResults = await Promise.all(readCalls.map((call) => executeTool(call, cwd, toolCb)));
+    for (const r of readResults) {
       callbacks.onToolResult(r);
-      if (r.changedFiles) {
-        for (const f of r.changedFiles) {
-          if (!changedFiles.includes(f)) changedFiles.push(f);
-        }
-      }
-    }
-  } else {
-    for (const call of toolCalls) {
-      if (signal.aborted) break;
-      callbacks.onToolStart(call.name, call.params);
-      const r = await executeTool(call, cwd, toolCb);
       results.push(r);
-      callbacks.onToolResult(r);
       if (r.changedFiles) {
         for (const f of r.changedFiles) {
           if (!changedFiles.includes(f)) changedFiles.push(f);
         }
       }
-      if (WRITE_TOOLS.has(call.name) && r.success) filesChanged = true;
     }
+  }
+
+  // Phase 2: dispatch write tools sequentially
+  for (const call of writeCalls) {
+    if (signal.aborted) break;
+    callbacks.onToolStart(call.name, call.params);
+    const r = await executeTool(call, cwd, toolCb);
+    results.push(r);
+    callbacks.onToolResult(r);
+    if (r.changedFiles) {
+      for (const f of r.changedFiles) {
+        if (!changedFiles.includes(f)) changedFiles.push(f);
+      }
+    }
+    if (WRITE_TOOLS.has(call.name) && r.success) filesChanged = true;
   }
   return { results, filesChanged };
 }

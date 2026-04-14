@@ -205,6 +205,89 @@ export function stripToolMarkup(text: string): string {
     .trim();
 }
 
+// ── Fuzzy edit matching ───────────────────────────────────────────────────────
+
+/** Minimum similarity ratio (0–1) for fuzzy matching. */
+const FUZZY_THRESHOLD = 0.6;
+
+/**
+ * Compute line-level similarity between two strings (Dice coefficient on trimmed lines).
+ */
+function lineSimilarity(a: string, b: string): number {
+  const aLines = a.split('\n').map(l => l.trim()).filter(Boolean);
+  const bLines = b.split('\n').map(l => l.trim()).filter(Boolean);
+  if (aLines.length === 0 && bLines.length === 0) return 1;
+  if (aLines.length === 0 || bLines.length === 0) return 0;
+  const bSet = new Set(bLines);
+  let matches = 0;
+  for (const line of aLines) {
+    if (bSet.has(line)) matches++;
+  }
+  return (2 * matches) / (aLines.length + bLines.length);
+}
+
+/**
+ * Try to find the best fuzzy-matching block in `content` for `needle`.
+ * Uses a sliding window of ±2 lines around the needle size.
+ * Returns { text, similarity } or null if nothing meets the threshold.
+ */
+export function fuzzyFindBlock(content: string, needle: string): { text: string; similarity: number } | null {
+  const contentLines = content.split('\n');
+  const needleLines = needle.split('\n');
+  const needleLen = needleLines.length;
+  if (needleLen === 0 || contentLines.length === 0) return null;
+
+  // For single-line needles, try trimmed matching first
+  if (needleLen === 1) {
+    const trimmed = needle.trim();
+    if (!trimmed) return null;
+    const candidates: Array<{ text: string; similarity: number }> = [];
+    for (let i = 0; i < contentLines.length; i++) {
+      const line = contentLines[i]!;
+      if (line.trim() === trimmed) {
+        candidates.push({ text: line, similarity: 1.0 });
+      }
+    }
+    // Only return if exactly one match (must be unique)
+    if (candidates.length === 1) return candidates[0]!;
+    return null;
+  }
+
+  let best: { text: string; similarity: number; start: number } | null = null;
+
+  // Slide window of sizes [needleLen-2 .. needleLen+2]
+  const minWin = Math.max(1, needleLen - 2);
+  const maxWin = Math.min(contentLines.length, needleLen + 2);
+
+  for (let winSize = minWin; winSize <= maxWin; winSize++) {
+    for (let start = 0; start <= contentLines.length - winSize; start++) {
+      const block = contentLines.slice(start, start + winSize).join('\n');
+      const sim = lineSimilarity(needle, block);
+      if (sim >= FUZZY_THRESHOLD && (!best || sim > best.similarity)) {
+        best = { text: block, similarity: sim, start };
+      }
+    }
+  }
+
+  if (!best) return null;
+
+  // Ensure uniqueness — check no other block scores equally high
+  let secondBest = 0;
+  for (let winSize = minWin; winSize <= maxWin; winSize++) {
+    for (let start = 0; start <= contentLines.length - winSize; start++) {
+      if (best && Math.abs(start - best.start) < needleLen) continue; // skip overlap
+      const block = contentLines.slice(start, start + winSize).join('\n');
+      const sim = lineSimilarity(needle, block);
+      if (sim > secondBest) secondBest = sim;
+    }
+  }
+
+  // If the second-best is too close, the match isn't unique enough
+  if (secondBest >= best.similarity * 0.95) return null;
+
+  return { text: best.text, similarity: best.similarity };
+}
+
 export function simpleDiff(oldText: string, newText: string, filePath: string): string {
   const oldLines = oldText.split('\n');
   const newLines = newText.split('\n');
@@ -445,19 +528,34 @@ async function executeBuiltinTool(
         if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         const content = fs.readFileSync(absPath, 'utf-8');
-        const occurrences = content.split(oldStr).length - 1;
-        if (occurrences === 0) return { tool: call.name, success: false, output: 'old_string not found in file.' };
+        let occurrences = content.split(oldStr).length - 1;
+        let actualOldStr = oldStr;
+        let fuzzyUsed = false;
+
+        // Fuzzy fallback: if exact match fails, try line-level similarity matching
+        if (occurrences === 0) {
+          const match = fuzzyFindBlock(content, oldStr);
+          if (match) {
+            actualOldStr = match.text;
+            fuzzyUsed = true;
+            occurrences = 1;
+          }
+        }
+
+        if (occurrences === 0) return { tool: call.name, success: false, output: 'old_string not found in file (exact and fuzzy match both failed).' };
         if (occurrences > 1) return { tool: call.name, success: false, output: `old_string found ${occurrences} times (must be unique).` };
         if (cb?.confirm) {
-          const ok = await cb.confirm(`Edit ${filePath}?`);
+          const prompt = fuzzyUsed ? `Edit ${filePath}? (fuzzy match used)` : `Edit ${filePath}?`;
+          const ok = await cb.confirm(prompt);
           if (!ok) return { tool: call.name, success: false, output: 'User declined.' };
         }
-        const updated = content.replace(oldStr, newStr);
+        const updated = content.replace(actualOldStr, newStr);
         if (cb?.onDiff) {
           cb.onDiff(filePath, simpleDiff(content, updated, filePath));
         }
         fs.writeFileSync(absPath, updated, 'utf-8');
-        return { tool: call.name, success: true, output: `Edited ${filePath}`, changedFiles: [filePath] };
+        const msg = fuzzyUsed ? `Edited ${filePath} (fuzzy match applied)` : `Edited ${filePath}`;
+        return { tool: call.name, success: true, output: msg, changedFiles: [filePath] };
       }
       case 'delete_file': {
         const filePath = call.params['path'];
@@ -569,10 +667,16 @@ async function executeBuiltinTool(
           if (!absPath.startsWith(resolvedCwd)) { editResults.push(`${edit.path}: path traversal blocked`); continue; }
           if (!fs.existsSync(absPath)) { editResults.push(`${edit.path}: file not found`); continue; }
           const content = fs.readFileSync(absPath, 'utf-8');
-          const occ = content.split(edit.old_string).length - 1;
+          let occ = content.split(edit.old_string).length - 1;
+          let actualOld = edit.old_string;
+          let fuzzy = false;
+          if (occ === 0) {
+            const match = fuzzyFindBlock(content, edit.old_string);
+            if (match) { actualOld = match.text; fuzzy = true; occ = 1; }
+          }
           if (occ === 0) { editResults.push(`${edit.path}: old_string not found`); continue; }
           if (occ > 1) { editResults.push(`${edit.path}: old_string found ${occ} times (must be unique)`); continue; }
-          const updated = content.replace(edit.old_string, edit.new_string);
+          const updated = content.replace(actualOld, edit.new_string);
           if (cb?.onDiff) cb.onDiff(edit.path, simpleDiff(content, updated, edit.path));
           fs.writeFileSync(absPath, updated, 'utf-8');
           editResults.push(`${edit.path}: edited`);

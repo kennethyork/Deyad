@@ -3,7 +3,8 @@ import 'dotenv/config';
 
 import * as readline from 'node:readline';
 import * as path from 'node:path';
-import { checkOllama, listModels, streamChat } from './ollama.js';
+import * as fs from 'node:fs';
+import { checkOllama, listModels, streamChat, estimateTokens } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
@@ -463,9 +464,42 @@ async function main(): Promise<void> {
 
   printBanner(VERSION, model, cwd, isSandboxed());
 
+  // ── Tab completion ──
+  const REPL_COMMANDS = [
+    '/help', '/clear', '/status', '/models', '/compact', '/model ',
+    '/diff', '/git', '/tokens', '/index', '/init', '/undo',
+    '/snapshots', '/sandbox ', '/sessions', '/memory',
+    'exit', 'quit', 'git',
+  ];
+  const completer = (line: string): [string[], string] => {
+    // Command completion
+    if (line.startsWith('/') || line === 'g' || line === 'gi' || line === 'git' || line === 'e' || line === 'ex' || line === 'exi' || line === 'q' || line === 'qu' || line === 'qui') {
+      const hits = REPL_COMMANDS.filter(c => c.startsWith(line));
+      return [hits.length ? hits : REPL_COMMANDS, line];
+    }
+    // File path completion for any word containing /
+    const words = line.split(/\s+/);
+    const lastWord = words[words.length - 1] || '';
+    if (lastWord.includes('/') || lastWord.includes('.')) {
+      try {
+        const dir = path.dirname(path.resolve(cwd, lastWord));
+        const prefix = path.basename(lastWord);
+        const entries = fs.readdirSync(dir).filter(e => e.startsWith(prefix));
+        const completions = entries.map(e => {
+          const full = path.join(path.dirname(lastWord), e);
+          const stat = fs.statSync(path.resolve(cwd, full));
+          return stat.isDirectory() ? full + '/' : full;
+        });
+        return [completions, lastWord];
+      } catch { /* ignore */ }
+    }
+    return [[], line];
+  };
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    completer,
     history: [] as string[],
     historySize: 100,
   } as readline.ReadLineOptions);
@@ -852,7 +886,45 @@ async function main(): Promise<void> {
         history = result.history;
         totalTokens += result.stats.totalTokens;
         taskCount++;
-        console.log(formatTokenBadge(result.stats.totalTokens));
+
+        // Calculate context usage percentage
+        const historyChars = history.reduce((s, m) => s + m.content.length, 0);
+        const contextTokens = estimateTokens(historyChars);
+        const contextPct = Math.min(100, Math.round((contextTokens / contextSize) * 100));
+        console.log(formatTokenBadge(result.stats.totalTokens, contextPct));
+
+        // Auto-git: commit after tasks if enabled and files changed
+        if (gitAutoCommit && result.changedFiles.length > 0) {
+          try {
+            const { execFileSync } = await import('node:child_process');
+            execFileSync('git', ['add', '-A'], { cwd, timeout: 10000 });
+            const status = execFileSync('git', ['status', '--porcelain'], { cwd, encoding: 'utf-8', timeout: 10000 }).trim();
+            if (status) {
+              const diffStat = execFileSync('git', ['diff', '--cached', '--stat'], { cwd, encoding: 'utf-8', timeout: 10000 }).trim();
+              const diffContent = execFileSync('git', ['diff', '--cached'], { cwd, encoding: 'utf-8', timeout: 60000 });
+              const diffForPrompt = diffContent.length > 4000 ? diffContent.slice(0, 4000) + '\n...(truncated)' : diffContent;
+              let commitMsg = '';
+              try {
+                const cmResult = await streamChat(
+                  model,
+                  [
+                    { role: 'system', content: 'You are a git commit message generator. Output ONLY the commit message — no explanation, no quotes, no markdown. Use conventional commit format (feat:, fix:, chore:, refactor:, docs:, etc). Keep it under 72 chars. If multiple changes, summarize the most important one.' },
+                    { role: 'user', content: `Generate a commit message for:\n\n${diffStat}\n\n${diffForPrompt}` },
+                  ],
+                  (token) => { commitMsg += token; },
+                  { temperature: 0.1 },
+                  undefined, undefined, undefined, false, ollamaHost,
+                );
+                commitMsg = (commitMsg || cmResult.content).trim().replace(/^["'`]+|["'`]+$/g, '').split('\n')[0]!.trim();
+              } catch {
+                commitMsg = `chore: update ${result.changedFiles.length} file(s)`;
+              }
+              if (!commitMsg) commitMsg = 'chore: update files';
+              execFileSync('git', ['commit', '-m', commitMsg], { cwd, timeout: 10000 });
+              console.log(c.dim(`  auto-commit: ${commitMsg}`));
+            }
+          } catch { /* not a git repo or git error — skip silently */ }
+        }
 
         // Auto-save session after each task
         session.history = history;
@@ -870,8 +942,6 @@ async function main(): Promise<void> {
   ask();
 }
 
-import { realpathSync } from 'node:fs';
-
 function checkIsMain(): boolean {
   if (!process.argv[1]) return false;
   const scriptPath = process.argv[1].replace(/\\/g, '/');
@@ -879,7 +949,7 @@ function checkIsMain(): boolean {
   if (import.meta.url.endsWith(scriptPath)) return true;
   // Resolve symlinks (global npm install creates a symlink)
   try {
-    const resolved = realpathSync(scriptPath).replace(/\\/g, '/');
+    const resolved = fs.realpathSync(scriptPath).replace(/\\/g, '/');
     if (import.meta.url.endsWith(resolved)) return true;
   } catch { /* ignore */ }
   return false;

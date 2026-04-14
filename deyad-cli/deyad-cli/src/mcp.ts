@@ -23,6 +23,10 @@ import * as path from 'node:path';
 import * as readline from 'node:readline';
 import type { OllamaTool } from './ollama.js';
 
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface MCPServerConfig {
@@ -142,7 +146,7 @@ class MCPConnection {
     const resp = await this.send('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'deyad-cli', version: '0.5.2' },
+      clientInfo: { name: 'deyad-cli', version: pkg.version },
     });
     if (resp.error) throw new Error(`MCP init failed: ${resp.error.message}`);
 

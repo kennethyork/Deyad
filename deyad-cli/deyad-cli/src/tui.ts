@@ -382,8 +382,13 @@ export function formatSuccess(message: string): string {
 
 // ── Token Badge ──
 
-export function formatTokenBadge(tokens: number): string {
-  return c.dim(`  ─── ${tokens.toLocaleString()} tokens ───`);
+export function formatTokenBadge(tokens: number, contextPct?: number): string {
+  const tokenStr = `${tokens.toLocaleString()} tokens`;
+  if (contextPct !== undefined) {
+    const bar = contextPct >= 90 ? c.red(`${contextPct}%`) : contextPct >= 70 ? c.yellow(`${contextPct}%`) : c.green(`${contextPct}%`);
+    return c.dim(`  ─── ${tokenStr} · context ${bar}${c.dim(' ───')}`);
+  }
+  return c.dim(`  ─── ${tokenStr} ───`);
 }
 
 // ── Prompt ──
