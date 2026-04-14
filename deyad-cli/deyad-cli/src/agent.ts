@@ -38,6 +38,12 @@ const MAX_ITERATIONS = 50;
 /** Maximum retries for nudging a non-acting model to use tools. */
 const MAX_NUDGE_RETRIES = 3;
 
+/** Maximum characters per tool output before truncation. ~3K tokens. */
+const MAX_TOOL_OUTPUT_CHARS = 12_000;
+
+/** Default token budget per session (0 = unlimited). */
+const DEFAULT_TOKEN_BUDGET = 0;
+
 /** Escalating nudge messages to get the model to use tools. */
 const NUDGE_MESSAGES = [
   'You MUST use tools. Do not explain — act. Start with list_files or read_file.',
@@ -52,8 +58,11 @@ const MAX_REPEATED_TOOL_CALLS = 3;
 export const READ_ONLY_TOOLS = new Set([
   'list_files', 'read_file', 'search_files', 'glob_files', 'fetch_url',
   'git_status', 'git_log', 'git_diff', 'git_branch',
-  'browser', // read-only browser actions (navigate, screenshot, get_text, console)
+  'memory_read', 'memory_list',
 ]);
+
+/** Browser actions that are read-only (vs click/type which mutate state). */
+const BROWSER_READ_ONLY_ACTIONS = new Set(['navigate', 'screenshot', 'get_text', 'console', 'close']);
 
 /** Tools that modify files/state and must run sequentially. */
 export const WRITE_TOOLS = new Set([
@@ -135,7 +144,13 @@ export async function dispatchTools(
   let results: ToolResult[] = [];
   let filesChanged = false;
 
-  const allReadOnly = toolCalls.every((c) => READ_ONLY_TOOLS.has(c.name));
+  /** Check if a tool call is read-only (browser depends on action param). */
+  const isReadOnly = (call: ToolCall): boolean => {
+    if (call.name === 'browser') return BROWSER_READ_ONLY_ACTIONS.has(call.params.action ?? '');
+    return READ_ONLY_TOOLS.has(call.name);
+  };
+
+  const allReadOnly = toolCalls.every(isReadOnly);
   if (allReadOnly && toolCalls.length > 1) {
     for (const call of toolCalls) callbacks.onToolStart(call.name, call.params);
     results = await Promise.all(toolCalls.map((call) => executeTool(call, cwd, toolCb)));
@@ -190,6 +205,7 @@ export function runAutoLint(
 
 /**
  * Format tool results into conversation messages (native tool or XML format).
+ * Truncates output to prevent large tool results from consuming context.
  */
 export function formatToolResultMessages(
   results: ToolResult[],
@@ -198,17 +214,30 @@ export function formatToolResultMessages(
   if (usedNativeTools) {
     return results.map((r) => ({
       role: 'tool' as const,
-      content: `[${r.success ? 'success' : 'error'}] ${r.output}`,
+      content: `[${r.success ? 'success' : 'error'}] ${truncateOutput(r.output)}`,
       tool_name: r.tool,
     }));
   }
   const resultsText = results
     .map(
       (r) =>
-        `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${r.output}\n</output>\n</tool_result>`,
+        `<tool_result>\n<name>${r.tool}</name>\n<status>${r.success ? 'success' : 'error'}</status>\n<output>\n${truncateOutput(r.output)}\n</output>\n</tool_result>`,
     )
     .join('\n\n');
   return [{ role: 'user' as const, content: resultsText }];
+}
+
+/**
+ * Truncate tool output to stay within context budget.
+ * Keeps the first and last portions so the model sees both the start and end.
+ */
+export function truncateOutput(output: string, max = MAX_TOOL_OUTPUT_CHARS): string {
+  if (output.length <= max) return output;
+  const keep = Math.floor((max - 80) / 2); // 80 chars for the truncation notice
+  const head = output.slice(0, keep);
+  const tail = output.slice(-keep);
+  const omitted = output.length - keep * 2;
+  return `${head}\n\n... [${omitted} chars truncated] ...\n\n${tail}`;
 }
 
 function getSystemPrompt(cwd: string, hasHistory = false): string {
@@ -299,6 +328,7 @@ export async function runAgentLoop(
     maxIterations?: number;
     allowedTools?: string[];
     restrictedTools?: string[];
+    tokenBudget?: number;
   },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
@@ -313,6 +343,7 @@ export async function runAgentLoop(
   const maxIterations = options?.maxIterations ?? 50;
   const allowedTools = options?.allowedTools ?? [];
   const restrictedTools = options?.restrictedTools ?? [];
+  const tokenBudget = options?.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
 
   try {
     // Initialize MCP servers (if configured)
@@ -351,6 +382,10 @@ export async function runAgentLoop(
     while (!abortController.signal.aborted) {
       if (iteration >= maxIterations) {
         callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
+        break;
+      }
+      if (tokenBudget > 0 && stats.totalTokens >= tokenBudget) {
+        callbacks.onError(`Token budget exhausted (${stats.totalTokens}/${tokenBudget}). Stopping.`);
         break;
       }
       compactConversation(messages);
@@ -491,14 +526,24 @@ export async function runAgentLoop(
       );
       hasPerformedAction = true;
 
-      // ── Post-write: refresh context + auto-lint ─────────────────────
+      // ── Post-write: refresh file list + auto-lint ─────────────────
       if (filesChanged) {
         invalidateIndex();
+        // Only refresh the file listing (cheap) — key files were already read at start
         try {
-          const freshContext = await buildContext(cwd);
+          const { executeTool: exec } = await import('./tools.js');
+          const listing = await exec({ name: 'list_files', params: {} }, cwd);
           const second = messages[1];
           if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
-            messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
+            // Replace just the file listing portion, keep the rest
+            const existingContent = second.content;
+            const filesHeader = existingContent.indexOf('Project files (');
+            const afterFiles = existingContent.indexOf('\n---', filesHeader > -1 ? filesHeader : 0);
+            if (filesHeader > -1 && afterFiles > -1) {
+              const files = listing.output.split('\n').filter(Boolean);
+              const newListing = `Project files (${files.length}):\n${listing.output}\n`;
+              messages[1] = { role: 'system', content: existingContent.slice(0, filesHeader) + newListing + existingContent.slice(afterFiles) };
+            }
           }
         } catch { /* ignore */ }
 
