@@ -118,10 +118,30 @@ export function parseToolCalls(text: string): ToolCall[] {
   /** Sanitise a parsed tool name — strip XML artefacts from malformed model output. */
   const sanitizeName = (raw: string): string => raw.replace(/<[^>]*>?/g, '').replace(/[^a-zA-Z0-9_-]/g, '').trim();
 
+  // ── Pre-process: repair truncated tool calls ──
+  // Models sometimes output <tool_call>...<name>...</name>...<param>...</param> without closing </tool_call>.
+  // Detect unclosed tool_call blocks and add the missing closing tag.
+  let repaired = text;
+  const openCount = (repaired.match(/<tool_call>/g) || []).length;
+  const closeCount = (repaired.match(/<\/tool_call>/g) || []).length;
+  if (openCount > closeCount) {
+    for (let i = 0; i < openCount - closeCount; i++) {
+      repaired += '\n</tool_call>';
+    }
+  }
+
+  // Also repair unclosed <param> tags — model may truncate mid-param
+  repaired = repaired.replace(/<param\s+name="([^"]*)">([\s\S]*?)(?=<(?:param|\/tool_call|tool_call|name)|$)/g,
+    (full, pName, pValue) => {
+      if (full.includes('</param>')) return full;
+      return `<param name="${pName}">${pValue.trim()}</param>`;
+    }
+  );
+
   // Format 1: <tool_call><name>...</name><param name="...">...</param></tool_call>
   const pattern1 = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
   let match: RegExpExecArray | null;
-  while ((match = pattern1.exec(text)) !== null) {
+  while ((match = pattern1.exec(repaired)) !== null) {
     const name = sanitizeName(match[1]!);
     if (!name) continue;
     const body = match[2] ?? '';
@@ -137,7 +157,7 @@ export function parseToolCalls(text: string): ToolCall[] {
   // Format 2: <function=name><parameter=key>value</parameter></function>
   // (used by qwen and some other models)
   const pattern2 = /<function=([^>]+)>([\s\S]*?)<\/function>/g;
-  while ((match = pattern2.exec(text)) !== null) {
+  while ((match = pattern2.exec(repaired)) !== null) {
     const name = sanitizeName(match[1]!);
     if (!name) continue;
     const body = match[2] ?? '';
@@ -152,7 +172,7 @@ export function parseToolCalls(text: string): ToolCall[] {
 
   // Format 3: ```tool_call\n{"name":"...","parameters":{...}}\n``` (JSON in code block)
   const pattern3 = /```tool_call\s*\n([\s\S]*?)\n\s*```/g;
-  while ((match = pattern3.exec(text)) !== null) {
+  while ((match = pattern3.exec(repaired)) !== null) {
     try {
       const parsed = JSON.parse(match[1]!.trim());
       if (parsed.name) {

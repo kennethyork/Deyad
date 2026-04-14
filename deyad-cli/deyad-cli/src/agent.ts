@@ -216,21 +216,19 @@ function getSystemPrompt(cwd: string): string {
 
 ${TOOLS_DESCRIPTION}
 
-TOOL FORMAT:
+TOOL FORMAT (ALWAYS close every tag):
 <tool_call>
 <name>TOOL_NAME</name>
 <param name="KEY">VALUE</param>
 </tool_call>
 
 RULES:
-- Act immediately. Do NOT explain what you plan to do — just do it with tools.
-- Use tools for EVERY action. Never describe actions without executing them.
-- Be brief. Minimal text, maximum tool usage.
-- For edit_file, include 3+ context lines in old_string for unique matching.
+- Act immediately. Do NOT explain — just use tools.
+- ALWAYS close XML tags: </tool_call>, </param>, </name>.
+- One tool call per <tool_call> block. Multiple blocks allowed.
+- For edit_file, include 3+ context lines in old_string.
 - If a tool fails, read the error and retry with a fix.
-- Multiple tool calls per response are allowed.
 - After completing the task, output <done/>.
-- Do NOT output <done/> until the task is fully complete.
 `;
 }
 
@@ -383,12 +381,32 @@ export async function runAgentLoop(
         );
       } catch (err: unknown) {
         const errMsg = String((err as Error).message || err);
-        callbacks.onError(`Ollama error: ${errMsg}`);
-        if (iteration > 0) {
-          iteration++;
-          continue;
+        // If Ollama's native tool-call XML parser failed (500 + "XML syntax error"),
+        // retry WITHOUT native tools — let the model output raw XML that we parse ourselves.
+        if (/XML syntax error|xml.*unexpected/i.test(errMsg)) {
+          try {
+            result = await streamChat(
+              model,
+              messages,
+              callbacks.onToken,
+              ollamaOpts,
+              abortController.signal,
+              callbacks.onThinkingToken,
+              undefined, // no native tools — fall back to text-based XML parsing
+              iterThink,
+              options?.ollamaHost,
+            );
+          } catch (retryErr: unknown) {
+            const retryMsg = String((retryErr as Error).message || retryErr);
+            callbacks.onError(`Ollama error (retry): ${retryMsg}`);
+            if (iteration > 0) { iteration++; continue; }
+            break;
+          }
+        } else {
+          callbacks.onError(`Ollama error: ${errMsg}`);
+          if (iteration > 0) { iteration++; continue; }
+          break;
         }
-        break;
       }
       if (abortController.signal.aborted) break;
 

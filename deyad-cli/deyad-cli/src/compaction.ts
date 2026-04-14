@@ -7,11 +7,12 @@
 import { stripToolMarkup } from './tools.js';
 import type { OllamaMessage } from './ollama.js';
 
-/** Maximum conversation size (chars) before compaction kicks in. ~32k tokens at ~4 chars/token. */
-export const MAX_CONVERSATION_CHARS = 128_000;
+/** Maximum conversation size (chars) before compaction kicks in. ~16k tokens at ~4 chars/token.
+ *  Conservative limit leaves room for system prompt, context, and model response within 32K context. */
+export const MAX_CONVERSATION_CHARS = 64_000;
 
 /** Number of recent messages to keep when compacting conversation history. */
-export const COMPACT_KEEP_RECENT = 10;
+export const COMPACT_KEEP_RECENT = 6;
 
 /**
  * Compact conversation history in-place when it exceeds {@link MAX_CONVERSATION_CHARS}.

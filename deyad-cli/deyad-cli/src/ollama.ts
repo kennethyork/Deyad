@@ -11,7 +11,8 @@ export const BACKOFF_BASE_MS = 1_000;
 
 /** Returns true for HTTP status codes that are worth retrying. */
 export function isRetryableStatus(status: number): boolean {
-  return status === 429 || status === 503 || status === 502 || status === 504;
+  // 500: Ollama's native tool call XML parser can fail on malformed model output — retry helps
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
 /** Returns true for error messages that indicate transient failures. */
@@ -127,7 +128,7 @@ export async function streamChat(
     messages,
     stream: true,
     options: {
-      temperature: options.temperature ?? 0.3,
+      temperature: options.temperature ?? 0.2,
       top_p: options.top_p ?? 0.9,
       repeat_penalty: options.repeat_penalty ?? 1.1,
       ...(options.num_ctx ? { num_ctx: options.num_ctx } : {}),

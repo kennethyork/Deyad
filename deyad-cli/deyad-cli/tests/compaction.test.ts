@@ -52,7 +52,7 @@ describe('compactConversation', () => {
     const msgs: OllamaMessage[] = [
       { role: 'system', content: 'sys' },
     ];
-    const big = 'z'.repeat(Math.ceil(MAX_CONVERSATION_CHARS / 10));
+    const big = 'z'.repeat(Math.ceil(MAX_CONVERSATION_CHARS / 8));
     msgs.push({ role: 'user', content: big });
     msgs.push({ role: 'tool', content: 'result', tool_name: 'read_file' });
     msgs.push({ role: 'user', content: `<tool_result><name>edit_file</name><output>ok</output></tool_result>${big}` });
@@ -69,7 +69,7 @@ describe('compactConversation', () => {
   });
 
   it('exports constants with expected values', () => {
-    expect(MAX_CONVERSATION_CHARS).toBe(128_000);
-    expect(COMPACT_KEEP_RECENT).toBe(10);
+    expect(MAX_CONVERSATION_CHARS).toBe(64_000);
+    expect(COMPACT_KEEP_RECENT).toBe(6);
   });
 });

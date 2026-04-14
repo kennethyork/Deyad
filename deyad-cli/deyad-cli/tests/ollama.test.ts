@@ -282,7 +282,7 @@ describe('isRetryableStatus', () => {
     expect(isRetryableStatus(400)).toBe(false);
     expect(isRetryableStatus(401)).toBe(false);
     expect(isRetryableStatus(404)).toBe(false);
-    expect(isRetryableStatus(500)).toBe(false);
+    expect(isRetryableStatus(500)).toBe(true);
   });
 });
 

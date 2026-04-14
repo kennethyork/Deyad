@@ -29,8 +29,8 @@ describe('isRetryableStatus', () => {
   it('does not retry 404', () => {
     expect(isRetryableStatus(404)).toBe(false);
   });
-  it('does not retry 500', () => {
-    expect(isRetryableStatus(500)).toBe(false);
+  it('retries 500 (XML parse errors)', () => {
+    expect(isRetryableStatus(500)).toBe(true);
   });
 });
 
