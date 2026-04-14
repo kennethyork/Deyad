@@ -13,7 +13,6 @@ export interface Config {
   gitAutoCommit?: boolean;
   allowedTools?: string[];
   restrictedTools?: string[];
-  tokenBudget?: number;
 }
 
 const configDir = path.join(os.homedir(), '.deyad');

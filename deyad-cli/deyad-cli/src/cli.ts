@@ -250,7 +250,6 @@ export async function runOnce(
     allowedTools?: string[];
     restrictedTools?: string[];
     autoApprove?: boolean;
-    tokenBudget?: number;
   },
 ): Promise<void> {
   const spinner = new Spinner('Thinking...');
@@ -356,14 +355,13 @@ async function main(): Promise<void> {
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
   const allowedTools = globalConfig.allowedTools ?? [];
   const restrictedTools = globalConfig.restrictedTools ?? [];
-  const tokenBudget = globalConfig.tokenBudget ?? 0;
 
   const cwd = process.cwd();
 
   // --print mode: run once and exit
   const printPrompt = args.print;
   if (printPrompt !== undefined) {
-    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove: true, tokenBudget });
+    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove: true });
     process.exit(0);
   }
 
@@ -411,7 +409,7 @@ async function main(): Promise<void> {
     };
 
     autoSpinner.start(); autoSpinnerActive = true;
-    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, tokenBudget });
+    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
     if (autoSpinnerActive) { autoSpinner.stop(); autoSpinnerActive = false; }
 
     console.log('');
@@ -434,7 +432,7 @@ async function main(): Promise<void> {
 
   // One-shot prompt mode
   if (args.prompt) {
-    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove, tokenBudget });
+    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove });
     process.exit(0);
   }
 
@@ -778,7 +776,7 @@ async function main(): Promise<void> {
       replSpinner.start(); replSpinnerActive = true;
 
       try {
-        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, tokenBudget });
+        const result = await runAgentLoop(model, input, cwd, callbacks, history, undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
         history = result.history;
         totalTokens += result.stats.totalTokens;
         taskCount++;

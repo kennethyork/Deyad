@@ -41,9 +41,6 @@ const MAX_NUDGE_RETRIES = 3;
 /** Maximum characters per tool output before truncation. ~3K tokens. */
 const MAX_TOOL_OUTPUT_CHARS = 12_000;
 
-/** Default token budget per session (0 = unlimited). */
-const DEFAULT_TOKEN_BUDGET = 0;
-
 /** Escalating nudge messages to get the model to use tools. */
 const NUDGE_MESSAGES = [
   'You MUST use tools. Do not explain — act. Start with list_files or read_file.',
@@ -328,7 +325,6 @@ export async function runAgentLoop(
     maxIterations?: number;
     allowedTools?: string[];
     restrictedTools?: string[];
-    tokenBudget?: number;
   },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
@@ -343,7 +339,6 @@ export async function runAgentLoop(
   const maxIterations = options?.maxIterations ?? 50;
   const allowedTools = options?.allowedTools ?? [];
   const restrictedTools = options?.restrictedTools ?? [];
-  const tokenBudget = options?.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
 
   try {
     // Initialize MCP servers (if configured)
@@ -382,10 +377,6 @@ export async function runAgentLoop(
     while (!abortController.signal.aborted) {
       if (iteration >= maxIterations) {
         callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
-        break;
-      }
-      if (tokenBudget > 0 && stats.totalTokens >= tokenBudget) {
-        callbacks.onError(`Token budget exhausted (${stats.totalTokens}/${tokenBudget}). Stopping.`);
         break;
       }
       compactConversation(messages);
@@ -526,24 +517,14 @@ export async function runAgentLoop(
       );
       hasPerformedAction = true;
 
-      // ── Post-write: refresh file list + auto-lint ─────────────────
+      // ── Post-write: refresh context + auto-lint ─────────────────────
       if (filesChanged) {
         invalidateIndex();
-        // Only refresh the file listing (cheap) — key files were already read at start
         try {
-          const { executeTool: exec } = await import('./tools.js');
-          const listing = await exec({ name: 'list_files', params: {} }, cwd);
+          const freshContext = await buildContext(cwd);
           const second = messages[1];
           if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
-            // Replace just the file listing portion, keep the rest
-            const existingContent = second.content;
-            const filesHeader = existingContent.indexOf('Project files (');
-            const afterFiles = existingContent.indexOf('\n---', filesHeader > -1 ? filesHeader : 0);
-            if (filesHeader > -1 && afterFiles > -1) {
-              const files = listing.output.split('\n').filter(Boolean);
-              const newListing = `Project files (${files.length}):\n${listing.output}\n`;
-              messages[1] = { role: 'system', content: existingContent.slice(0, filesHeader) + newListing + existingContent.slice(afterFiles) };
-            }
+            messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
           }
         } catch { /* ignore */ }
 
