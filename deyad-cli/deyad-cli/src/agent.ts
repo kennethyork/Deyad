@@ -387,7 +387,7 @@ export async function runAgentLoop(
         callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
         break;
       }
-      compactConversation(messages);
+      compactConversation(messages, options?.contextSize);
       const nativeTools = getOllamaTools();
       // Filter tools based on allowed/restricted lists
       const filteredTools = nativeTools.filter(tool => {

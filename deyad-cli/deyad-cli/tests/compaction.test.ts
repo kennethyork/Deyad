@@ -72,4 +72,22 @@ describe('compactConversation', () => {
     expect(MAX_CONVERSATION_CHARS).toBe(64_000);
     expect(COMPACT_KEEP_RECENT).toBe(6);
   });
+
+  it('uses contextTokens to derive a tighter threshold when provided', () => {
+    // With contextTokens=2048 → threshold = 2048 * 0.75 * 4 = 6144 chars
+    const msgs: OllamaMessage[] = [
+      { role: 'system', content: 'sys' },
+    ];
+    const bigContent = 'w'.repeat(1000);
+    for (let i = 0; i < COMPACT_KEEP_RECENT + 4; i++) {
+      msgs.push({ role: 'user', content: `msg ${i} ${bigContent}` });
+    }
+    const totalBefore = msgs.length;
+    // Without contextTokens (uses 64K default), should NOT compact since total is ~10K
+    compactConversation(msgs);
+    expect(msgs.length).toBe(totalBefore);
+    // With a small contextTokens, should compact
+    compactConversation(msgs, 2048);
+    expect(msgs.length).toBeLessThan(totalBefore);
+  });
 });

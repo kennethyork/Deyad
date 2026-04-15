@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { checkOllama, listModels, streamChat, estimateTokens } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
-import { runAgentLoop } from './agent.js';
+import { runAgentLoop, compactConversation } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
 import { loadOrCreateSession, saveSession, pruneSessions, memoryList } from './session.js';
 import { createSnapshot, undoLast, getSnapshots } from './undo.js';
@@ -350,7 +350,7 @@ async function main(): Promise<void> {
   const autoApprove = args.autoApprove ?? globalConfig.autoApprove ?? false;
   const noThink = args.noThink ?? globalConfig.noThink ?? false;
   const temperature = globalConfig.temperature ?? 0.3;
-  const contextSize = globalConfig.contextSize ?? 8192;
+  const contextSize = globalConfig.contextSize ?? 32768;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
   const maxIterations = globalConfig.maxIterations ?? 30;
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
@@ -448,14 +448,11 @@ async function main(): Promise<void> {
   // Load or create session
   let session = loadOrCreateSession(cwd, model);
   if (args.resume && session.history.length > 0) {
-    // Auto-compact large sessions to keep context manageable
-    if (session.history.length > 20) {
-      const keep = session.history.slice(-10);
-      session.history = [
-        { role: 'system' as const, content: `[Earlier conversation compacted — ${session.history.length - 10} messages summarized]` },
-        ...keep,
-      ];
-      console.log(c.dim(`  Resuming session ${session.id} (compacted ${session.taskCount} tasks to ${session.history.length} messages)`));
+    // Auto-compact resumed sessions using the real compaction function
+    const before = session.history.length;
+    compactConversation(session.history, contextSize);
+    if (session.history.length < before) {
+      console.log(c.dim(`  Resuming session ${session.id} (compacted ${before}→${session.history.length} messages, ${session.taskCount} tasks)`));
     } else {
       console.log(c.dim(`  Resuming session ${session.id} (${session.taskCount} tasks, ${session.history.length} messages)`));
     }
@@ -580,10 +577,7 @@ async function main(): Promise<void> {
       }
       if (input === '/compact') {
         const before = history.length;
-        if (history.length > 10) {
-          const keep = history.slice(-10);
-          history = [{ role: 'system' as const, content: `[Earlier conversation compacted — ${before - 10} messages summarized]` }, ...keep];
-        }
+        compactConversation(history, contextSize);
         console.log(formatSuccess(`Compacted: ${before} → ${history.length} messages`));
         ask();
         return;

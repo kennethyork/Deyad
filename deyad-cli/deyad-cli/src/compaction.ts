@@ -7,22 +7,32 @@
 import { stripToolMarkup } from './tools.js';
 import type { OllamaMessage } from './ollama.js';
 
-/** Maximum conversation size (chars) before compaction kicks in. ~16k tokens at ~4 chars/token.
- *  Conservative limit leaves room for system prompt, context, and model response within 32K context. */
+/** Default maximum conversation size (chars) before compaction kicks in.
+ *  Overridden at runtime when contextSize is known — uses 75% of context window. */
 export const MAX_CONVERSATION_CHARS = 64_000;
 
 /** Number of recent messages to keep when compacting conversation history. */
 export const COMPACT_KEEP_RECENT = 6;
 
+/** Chars-per-token estimate used to derive compaction threshold from context size. */
+const CHARS_PER_TOKEN = 4;
+
 /**
- * Compact conversation history in-place when it exceeds {@link MAX_CONVERSATION_CHARS}.
+ * Compact conversation history in-place when it exceeds the size threshold.
+ *
+ * If `contextTokens` is provided the threshold is set to 75% of that context
+ * window (in chars) so compaction fires before the model chokes.  Otherwise
+ * the static {@link MAX_CONVERSATION_CHARS} fallback is used.
  *
  * Older non-system messages are replaced with a single summary system message
  * while preserving the most recent {@link COMPACT_KEEP_RECENT} messages.
  */
-export function compactConversation(messages: OllamaMessage[]): void {
+export function compactConversation(messages: OllamaMessage[], contextTokens?: number): void {
+  const maxChars = contextTokens
+    ? Math.floor(contextTokens * 0.75 * CHARS_PER_TOKEN)
+    : MAX_CONVERSATION_CHARS;
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
-  if (totalChars <= MAX_CONVERSATION_CHARS) return;
+  if (totalChars <= maxChars) return;
 
   let firstNonSystem = 0;
   while (firstNonSystem < messages.length && messages[firstNonSystem]?.role === 'system') {
