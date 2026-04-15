@@ -977,8 +977,28 @@ function checkIsMain(): boolean {
 }
 
 if (checkIsMain()) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  const MAX_RESTARTS = 3;
+  const RESTART_DELAY_MS = 2000;
+  let restarts = 0;
+
+  const run = async (): Promise<void> => {
+    try {
+      await main();
+    } catch (err) {
+      console.error(formatError(String(err)));
+      restarts++;
+      if (restarts <= MAX_RESTARTS) {
+        console.log(c.dim(`  Restarting in ${RESTART_DELAY_MS / 1000}s... (attempt ${restarts}/${MAX_RESTARTS})`));
+        await new Promise(r => setTimeout(r, RESTART_DELAY_MS));
+        return run();
+      }
+      console.error(formatError(`Failed after ${MAX_RESTARTS} restarts. Exiting.`));
+      process.exit(1);
+    }
+  };
+
+  // Reset restart counter on SIGUSR1 (manual restart signal)
+  process.on('SIGUSR1', () => { restarts = 0; });
+
+  run();
 }
