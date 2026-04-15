@@ -186,7 +186,7 @@ export function parseToolCalls(text: string): ToolCall[] {
         }
         calls.push({ name, params });
       }
-    } catch { /* ignore malformed JSON */ }
+    } catch (e) { debugLog('tool call JSON parse failed: %s', (e as Error).message); }
   }
 
   return calls;

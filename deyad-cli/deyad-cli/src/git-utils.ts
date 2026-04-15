@@ -3,6 +3,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { debugLog } from './debug.js';
 
 /** Run a git command and return trimmed stdout. */
 export function git(args: string[], cwd: string): string {
@@ -14,7 +15,8 @@ export function isGitRepo(cwd: string): boolean {
   try {
     git(['rev-parse', '--is-inside-work-tree'], cwd);
     return true;
-  } catch {
+  } catch (e) {
+    debugLog('isGitRepo check failed: %s', (e as Error).message);
     return false;
   }
 }
@@ -24,7 +26,8 @@ export function hasChanges(cwd: string): boolean {
   try {
     const status = git(['status', '--porcelain'], cwd);
     return status.length > 0;
-  } catch {
+  } catch (e) {
+    debugLog('hasChanges check failed: %s', (e as Error).message);
     return false;
   }
 }

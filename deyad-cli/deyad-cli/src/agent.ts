@@ -19,6 +19,7 @@ import {
   parseToolCallsFromTurn, dispatchTools, runAutoLint, formatToolResultMessages,
   READ_ONLY_TOOLS, isDone, stripToolMarkup, getOllamaTools,
 } from './agent-helpers.js';
+import { debugLog } from './debug.js';
 
 /** Strip <think>...</think> blocks from text so thinking never enters history. */
 function stripThinkTags(text: string): string {
@@ -375,7 +376,7 @@ export async function runAgentLoop(
           if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
             messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
           }
-        } catch { /* ignore */ }
+        } catch (e) { debugLog('context refresh failed: %s', (e as Error).message); }
 
         const lintMsg = runAutoLint(cwd, changedFiles, callbacks);
         if (lintMsg) {

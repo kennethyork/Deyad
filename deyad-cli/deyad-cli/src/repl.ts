@@ -93,7 +93,8 @@ async function runGitCommitPushImpl(state: ReplState): Promise<void> {
       execFileSync('git', ['push'], { cwd: cfg.cwd, timeout: 30000 });
       pushSpinner.stop();
       console.log(formatSuccess('Staged, committed, and pushed.'));
-    } catch {
+    } catch (e) {
+      debugLog('git push failed: %s', (e as Error).message);
       pushSpinner.stop();
       console.log(formatSuccess('Committed locally.'));
       console.log(c.dim('  Push failed — no remote configured or network error. Run git push manually.'));
@@ -125,7 +126,8 @@ async function generateCommitMessage(cfg: ReplConfig, cwd: string): Promise<stri
       undefined, undefined, undefined, false, cfg.ollamaHost,
     );
     commitMsg = (commitMsg || result.content).trim().replace(/^["'`]+|["'`]+$/g, '').split('\n')[0]!.trim();
-  } catch {
+  } catch (e) {
+    debugLog('commit message generation failed: %s', (e as Error).message);
     const lines = diffStat.split('\n');
     commitMsg = `chore: update ${lines.length > 1 ? lines.length - 1 + ' files' : lines[0]?.trim() || 'files'}`;
   }

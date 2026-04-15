@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { debugLog } from './debug.js';
 
 export interface Config {
   model?: string;
@@ -37,7 +38,8 @@ export function loadConfig(): Config {
       allowedTools: parsed.allowedTools ?? [],
       restrictedTools: parsed.restrictedTools ?? [],
     };
-  } catch {
+  } catch (e) {
+    debugLog('config load failed: %s', (e as Error).message);
     return {};
   }
 }

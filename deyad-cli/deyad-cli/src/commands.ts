@@ -14,6 +14,7 @@ import {
   formatStatus, formatHelp, formatError,
   formatSuccess,
 } from './tui.js';
+import { debugLog } from './debug.js';
 import type { ReplState } from './repl.js';
 
 /** Handle a single slash command. Returns true if handled, false if it's a user prompt. */
@@ -152,7 +153,8 @@ export async function handleSlashCommand(
           console.log(c.dim('  No changes detected.'));
         }
       }
-    } catch {
+    } catch (e) {
+      debugLog('git diff failed: %s', (e as Error).message);
       console.log(formatError('Not a git repository or git not available.'));
     }
     return true;

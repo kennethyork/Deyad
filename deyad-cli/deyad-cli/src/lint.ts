@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execSync, execFileSync } from 'node:child_process';
+import { debugLog } from './debug.js';
 
 /** Maximum characters of lint output before truncation. Override with DEYAD_MAX_LINT env. */
 const MAX_LINT_CHARS = parseInt(process.env['DEYAD_MAX_LINT'] || '5000', 10);
@@ -68,7 +69,8 @@ function commandExists(cmd: string): boolean {
   try {
     execSync(`which ${cmd}`, { encoding: 'utf-8', stdio: 'pipe' });
     return true;
-  } catch {
+  } catch (e) {
+    debugLog('which %s failed: %s', cmd, (e as Error).message);
     return false;
   }
 }

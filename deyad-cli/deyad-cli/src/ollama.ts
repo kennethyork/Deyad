@@ -140,7 +140,7 @@ export async function streamChat(
   // Disable thinking by default for reasoning models (qwen3.5, etc.)
   // This dramatically reduces latency — thinking adds 5-30s of chain-of-thought.
   if (think !== undefined) {
-    (body as any)['think'] = think;
+    body['think'] = think;
   }
 
   const resp = await (async () => {
@@ -215,8 +215,8 @@ export async function streamChat(
           usage.promptTokens = json.prompt_eval_count;
           usage.completionTokens = json.eval_count ?? 0;
         }
-      } catch {
-        // Ignore malformed lines
+      } catch (e) {
+        debugLog('ollama stream JSON parse failed: %s', (e as Error).message);
       }
     }
   }
@@ -239,8 +239,8 @@ export async function streamChat(
         usage.promptTokens = json.prompt_eval_count;
         usage.completionTokens = json.eval_count ?? 0;
       }
-    } catch {
-      // ignore remaining buffer
+    } catch (e) {
+      debugLog('ollama stream buffer parse failed: %s', (e as Error).message);
     }
   }
 

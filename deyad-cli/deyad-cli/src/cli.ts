@@ -15,6 +15,7 @@ import {
   formatConfirm, formatError, formatSuccess,
 } from './tui.js';
 import { VERSION, printUsage, generateCompletions, parseArgs } from './cli-args.js';
+import { debugLog } from './debug.js';
 
 /**
  * Streaming filter that suppresses <think>...</think> blocks from token output.
@@ -290,7 +291,7 @@ function checkIsMain(): boolean {
   try {
     const resolved = fs.realpathSync(scriptPath).replace(/\\/g, '/');
     if (import.meta.url.endsWith(resolved)) return true;
-  } catch { /* ignore */ }
+  } catch (e) { debugLog('realpath check failed: %s', (e as Error).message); }
   return false;
 }
 
