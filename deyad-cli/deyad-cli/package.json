@@ -1,6 +1,6 @@
 {
   "name": "deyad-cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "license": "Apache-2.0",
   "bin": {
     "deyad": "dist/cli.js"
@@ -54,6 +54,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ymichael/codex"
+    "url": "https://github.com/kennethhy/Deyad"
   }
 }

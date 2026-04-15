@@ -12,9 +12,7 @@ beforeEach(() => {
     gitPull: vi.fn().mockResolvedValue({ success: true }),
     gitBranchCreate: vi.fn().mockResolvedValue({ success: true }),
     gitBranchSwitch: vi.fn().mockResolvedValue({ success: true }),
-    createTerminal: vi.fn().mockResolvedValue('term-1'),
-    terminalWrite: vi.fn().mockResolvedValue(undefined),
-    terminalKill: vi.fn().mockResolvedValue(undefined),
+    gitCommitAgent: vi.fn().mockResolvedValue({ success: true }),
   } as unknown as DeyadAPI;
 });
 
@@ -89,7 +87,7 @@ describe('GitPanel', () => {
     });
   });
 
-  it('commits with message via terminal', async () => {
+  it('commits with message via safe IPC', async () => {
     render(<GitPanel appId="app1" />);
     await waitFor(() => expect(screen.getByDisplayValue('https://github.com/user/repo.git')).toBeTruthy());
     const commitInput = screen.getByPlaceholderText(/Commit message/i);
@@ -97,7 +95,7 @@ describe('GitPanel', () => {
     const commitBtn = screen.getByRole('button', { name: /Commit/i });
     fireEvent.click(commitBtn);
     await waitFor(() => {
-      expect(window.deyad.createTerminal).toHaveBeenCalledWith('app1');
+      expect(window.deyad.gitCommitAgent).toHaveBeenCalledWith('app1', 'Initial commit');
     });
   });
 
@@ -159,7 +157,7 @@ describe('GitPanel', () => {
     fireEvent.change(commitInput, { target: { value: 'fix bug' } });
     fireEvent.keyDown(commitInput, { key: 'Enter' });
     await waitFor(() => {
-      expect(window.deyad.createTerminal).toHaveBeenCalled();
+      expect(window.deyad.gitCommitAgent).toHaveBeenCalledWith('app1', 'fix bug');
     });
   });
 

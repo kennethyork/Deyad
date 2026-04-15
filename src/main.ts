@@ -232,7 +232,8 @@ const createWindow = () => {
             ...details.responseHeaders,
             'Content-Security-Policy': [
               "default-src 'self'; " +
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+              "script-src 'self' 'unsafe-inline'; " +
+              "worker-src 'self' blob:; " +
               "style-src 'self' 'unsafe-inline'; " +
               "img-src 'self' data: blob: http://localhost:* http://127.0.0.1:*; " +
               "connect-src 'self' http://localhost:* http://127.0.0.1:* ws://localhost:*; " +

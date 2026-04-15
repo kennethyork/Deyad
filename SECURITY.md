@@ -41,7 +41,7 @@ Deyad is designed with a **local-first** security model:
 - Electron context isolation and sandboxed preload bridge
 - IPC channel allowlisting — only declared channels are exposed
 - Content Security Policy enforced via `session.webRequest.onHeadersReceived`
-  - `'unsafe-eval'` is required in `script-src` for the Monaco Editor's web-worker evaluation; this is scoped to `file://` and `http://localhost` origins only
+  - Monaco Editor workers run via `blob:` URIs; the CSP uses `worker-src 'self' blob:` to allow this without `unsafe-eval`
 - No telemetry, no analytics, no cloud dependencies
 
 ### CLI Agent

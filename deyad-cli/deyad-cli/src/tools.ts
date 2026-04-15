@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { minimatch } from 'minimatch';
 import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
@@ -617,13 +617,13 @@ async function executeBuiltinTool(
         const timeoutMs = parseInt(call.params['timeout'] || '30000', 10);
         try {
           // Parse command with shell-quote; use execFileSync for simple commands
-          // to avoid shell injection, fall back to execSync for shell operators
+          // use explicit /bin/sh -c for commands with shell operators (pipes, redirects)
           let parsed: ReturnType<typeof shellParse> = [];
           let isSimple = false;
           try {
             parsed = shellParse(command);
             isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
-          } catch { /* malformed input — fall through to execSync */ }
+          } catch { /* malformed input — fall through to sh -c */ }
           const execOpts = {
             cwd,
             encoding: 'utf-8' as const,
@@ -634,7 +634,7 @@ async function executeBuiltinTool(
           };
           const output = isSimple
             ? execFileSync((parsed as string[])[0]!, (parsed as string[]).slice(1), execOpts)
-            : execSync(command, execOpts);
+            : execFileSync('/bin/sh', ['-c', command], execOpts);
           const truncated = output.length > MAX_CMD_CHARS ? output.slice(0, MAX_CMD_CHARS) + `\n... (truncated at ${MAX_CMD_CHARS} chars)` : output;
           return { tool: call.name, success: true, output: truncated || '(no output)' };
         } catch (err: unknown) {

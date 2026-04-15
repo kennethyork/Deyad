@@ -52,15 +52,15 @@ export default function GitPanel({ appId, onFilesChanged }: Props) {
     if (!commitMsg.trim()) return;
     setLoading('commit');
     try {
-      // Use the IPC directly — git add + commit
-      const termId = await window.deyad.createTerminal(appId);
-      await window.deyad.terminalWrite(termId, `git add . && git commit -m "${commitMsg.replace(/"/g, '\\"')}"\n`);
-      // Wait a moment for it to complete
-      await new Promise(r => setTimeout(r, 2000));
-      await window.deyad.terminalKill(termId);
-      setCommitMsg('');
-      showMsg('success', 'Committed');
-      refresh();
+      // Use safe IPC handler (execFileSync) — no shell injection risk
+      const res = await window.deyad.gitCommitAgent(appId, commitMsg.trim());
+      if (res.success) {
+        setCommitMsg('');
+        showMsg('success', 'Committed');
+        refresh();
+      } else {
+        showMsg('error', res.error || 'Commit failed');
+      }
     } catch (err) {
       showMsg('error', err instanceof Error ? err.message : String(err));
     }
