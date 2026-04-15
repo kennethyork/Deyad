@@ -378,3 +378,54 @@ describe('checkOllama', () => {
     expect(await checkOllama()).toBe(false);
   });
 });
+
+describe('getModelContextLength', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('returns context_length from model_info', async () => {
+    const { getModelContextLength } = await import('../src/ollama.js');
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ model_info: { 'qwen35.context_length': 262144 } }),
+    }) as unknown as typeof fetch;
+    expect(await getModelContextLength('qwen3.5:27b')).toBe(262144);
+  });
+
+  it('handles different architecture prefixes', async () => {
+    const { getModelContextLength } = await import('../src/ollama.js');
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ model_info: { 'llama.context_length': 131072 } }),
+    }) as unknown as typeof fetch;
+    expect(await getModelContextLength('llama3.1:8b')).toBe(131072);
+  });
+
+  it('returns undefined when model not found', async () => {
+    const { getModelContextLength } = await import('../src/ollama.js');
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false }) as unknown as typeof fetch;
+    expect(await getModelContextLength('nonexistent')).toBeUndefined();
+  });
+
+  it('returns undefined when model_info is missing', async () => {
+    const { getModelContextLength } = await import('../src/ollama.js');
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ details: {} }),
+    }) as unknown as typeof fetch;
+    expect(await getModelContextLength('some-model')).toBeUndefined();
+  });
+
+  it('returns undefined when fetch fails', async () => {
+    const { getModelContextLength } = await import('../src/ollama.js');
+    globalThis.fetch = vi.fn().mockRejectedValueOnce(new Error('ECONNREFUSED')) as unknown as typeof fetch;
+    expect(await getModelContextLength('model')).toBeUndefined();
+  });
+});
