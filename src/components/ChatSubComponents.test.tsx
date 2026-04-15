@@ -88,7 +88,7 @@ describe('ChatHeader', () => {
 describe('ErrorBanners', () => {
   const defaults = {
     error: null as string | null,
-    detectedErrors: [] as { type: string; message: string; source: string }[],
+    detectedErrors: [] as { type: 'runtime'; message: string; source: string; raw: string }[],
     streaming: false,
     agentMode: false,
     autoFixAttemptsRef: { current: 0 },
@@ -110,20 +110,20 @@ describe('ErrorBanners', () => {
   });
 
   it('renders detected errors with auto-fix button', () => {
-    const errors = [{ type: 'runtime', message: 'TypeError: x is not a function', source: 'console' }];
+    const errors = [{ type: 'runtime' as const, message: 'TypeError: x is not a function', source: 'console', raw: 'TypeError: x is not a function' }];
     render(<ErrorBanners {...defaults} detectedErrors={errors} />);
     expect(screen.getByText(/1 error detected/)).toBeTruthy();
     expect(screen.getByText('🔧 Auto-fix')).toBeTruthy();
   });
 
   it('hides detected errors while streaming', () => {
-    const errors = [{ type: 'runtime', message: 'err', source: 'console' }];
+    const errors = [{ type: 'runtime' as const, message: 'err', source: 'console', raw: 'err' }];
     const { container } = render(<ErrorBanners {...defaults} detectedErrors={errors} streaming />);
     expect(container.querySelector('.error-detection-banner')).toBeNull();
   });
 
   it('shows auto-fixing status in agent mode', () => {
-    const errors = [{ type: 'runtime', message: 'err', source: 'console' }];
+    const errors = [{ type: 'runtime' as const, message: 'err', source: 'console', raw: 'err' }];
     render(<ErrorBanners {...defaults} detectedErrors={errors} agentMode autoFixAttemptsRef={{ current: 1 }} />);
     expect(screen.getByText(/Auto-fixing/)).toBeTruthy();
   });
