@@ -47,7 +47,7 @@ function findBrowser(paths: string[]): string | null {
     try {
       const resolved = execFileSync('which', [p], { encoding: 'utf-8', timeout: 3000 }).trim();
       if (resolved) return resolved;
-    } catch { /* continue */ }
+    } catch (e) { debugLog('browser', 'which lookup failed for ' + p, e); }
     if (p.startsWith('/') && fs.existsSync(p)) return p;
   }
   return null;
@@ -192,7 +192,7 @@ async function startChrome(chromePath: string): Promise<void> {
       const data = await resp.json() as { webSocketDebuggerUrl: string };
       wsUrl = data.webSocketDebuggerUrl;
       if (wsUrl) break;
-    } catch { /* retry */ }
+    } catch (e) { debugLog('browser', 'CDP discovery retry', e); }
   }
 
   if (!wsUrl) {
@@ -275,7 +275,7 @@ async function startFirefox(firefoxPath: string): Promise<void> {
   // Subscribe to console log events
   try {
     await send('session.subscribe', { events: ['log.entryAdded'] });
-  } catch { /* non-fatal */ }
+  } catch (e) { debugLog('browser', 'BiDi subscribe failed', e); }
 }
 
 // ── Evaluate Helper ───────────────────────────────────────────────────────────
@@ -402,11 +402,11 @@ export async function browserGetConsole(): Promise<string> {
 
 export function closeBrowser(): void {
   if (ws) {
-    try { ws.close(); } catch { /* ignore */ }
+    try { ws.close(); } catch (e) { debugLog('browser', 'ws.close failed', e); }
     ws = null;
   }
   if (browserProcess) {
-    try { browserProcess.kill('SIGTERM'); } catch { /* ignore */ }
+    try { browserProcess.kill('SIGTERM'); } catch (e) { debugLog('browser', 'process.kill failed', e); }
     browserProcess = null;
   }
   consoleLogs.length = 0;
@@ -438,7 +438,7 @@ export async function executeBrowserAction(
         const url = params['url'];
         if (!url) return { success: false, output: 'Missing "url" param for navigate action.' };
         // Basic URL validation
-        try { new URL(url); } catch { return { success: false, output: 'Invalid URL.' }; }
+        try { new URL(url); } catch (e) { debugLog('browser', 'invalid URL', e); return { success: false, output: 'Invalid URL.' }; }
         return { success: true, output: await browserNavigate(url) };
       }
       case 'screenshot':

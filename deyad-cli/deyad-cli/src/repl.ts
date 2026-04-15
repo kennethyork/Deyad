@@ -66,7 +66,7 @@ function buildCompleter(cwd: string): (line: string) => [string[], string] {
           return stat.isDirectory() ? full + '/' : full;
         });
         return [completions, lastWord];
-      } catch { /* ignore */ }
+      } catch (e) { debugLog('repl', 'tab completion failed', e); }
     }
     return [[], line];
   };

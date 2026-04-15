@@ -175,9 +175,9 @@ class MCPConnection {
   }
 
   close(): void {
-    try { this.rl.close(); } catch { /* ignore */ }
-    try { this.process.stdin!.end(); } catch { /* ignore */ }
-    try { this.process.kill('SIGTERM'); } catch { /* ignore */ }
+    try { this.rl.close(); } catch (e) { debugLog('mcp', 'rl.close failed', e); }
+    try { this.process.stdin!.end(); } catch (e) { debugLog('mcp', 'stdin.end failed', e); }
+    try { this.process.kill('SIGTERM'); } catch (e) { debugLog('mcp', 'process.kill failed', e); }
     this.pending.clear();
   }
 }

@@ -101,7 +101,7 @@ export async function executeBuiltinTool(
         } catch (err) {
           // Clean up any temp files on failure
           for (const { tmpPath } of staged) {
-            try { fs.unlinkSync(tmpPath); } catch { /* already gone */ }
+            try { fs.unlinkSync(tmpPath); } catch (e) { debugLog('tool-handlers', 'tmp cleanup failed', e); }
           }
           return { tool: call.name, success: false, output: `Atomic write failed: ${String(err)}` };
         }
@@ -177,7 +177,7 @@ export async function executeBuiltinTool(
         const MAX_RESULTS = 100;
         let regex: RegExp | null = null;
         if (isRegex) {
-          try { regex = new RegExp(query, 'gi'); } catch { return { tool: call.name, success: false, output: `Invalid regex: ${query}` }; }
+          try { regex = new RegExp(query, 'gi'); } catch (e) { debugLog('tool-handlers', 'invalid regex', e); return { tool: call.name, success: false, output: `Invalid regex: ${query}` }; }
         }
         for (const file of allFiles) {
           if (results.length >= MAX_RESULTS) break;
@@ -347,7 +347,8 @@ export async function executeBuiltinTool(
         let parsed: URL;
         try {
           parsed = new URL(url);
-        } catch {
+        } catch (e) {
+          debugLog('tool-handlers', 'invalid URL', e);
           return { tool: call.name, success: false, output: 'Invalid URL.' };
         }
         // SSRF protection: block private/internal IPs and non-HTTP schemes

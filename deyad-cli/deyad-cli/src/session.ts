@@ -68,10 +68,10 @@ function acquireLock(filePath: string): boolean {
             continue;
           }
         }
-      } catch { /* ignore stat errors */ }
+      } catch (e) { debugLog('session', 'lock stat failed', e); }
 
       // Wait 50ms before retrying (spinhalt avoids busy-wait via Atomics on shared buffer)
-      try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); } catch { const s = Date.now(); while (Date.now() - s < 50) { /* fallback */ } }
+      try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50); } catch (e) { debugLog('session', 'Atomics.wait fallback', e); const s = Date.now(); while (Date.now() - s < 50) { /* fallback */ } }
     }
   }
   return false;
@@ -86,7 +86,7 @@ function releaseLock(filePath: string): void {
     const pidFile = path.join(lockPath, 'pid');
     if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
     fs.rmdirSync(lockPath);
-  } catch { /* lock already released */ }
+  } catch (e) { debugLog('session', 'releaseLock failed', e); }
 }
 
 /**
@@ -161,13 +161,13 @@ export function saveSession(session: SessionData): void {
   try {
     // Create backup of existing file before overwriting
     if (fs.existsSync(filePath)) {
-      try { fs.copyFileSync(filePath, backupPath); } catch { /* best effort */ }
+      try { fs.copyFileSync(filePath, backupPath); } catch (e) { debugLog('session', 'backup copy failed', e); }
     }
     fs.writeFileSync(tmpPath, JSON.stringify(session, null, 2), 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
     // Clean up temp file on failure
-    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(tmpPath); } catch (e) { debugLog('session', 'tmp cleanup failed', e); }
     throw err;
   } finally {
     releaseLock(filePath);
@@ -231,7 +231,7 @@ export function pruneSessions(): number {
     try {
       fs.unlinkSync(path.join(SESSIONS_DIR, file));
       pruned++;
-    } catch { /* ignore */ }
+    } catch (e) { debugLog('session', 'prune unlink failed', e); }
   }
   return pruned;
 }
@@ -314,7 +314,7 @@ export function memoryWrite(key: string, value: string): void {
     fs.writeFileSync(tmpPath, JSON.stringify(entry, null, 2), 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(tmpPath); } catch (e) { debugLog('session', 'memory tmp cleanup failed', e); }
     throw err;
   } finally {
     releaseLock(filePath);

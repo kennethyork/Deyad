@@ -4,6 +4,7 @@
  */
 
 import { git, isGitRepo, getCurrentBranch } from './git-utils.js';
+import { debugLog } from './debug.js';
 
 export interface SandboxState {
   active: boolean;
@@ -91,7 +92,7 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
         git(['add', '-A'], cwd);
         git(['commit', '-m', 'deyad: sandbox final changes'], cwd);
       }
-    } catch { /* nothing to commit */ }
+    } catch (e) { debugLog('sandbox', 'final commit failed', e); }
 
     // Get diff summary
     const diff = git(['diff', `${savedSandbox.startRef}..HEAD`, '--stat'], cwd);
@@ -108,10 +109,10 @@ export function exitSandbox(cwd: string, merge: boolean): { success: boolean; me
         let conflictInfo = '';
         try {
           conflictInfo = git(['diff', '--name-only', '--diff-filter=U'], cwd);
-        } catch { /* ignore */ }
+        } catch (e) { debugLog('sandbox', 'conflict list failed', e); }
 
         // Abort the merge so we don't leave the repo in a broken state
-        try { git(['merge', '--abort'], cwd); } catch { /* ignore */ }
+        try { git(['merge', '--abort'], cwd); } catch (e) { debugLog('sandbox', 'merge --abort failed', e); }
 
         const conflictFiles = conflictInfo ? conflictInfo.split('\n').filter(Boolean) : [];
         const conflictMsg = conflictFiles.length > 0
