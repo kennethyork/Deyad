@@ -11,7 +11,8 @@ let _pty: { spawn: (...args: any[]) => any } | null = null;
 try {
    
   _pty = require('node-pty');
-} catch {
+} catch (e) {
+  console.debug('node-pty load failed:', e);
   _pty = null;
 }
 

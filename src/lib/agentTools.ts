@@ -270,7 +270,8 @@ async function executeToolRaw(
           if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|localhost|::1|\[::1\]|metadata\.google|169\.254\.)/i.test(host)) {
             return { tool: call.name, success: false, output: 'Blocked: private/internal addresses are not allowed.' };
           }
-        } catch {
+        } catch (e) {
+          console.debug('invalid URL:', e);
           return { tool: call.name, success: false, output: 'Invalid URL format.' };
         }
         try {
@@ -402,7 +403,7 @@ function auditLog(appId: string, tool: string, params: Record<string, string>, r
       outputLen: result.output.length,
     };
     console.info('[deyad:audit]', JSON.stringify(entry));
-  } catch { /* best-effort */ }
+  } catch (e) { console.debug('audit log failed:', e); }
 }
 
 /** Execute a tool call with audit logging. */

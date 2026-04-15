@@ -108,7 +108,7 @@ try {
   ipcMain.handle('update:install', () => {
     autoUpdater.quitAndInstall();
   });
-} catch { /* electron-updater not available in dev */ }
+} catch (e) { console.debug('auto-updater not available:', e); }
 
 if (started) { app.quit(); }
 

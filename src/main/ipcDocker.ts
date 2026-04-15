@@ -31,18 +31,18 @@ function killProcessOnPort(port: number): void {
       const out = execSync(`netstat -ano | findstr :${port} | findstr LISTENING`, { encoding: 'utf-8', timeout: 3000 });
       const pids = new Set(out.split(/\r?\n/).map(l => l.trim().split(/\s+/).pop()).filter(Boolean));
       for (const pid of pids) {
-        try { execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 }); } catch { /* already dead */ }
+        try { execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 }); } catch (e) { console.debug('taskkill failed:', e); }
       }
-    } catch { /* no listeners */ }
+    } catch (e) { console.debug('win netstat scan failed:', e); }
   } else {
     try {
       const out = execSync(`lsof -ti :${port}`, { encoding: 'utf-8', timeout: 3000 }).trim();
       if (out) {
         for (const pid of out.split(/\s+/)) {
-          try { process.kill(Number(pid), 'SIGKILL'); } catch { /* already dead */ }
+          try { process.kill(Number(pid), 'SIGKILL'); } catch (e) { console.debug('kill pid failed:', e); }
         }
       }
-    } catch { /* no listeners */ }
+    } catch (e) { console.debug('lsof port scan failed:', e); }
   }
 }
 
@@ -182,7 +182,7 @@ export function registerDockerHandlers(appDir: (id: string) => string): void {
       try {
         const meta = JSON.parse(fs.readFileSync(path.join(dir, 'deyad.json'), 'utf-8'));
         if (meta.guiPort) guiPort = meta.guiPort;
-      } catch { /* use default */ }
+      } catch (e) { console.debug('read guiPort failed:', e); }
 
       killStudio(appId);
       killProcessOnPort(guiPort);

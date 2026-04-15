@@ -561,7 +561,7 @@ export function registerAppHandlers(
             fs.mkdirSync(destPath, { recursive: true });
             copyDir(srcPath, destPath);
           } else if (entry.isFile()) {
-            try { fs.copyFileSync(srcPath, destPath); } catch { /* skip unreadable files */ }
+            try { fs.copyFileSync(srcPath, destPath); } catch (e) { console.debug('copy file failed:', e); }
           }
         }
       };
@@ -593,7 +593,7 @@ export function registerAppHandlers(
     const metaPath = path.join(srcDir, 'deyad.json');
     let srcMeta: Record<string, unknown> = {};
     if (fs.existsSync(metaPath)) {
-      try { srcMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch { /* ignore */ }
+      try { srcMeta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch (e) { console.debug('read meta failed:', e); }
     }
     const srcName = (srcMeta.name as string) || appId;
     const newName = `${srcName} (Copy)`;
@@ -631,8 +631,8 @@ export function registerAppHandlers(
     let pattern: RegExp;
     try {
       pattern = new RegExp(query, 'gi');
-    } catch {
-      // Fallback to literal match if invalid regex
+    } catch (e) {
+      console.debug('invalid regex, falling back to literal:', e);
       pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     }
 
@@ -654,7 +654,7 @@ export function registerAppHandlers(
               }
               pattern.lastIndex = 0;
             }
-          } catch { /* skip binary files */ }
+          } catch (e) { console.debug('skip binary file:', e); }
         }
       }
     };

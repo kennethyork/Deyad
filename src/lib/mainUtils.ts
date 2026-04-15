@@ -18,7 +18,8 @@ export function acquireLock(filePath: string): boolean {
       fs.mkdirSync(lockPath);
       fs.writeFileSync(path.join(lockPath, 'pid'), String(process.pid), 'utf-8');
       return true;
-    } catch {
+    } catch (e) {
+      console.debug('lock acquire retry:', e);
       // Lock exists — check if stale
       try {
         const pidFile = path.join(lockPath, 'pid');
@@ -29,7 +30,7 @@ export function acquireLock(filePath: string): boolean {
             continue;
           }
         }
-      } catch { /* ignore stat errors */ }
+      } catch (e) { console.debug('lock stat failed:', e); }
       // Brief spin-wait
       const start = Date.now();
       while (Date.now() - start < 50) { /* spin */ }
@@ -47,7 +48,7 @@ export function releaseLock(filePath: string): void {
     const pidFile = path.join(lockPath, 'pid');
     if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
     fs.rmdirSync(lockPath);
-  } catch { /* already released */ }
+  } catch (e) { console.debug('releaseLock failed:', e); }
 }
 
 /**
@@ -61,7 +62,7 @@ export function atomicWriteFileSync(filePath: string, content: string): void {
     fs.writeFileSync(tmpPath, content, 'utf-8');
     fs.renameSync(tmpPath, filePath);
   } catch (err) {
-    try { fs.unlinkSync(tmpPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(tmpPath); } catch (e) { console.debug('tmp cleanup failed:', e); }
     throw err;
   } finally {
     if (locked) releaseLock(filePath);
