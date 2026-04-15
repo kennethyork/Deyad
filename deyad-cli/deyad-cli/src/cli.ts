@@ -4,7 +4,7 @@ import 'dotenv/config';
 import * as readline from 'node:readline';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { checkOllama, listModels, streamChat, estimateTokens } from './ollama.js';
+import { checkOllama, listModels, streamChat, estimateTokens, getModelContextLength } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop, compactConversation } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
@@ -350,8 +350,14 @@ async function main(): Promise<void> {
   const autoApprove = args.autoApprove ?? globalConfig.autoApprove ?? false;
   const noThink = args.noThink ?? globalConfig.noThink ?? false;
   const temperature = globalConfig.temperature ?? 0.3;
-  const contextSize = globalConfig.contextSize ?? 32768;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
+
+  // Auto-detect context size from model metadata if not explicitly configured
+  let contextSize = globalConfig.contextSize;
+  if (contextSize === undefined) {
+    const detected = await getModelContextLength(model, ollamaHost);
+    contextSize = detected ?? 32768;
+  }
   const maxIterations = globalConfig.maxIterations ?? 30;
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
   const allowedTools = globalConfig.allowedTools ?? [];
@@ -467,6 +473,7 @@ async function main(): Promise<void> {
   }
 
   printBanner(VERSION, model, cwd, isSandboxed());
+  console.log(c.dim(`  Context: ${(contextSize / 1024).toFixed(0)}K tokens${globalConfig.contextSize ? '' : ' (auto-detected)'}`));
 
   // ── Tab completion ──
   const REPL_COMMANDS = [

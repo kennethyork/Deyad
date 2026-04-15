@@ -294,3 +294,32 @@ export async function checkOllama(baseUrl?: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Query the model's native context window size from Ollama's /api/show endpoint.
+ * Returns the context length in tokens, or `undefined` if it can't be determined.
+ */
+export async function getModelContextLength(model: string, baseUrl?: string): Promise<number | undefined> {
+  const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+  try {
+    const resp = await fetch(`${ollamaHost}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: model }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return undefined;
+    const data = await resp.json() as { model_info?: Record<string, unknown> };
+    const info = data.model_info;
+    if (!info) return undefined;
+    // Key format: "<arch>.context_length", e.g. "llama.context_length", "qwen35.context_length"
+    for (const [key, value] of Object.entries(info)) {
+      if (key.endsWith('.context_length') && typeof value === 'number' && value > 0) {
+        return value;
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
