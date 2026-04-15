@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import type { OllamaTool } from './ollama.js';
 import { isMCPTool, executeMCPTool, getMCPOllamaTools, getMCPToolsDescription } from './mcp.js';
 import { executeBuiltinTool } from './tool-handlers.js';
+import { debugLog } from './debug.js';
 
 // Re-export utilities so existing consumers are not broken
 export { walkDir, globFiles, fuzzyFindBlock, simpleDiff } from './tool-utils.js';
@@ -221,7 +222,7 @@ function auditLog(tool: string, params: Record<string, string>, result: ToolResu
       outputLen: result.output.length,
     };
     fs.appendFileSync(path.join(dir, 'audit.log'), JSON.stringify(entry) + '\n');
-  } catch { /* best-effort */ }
+  } catch (e) { debugLog('audit log write failed: %s', (e as Error).message); }
 }
 
 export async function executeTool(

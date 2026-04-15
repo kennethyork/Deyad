@@ -8,6 +8,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { debugLog } from './debug.js';
 import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
 import { executeBrowserAction } from './browser.js';
@@ -186,7 +187,7 @@ export async function executeBuiltinTool(
                 results.push(`${file}:${i + 1}: ${line.slice(0, 200)}`);
               }
             }
-          } catch { /* skip unreadable files */ }
+          } catch (e) { debugLog('skip unreadable file %s: %s', file, (e as Error).message); }
         }
         return { tool: call.name, success: true, output: results.length > 0 ? results.join('\n') : '(no matches)' };
       }
@@ -204,7 +205,7 @@ export async function executeBuiltinTool(
           try {
             parsed = shellParse(command);
             isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
-          } catch { /* malformed input — fall through to sh -c */ }
+          } catch (e) { debugLog('shell-parse fallback: %s', (e as Error).message); }
           const execOpts = {
             cwd,
             encoding: 'utf-8' as const,

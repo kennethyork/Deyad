@@ -3,11 +3,13 @@
  * Tool utilities — file walking, globbing, fuzzy matching, diff generation.
  *
  * Extracted from tools.ts for modularity.
+ * @see {@link ./debug.ts} for DEYAD_DEBUG conditional logging.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { minimatch } from 'minimatch';
+import { debugLog } from './debug.js';
 
 // ── Fuzzy edit matching ───────────────────────────────────────────────────────
 
@@ -140,7 +142,8 @@ function parseGitignore(dir: string): string[] {
       .split('\n')
       .map((line) => line.trim())
       .filter((line) => line && !line.startsWith('#'));
-  } catch {
+  } catch (e) {
+    debugLog('gitignore parse failed %s: %s', gitignorePath, (e as Error).message);
     return [];
   }
 }
@@ -161,7 +164,7 @@ export function walkDir(dir: string, root: string, results: string[] = [], gitig
     gitignorePatterns = parseGitignore(root);
   }
   let entries: fs.Dirent[];
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return results; }
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { debugLog('readdir failed %s: %s', dir, (e as Error).message); return results; }
   for (const entry of entries) {
     if (DEFAULT_IGNORE_DIRS.has(entry.name)) continue;
     if (entry.name.startsWith('.') && entry.name !== '.env' && entry.name !== '.gitignore') continue;
