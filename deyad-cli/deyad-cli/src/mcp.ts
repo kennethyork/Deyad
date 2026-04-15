@@ -22,6 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import type { OllamaTool } from './ollama.js';
+import { debugLog } from './debug.js';
 
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
@@ -98,7 +99,7 @@ class MCPConnection {
           this.pending.delete(msg.id);
           req.resolve(msg);
         }
-      } catch { /* ignore non-JSON lines */ }
+      } catch (e) { debugLog('MCP non-JSON line from %s: %s', this.serverName, (e as Error).message); }
     });
 
     this.process.on('error', (err) => {

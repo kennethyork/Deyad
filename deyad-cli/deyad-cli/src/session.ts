@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { homedir } from 'node:os';
 import type { OllamaMessage } from './ollama.js';
+import { debugLog } from './debug.js';
 
 const SESSIONS_DIR = path.join(homedir(), '.deyad', 'sessions');
 const MEMORY_DIR = path.join(homedir(), '.deyad', 'memory');
@@ -54,7 +55,8 @@ function acquireLock(filePath: string): boolean {
       // Write PID so stale locks can be detected
       fs.writeFileSync(path.join(lockPath, 'pid'), String(process.pid), 'utf-8');
       return true;
-    } catch {
+    } catch (e) {
+      debugLog('lock contention on %s: %s', path.basename(filePath), (e as Error).message);
       // Lock exists — check if stale
       try {
         const pidFile = path.join(lockPath, 'pid');
@@ -103,7 +105,8 @@ export function recoverSession(filePath: string): SessionData | null {
       console.error('[session] recovered from backup:', path.basename(filePath));
     }
     return data;
-  } catch {
+  } catch (e) {
+    debugLog('session recovery failed for %s: %s', path.basename(filePath), (e as Error).message);
     return null;
   }
 }
@@ -293,7 +296,7 @@ export function memoryWrite(key: string, value: string): void {
       const prev: MemoryEntry = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
       existingCreatedAt = prev.createdAt;
     }
-  } catch { /* ignore */ }
+  } catch (e) { debugLog('memoryWrite read-prev failed for %s: %s', key, (e as Error).message); }
   
   const entry: MemoryEntry = {
     key,
