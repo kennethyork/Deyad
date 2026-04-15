@@ -418,6 +418,13 @@ async function main(): Promise<void> {
     console.log('');
 
     const autoRl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    autoRl.on('close', () => {
+      // EOF during sandbox prompt — discard by default
+      const result = exitSandbox(cwd, false);
+      if (result.diff) console.log(c.dim(result.diff));
+      console.log(result.success ? formatSuccess(result.message) : formatError(result.message));
+      process.exit(0);
+    });
     autoRl.question(formatConfirm('Merge changes into your branch?'), (answer) => {
       const merge = answer.trim().toLowerCase().startsWith('y');
       const result = exitSandbox(cwd, merge);
@@ -506,6 +513,20 @@ async function main(): Promise<void> {
   let history: OllamaMessage[] = args.resume ? session.history : [];
   let totalTokens = args.resume ? session.totalTokens : 0;
   let taskCount = args.resume ? session.taskCount : 0;
+
+  // Handle EOF (Ctrl+D / piped stdin closing) gracefully
+  rl.on('close', () => {
+    session.history = history;
+    session.totalTokens = totalTokens;
+    session.taskCount = taskCount;
+    session.model = model;
+    saveSession(session);
+    console.log('');
+    console.log(c.dim(`  Session saved: ${session.id}`));
+    console.log(c.dim('  Goodbye!'));
+    console.log('');
+    process.exit(0);
+  });
 
   const ask = (): void => {
     rl.question(getPrompt(isSandboxed()), async (line) => {
