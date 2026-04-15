@@ -12,6 +12,7 @@ import type { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { debugLog } from './debug.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -139,7 +140,8 @@ async function ensureBrowser(): Promise<void> {
     try {
       await startFirefox(firefoxPath);
       return;
-    } catch {
+    } catch (e) {
+      debugLog('Firefox launch failed: %s', (e as Error).message);
       closeBrowser();
     }
   }
@@ -150,7 +152,8 @@ async function ensureBrowser(): Promise<void> {
     try {
       await startChrome(chromePath);
       return;
-    } catch {
+    } catch (e) {
+      debugLog('Chrome launch failed: %s', (e as Error).message);
       closeBrowser();
     }
   }
@@ -241,7 +244,8 @@ async function startFirefox(firefoxPath: string): Promise<void> {
       await connectWebSocket(`ws://127.0.0.1:${port}/session`);
       connected = true;
       break;
-    } catch {
+    } catch (e) {
+      debugLog('BiDi connect attempt %d failed: %s', i + 1, (e as Error).message);
       ws = null;
       await new Promise(r => setTimeout(r, 500));
     }

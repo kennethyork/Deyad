@@ -16,6 +16,13 @@ import { walkDir, globFiles, fuzzyFindBlock, simpleDiff } from './tool-utils.js'
 import type { ToolCall, ToolResult, ToolCallbacks } from './tools.js';
 import { MAX_READ_BYTES, MAX_CMD_CHARS } from './tools.js';
 
+/** Check if hostname is in the RFC 1918 172.16.0.0/12 range. */
+function isPrivate172(host: string): boolean {
+  if (!host.startsWith('172.')) return false;
+  const second = parseInt(host.split('.')[1]!, 10);
+  return second >= 16 && second <= 31;
+}
+
 /**
  * Execute a built-in tool by name. Used to populate the tool registry.
  */
@@ -354,7 +361,7 @@ export async function executeBuiltinTool(
           host === '[::1]' ||
           host.startsWith('10.') ||
           host.startsWith('192.168.') ||
-          host.startsWith('172.') ||
+          isPrivate172(host) ||
           host.startsWith('169.254.') ||
           host.endsWith('.local') ||
           host === '0.0.0.0'

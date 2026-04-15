@@ -2,6 +2,7 @@
  * Ollama API client — streaming chat completions + multimodal support.
  * No external dependencies, uses native fetch.
  */
+import { debugLog } from './debug.js';
 
 // ── Retry configuration ──────────────────────────────────────────────────────
 /** Maximum retries for transient errors (timeouts, 429, 503). */
@@ -290,7 +291,8 @@ export async function checkOllama(baseUrl?: string): Promise<boolean> {
     const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
     const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3000) });
     return resp.ok;
-  } catch {
+  } catch (e) {
+    debugLog('checkOllama failed: %s', (e as Error).message);
     return false;
   }
 }
@@ -319,7 +321,8 @@ export async function getModelContextLength(model: string, baseUrl?: string): Pr
       }
     }
     return undefined;
-  } catch {
+  } catch (e) {
+    debugLog('getModelContextLength failed for %s: %s', model, (e as Error).message);
     return undefined;
   }
 }
