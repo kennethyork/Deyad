@@ -39,6 +39,6 @@ cd camerascii
 ## Other examples
 Besides **camerascii**, you can experiment with:
 
-- **build‑codex‑demo**: recreate the original 2021 Codex YouTube demo.
+- **build‑codex‑demo**: recreate the original 2021 OpenAI Codex YouTube demo (folder name kept for compatibility).
 - **impossible‑pong**: where Deyad creates more difficult levels.
 - **prompt‑analyzer**: make a data science app for clustering [prompts](https://github.com/f/awesome-chatgpt-prompts).

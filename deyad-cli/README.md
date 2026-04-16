@@ -67,7 +67,7 @@ Deyad lets you choose how much autonomy the agent receives via the `--approval-m
 | ------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
 | **Suggest** (default)     | Read any file in the repo                       | **All** file writes/patches, **all** shell commands             |
 | **Auto Edit**             | Read **and** write files                        | **All** shell commands                                          |
-| **Full Auto**             | Read/write files, execute shell commands         | -                                                               |
+| **Full Auto**             | Read/write files, execute shell commands        | -                                                               |
 
 In **Full Auto** every command is run **network-disabled** and confined to the current working directory for defense-in-depth. Deyad will warn if you start in auto-edit or full-auto while the directory is not tracked by Git.
 
