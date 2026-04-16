@@ -4,7 +4,8 @@ import 'dotenv/config';
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { checkOllama, listModels, getModelContextLength, warmModel } from './ollama.js';
+import { checkOllama, listModels, getModelContextLength, warmModel, streamChat } from './ollama.js';
+import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
 import { loadConfig, getConfigPath } from './config.js';
@@ -215,12 +216,42 @@ async function main(): Promise<void> {
   const temperature = globalConfig.temperature ?? 0.3;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
 
-  // Kick off model loading immediately (fire-and-forget).
-  // If the model is already loaded this is a no-op; otherwise Ollama starts
-  // loading weights into RAM/VRAM while we finish CLI init.
-  warmModel(model, ollamaHost);
+  // Use all CPU cores for inference threads
+  const numThread = globalConfig.numThread ?? os.cpus().length;
+  const numGpu = globalConfig.numGpu; // let Ollama auto-decide GPU layers unless explicitly set
 
-  // Auto-detect context size from model metadata (parallel with nothing — fast path)
+  const cwd = process.cwd();
+
+  // --print mode: fast path — call streamChat directly, skip agent loop overhead
+  // (no MCP init, no RAG indexing, no buildContext, no tool setup, no context size detection)
+  const printPrompt = args.print;
+  if (printPrompt !== undefined) {
+    const messages: OllamaMessage[] = [
+      { role: 'system', content: 'You are a helpful assistant. Be concise.' },
+      { role: 'user', content: printPrompt },
+    ];
+    try {
+      await streamChat(
+        model,
+        messages,
+        (t) => process.stdout.write(t),
+        { temperature, num_thread: numThread, ...(numGpu !== undefined ? { num_gpu: numGpu } : {}) },
+        undefined, // no abort signal
+        undefined, // no thinking token handler
+        undefined, // no tools
+        false,     // always disable thinking for --print (speed)
+        ollamaHost,
+      );
+      console.log('');
+    } catch (err) {
+      console.error(formatError(`Ollama error: ${err instanceof Error ? err.message : String(err)}`));
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // ── Non-print modes: full agent setup ──
+  // Auto-detect context size from model metadata
   let contextSize = globalConfig.contextSize;
   if (contextSize === undefined) {
     contextSize = await getModelContextLength(model, ollamaHost) ?? 32768;
@@ -230,18 +261,9 @@ async function main(): Promise<void> {
   const allowedTools = globalConfig.allowedTools ?? [];
   const restrictedTools = globalConfig.restrictedTools ?? [];
 
-  // Use all CPU cores for inference threads
-  const numThread = globalConfig.numThread ?? os.cpus().length;
-  const numGpu = globalConfig.numGpu; // let Ollama auto-decide GPU layers unless explicitly set
-
-  const cwd = process.cwd();
-
-  // --print mode: run once and exit
-  const printPrompt = args.print;
-  if (printPrompt !== undefined) {
-    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove: true, numThread, numGpu });
-    process.exit(0);
-  }
+  // Pre-warm model for non-print modes (fire-and-forget).
+  // Overlaps with remaining CLI init + agent startup.
+  warmModel(model, ollamaHost);
 
   // --auto mode: enter sandbox, run task, prompt to merge or discard
   if (args.auto && args.prompt) {
