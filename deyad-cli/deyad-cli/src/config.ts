@@ -32,7 +32,7 @@ export function loadConfig(): Config {
       noThink: parsed.noThink ?? false,
       maxIterations: parsed.maxIterations ?? 30,
       temperature: parsed.temperature ?? 0.3,
-      contextSize: parsed.contextSize ?? 8192,
+      contextSize: parsed.contextSize, // undefined unless set in config, so cli.ts will auto-detect
       ollamaHost: parsed.ollamaHost ?? 'http://127.0.0.1:11434',
       gitAutoCommit: parsed.gitAutoCommit ?? true,
       allowedTools: parsed.allowedTools ?? [],
