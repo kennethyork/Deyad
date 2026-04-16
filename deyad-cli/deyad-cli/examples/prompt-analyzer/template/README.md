@@ -1,8 +1,8 @@
 # Prompt‑Clustering Utility
 
 This repository contains a small utility (`cluster_prompts.py`) that embeds a
-list of prompts with the OpenAI Embedding API, discovers natural groupings with
-unsupervised clustering, lets ChatGPT name & describe each cluster and finally
+list of prompts with the Ollama Embedding API, discovers natural groupings with
+unsupervised clustering, lets an LLM name & describe each cluster and finally
 produces a concise Markdown report plus a couple of diagnostic plots.
 
 The default input file (`prompts.csv`) ships with the repo so you can try the
@@ -15,13 +15,13 @@ script immediately, but you can of course point it at your own file.
 1. Install the Python dependencies (preferably inside a virtual env):
 
 ```bash
-pip install pandas numpy scikit-learn matplotlib openai
+pip install pandas numpy scikit-learn matplotlib ollama
 ```
 
-2. Export your OpenAI API key (**required**):
+2. Make sure Ollama is running locally with an embedding model pulled:
 
 ```bash
-export OPENAI_API_KEY="sk‑..."
+ollama pull nomic-embed-text
 ```
 
 ---
@@ -35,9 +35,9 @@ python cluster_prompts.py
 
 This will
 
-* create embeddings with the `text-embedding-3-small` model, 
-* pick a suitable number *k* via silhouette score (K‑Means),
-* ask `gpt‑4o‑mini` to label & describe each cluster,
+* create embeddings with the `nomic-embed-text` model, 
+* pick a suitable number *k* via silhouette score (K‑Means),
+* ask `qwen3.5` to label & describe each cluster,
 * store the results in `analysis.md`,
 * and save two plots to `plots/` (`cluster_sizes.png` and `tsne.png`).
 
@@ -54,8 +54,8 @@ The script prints a short success message once done.
 | `--cluster-method` | `kmeans` | `kmeans` (with automatic *k*) or `dbscan` |
 | `--k-max` | `10` | upper bound for *k* when `kmeans` is selected |
 | `--dbscan-min-samples` | `3` | min samples parameter for DBSCAN |
-| `--embedding-model` | `text-embedding-3-small` | any OpenAI embedding model |
-| `--chat-model` | `gpt-4o-mini` | chat model used to generate cluster names / descriptions |
+| `--embedding-model` | `nomic-embed-text` | any Ollama embedding model |
+| `--chat-model` | `qwen3.5` | chat model used to generate cluster names / descriptions |
 | `--output-md` | `analysis.md` | where to write the Markdown report |
 | `--plots-dir` | `plots` | directory for generated PNGs |
 
@@ -66,8 +66,8 @@ python cluster_prompts.py \
   --csv my_prompts.csv \
   --cache .cache/embeddings.json \
   --cluster-method dbscan \
-  --embedding-model text-embedding-3-large \
-  --chat-model gpt-4o \
+  --embedding-model mxbai-embed-large \
+  --chat-model qwen3.5 \
   --output-md my_analysis.md \
   --plots-dir my_plots
 ```
@@ -96,7 +96,7 @@ Quick bar‑chart visualisation of how many prompts ended up in each cluster.
 
 * **Rate‑limits / quota errors** – lower the number of prompts per run or switch
   to a larger quota account.
-* **Authentication errors** – make sure `OPENAI_API_KEY` is exported in the
+* **Authentication errors** – make sure Ollama is running (`ollama serve`) in the
   shell where you run the script.
 * **Inadequate clusters** – try the other clustering method, adjust `--k-max`
   or tune DBSCAN parameters (`eps` range is inferred, `min_samples` exposed via
