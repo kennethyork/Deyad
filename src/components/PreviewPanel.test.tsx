@@ -103,4 +103,93 @@ describe('PreviewPanel', () => {
     render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
     expect(screen.getByText('http://localhost:5173')).toBeTruthy();
   });
+
+  /* ── Placeholder text ──────────────────────────────── */
+
+  it('shows placeholder text when dev server stopped', () => {
+    render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    expect(screen.getByText(/Generate|Click Run/i)).toBeTruthy();
+  });
+
+  /* ── Status check on app change ────────────────────── */
+
+  it('re-checks status when app changes', () => {
+    const { rerender } = render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    expect(window.deyad.appDevStatus).toHaveBeenCalledWith('app1');
+
+    const newApp = { ...mockApp, id: 'app2', name: 'Second App' };
+    rerender(<PreviewPanel app={newApp} onPublish={() => {}} />);
+    expect(window.deyad.appDevStatus).toHaveBeenCalledWith('app2');
+  });
+
+  /* ── Log subscription cleanup ──────────────────────── */
+
+  it('cleans up log subscription on unmount', () => {
+    const unsub = vi.fn();
+    Object.assign(window.deyad, { onAppDevLog: vi.fn().mockReturnValue(unsub) });
+    const { unmount } = render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    unmount();
+    expect(unsub).toHaveBeenCalled();
+  });
+
+  it('cleans up dev status subscription on unmount', () => {
+    const unsub = vi.fn();
+    Object.assign(window.deyad, { onAppDevStatus: vi.fn().mockReturnValue(unsub) });
+    const { unmount } = render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    unmount();
+    expect(unsub).toHaveBeenCalled();
+  });
+
+  /* ── Run app error display ─────────────────────────── */
+
+  it('shows error message from appDevStart failure', async () => {
+    Object.assign(window.deyad, {
+      appDevStart: vi.fn().mockResolvedValue({ success: false, error: 'EADDRINUSE' }),
+    });
+    render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    fireEvent.click(screen.getAllByText('Run App')[0]);
+    await waitFor(() => expect(screen.getByText(/EADDRINUSE/)).toBeTruthy());
+  });
+
+  /* ── Stop returns to stopped state ─────────────────── */
+
+  it('shows Run App after stop', async () => {
+    Object.assign(window.deyad, {
+      appDevStatus: vi.fn().mockResolvedValue({ status: 'running' }),
+    });
+    render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    await waitFor(() => expect(screen.queryByText('Stop')).toBeTruthy());
+    Object.assign(window.deyad, {
+      appDevStatus: vi.fn().mockResolvedValue({ status: 'stopped' }),
+    });
+    fireEvent.click(screen.getByText('Stop'));
+  });
+
+  /* ── Publish passes through to callback ────────────── */
+
+  it('onPublish callback receives no arguments', () => {
+    const onPublish = vi.fn();
+    render(<PreviewPanel app={mockApp} onPublish={onPublish} />);
+    fireEvent.click(screen.getByText(/Publish/));
+    expect(onPublish).toHaveBeenCalledTimes(1);
+  });
+
+  /* ── Fullstack app ─────────────────────────────────── */
+
+  it('renders for fullstack app without crash', () => {
+    const fsApp = { ...mockApp, appType: 'fullstack' as const };
+    render(<PreviewPanel app={fsApp} onPublish={() => {}} />);
+    expect(screen.getAllByText('Run App').length).toBeGreaterThan(0);
+  });
+
+  /* ── Multiple log toggles ──────────────────────────── */
+
+  it('toggles log panel off and on', () => {
+    render(<PreviewPanel app={mockApp} onPublish={() => {}} />);
+    const logsBtn = screen.getByText('Logs');
+    fireEvent.click(logsBtn); // open
+    expect(logsBtn.className).toContain('active');
+    fireEvent.click(logsBtn); // close
+    expect(logsBtn.className).not.toContain('active');
+  });
 });

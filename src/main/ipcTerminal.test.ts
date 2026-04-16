@@ -5,8 +5,8 @@ vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
 }));
 
-vi.mock('uuid', () => ({
-  v4: vi.fn(() => 'mock-term-id'),
+vi.mock('node:crypto', () => ({
+  randomUUID: vi.fn(() => 'mock-term-id'),
 }));
 
 const mockTerm = {

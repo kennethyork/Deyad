@@ -139,8 +139,12 @@ function AppInner() {
   }, []);
 
   const loadApps = async () => {
-    const list = await window.deyad.listApps();
-    dispatch({ type: 'SET_APPS', apps: list });
+    try {
+      const list = await window.deyad.listApps();
+      dispatch({ type: 'SET_APPS', apps: list });
+    } catch (err) {
+      console.error('Failed to load apps:', err);
+    }
   };
 
   const selectApp = useCallback(async (app: AppProject) => {

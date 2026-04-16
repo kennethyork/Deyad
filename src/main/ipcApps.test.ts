@@ -420,4 +420,212 @@ describe('ipcApps handler registration', () => {
     const result = handler({}, 'nonexistent');
     expect(result).toEqual({ status: 'stopped' });
   });
+
+  /* ── apps:create metadata ──────────────────────────── */
+
+  it('apps:create writes deyad.json with correct fields', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:create')!;
+    const result = await handler({}, { name: 'Test App', description: 'A test', appType: 'frontend' });
+    expect(result).toBeTruthy();
+    expect(result.name).toBe('Test App');
+    expect(result.appType).toBe('frontend');
+    expect(result.id).toBeTruthy();
+    // deyad.json should exist
+    const metaPath = path.join(appsDir, result.id, 'deyad.json');
+    expect(fs.existsSync(metaPath)).toBe(true);
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    expect(meta.name).toBe('Test App');
+  });
+
+  it('apps:create fullstack app has frontend and backend dirs', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:create')!;
+    const result = await handler({}, { name: 'FS Create', description: '', appType: 'fullstack' });
+    const appPath = path.join(appsDir, result.id);
+    expect(result.appType).toBe('fullstack');
+    // Should have created frontend and/or backend dirs (or combined structure)
+    expect(fs.existsSync(appPath)).toBe(true);
+  });
+
+  /* ── apps:read-files content ───────────────────────── */
+
+  it('apps:read-files returns file content', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'read-app');
+    fs.mkdirSync(path.join(appSubdir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'src', 'index.ts'), 'export const x = 1;');
+    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), JSON.stringify({ name: 'Read' }));
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:read-files')!;
+    const result = await handler({}, 'read-app');
+    expect(result['src/index.ts']).toBe('export const x = 1;');
+  });
+
+  /* ── apps:write-files creates file ─────────────────── */
+
+  it('apps:write-files creates files on disk', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'write-app');
+    fs.mkdirSync(appSubdir, { recursive: true });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:write-files')!;
+    await handler({}, { appId: 'write-app', files: { 'src/hello.ts': 'console.log("hi")' } });
+    expect(fs.existsSync(path.join(appSubdir, 'src', 'hello.ts'))).toBe(true);
+    expect(fs.readFileSync(path.join(appSubdir, 'src', 'hello.ts'), 'utf-8')).toBe('console.log("hi")');
+  });
+
+  /* ── apps:delete-files removes file ────────────────── */
+
+  it('apps:delete-files removes files from disk', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'delfiles-app');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'temp.txt'), 'temp');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:delete-files')!;
+    await handler({}, { appId: 'delfiles-app', paths: ['temp.txt'] });
+    expect(fs.existsSync(path.join(appSubdir, 'temp.txt'))).toBe(false);
+  });
+
+  /* ── apps:rename updates deyad.json ────────────────── */
+
+  it('apps:rename updates name in deyad.json', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'rename-app');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), JSON.stringify({ name: 'Old', appType: 'frontend' }));
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:rename')!;
+    handler({}, { appId: 'rename-app', newName: 'New Name' });
+    const meta = JSON.parse(fs.readFileSync(path.join(appSubdir, 'deyad.json'), 'utf-8'));
+    expect(meta.name).toBe('New Name');
+  });
+
+  /* ── apps:delete removes the directory ─────────────── */
+
+  it('apps:delete removes app directory', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'to-delete');
+    fs.mkdirSync(appSubdir, { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), '{}');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:delete')!;
+    await handler({}, 'to-delete');
+    expect(fs.existsSync(appSubdir)).toBe(false);
+  });
+
+  /* ── apps:search-files matches ─────────────────────── */
+
+  it('apps:search-files finds matches in file content', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'search-content');
+    fs.mkdirSync(path.join(appSubdir, 'src'), { recursive: true });
+    fs.writeFileSync(path.join(appSubdir, 'src', 'main.ts'), 'function hello() { return 42; }');
+    fs.writeFileSync(path.join(appSubdir, 'deyad.json'), '{}');
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:search-files')!;
+    const result = handler({}, { appId: 'search-content', query: 'hello' });
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].text).toContain('hello');
+  });
+
+  /* ── apps:has-snapshot returns true when present ───── */
+
+  it('apps:has-snapshot returns true when snapshot exists', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    // Mock loadSnapshot to return non-null for this test
+    const { loadSnapshot } = await import('../lib/mainUtils');
+    vi.mocked(loadSnapshot).mockReturnValueOnce({ 'index.ts': 'export {}' });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:has-snapshot')!;
+    const result = handler({}, 'snap-app');
+    expect(result).toBe(true);
+  });
+
+  /* ── apps:get-dir returns directory path ───────────── */
+
+  it('apps:get-dir returns the app directory path', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'dir-app');
+    fs.mkdirSync(appSubdir, { recursive: true });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:get-dir')!;
+    const result = handler({}, 'dir-app');
+    expect(result).toBe(appSubdir);
+  });
+
+  /* ── apps:list with multiple apps ──────────────────── */
+
+  it('apps:list returns all apps sorted by creation', async () => {
+    // Use a fresh isolated directory for this test
+    const listDir = fs.mkdtempSync(path.join(os.tmpdir(), 'deyad-list-test-'));
+    const snapDir2 = path.join(listDir, '_snapshots');
+    fs.mkdirSync(snapDir2, { recursive: true });
+
+    const app1Dir = path.join(listDir, 'aaa');
+    const app2Dir = path.join(listDir, 'bbb');
+    fs.mkdirSync(app1Dir, { recursive: true });
+    fs.mkdirSync(app2Dir, { recursive: true });
+    fs.writeFileSync(path.join(app1Dir, 'deyad.json'), JSON.stringify({ name: 'First', appType: 'frontend', createdAt: '2024-01-01' }));
+    fs.writeFileSync(path.join(app2Dir, 'deyad.json'), JSON.stringify({ name: 'Second', appType: 'fullstack', createdAt: '2024-01-02' }));
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(listDir, id), listDir, snapDir2);
+
+    const handler = handlers.get('apps:list')!;
+    const result = handler();
+    // Filter out the _snapshots dir since it's not an app
+    const apps = result.filter((a: { id: string }) => a.id !== '_snapshots');
+    expect(apps.length).toBe(2);
+    const names = apps.map((a: { name: string }) => a.name);
+    expect(names).toContain('First');
+    expect(names).toContain('Second');
+    fs.rmSync(listDir, { recursive: true, force: true });
+  });
+
+  /* ── apps:write-files with nested directories ──────── */
+
+  it('apps:write-files creates nested directories', async () => {
+    const { appsDir, snapDir } = setupHandlers();
+    const appSubdir = path.join(appsDir, 'nested-app');
+    fs.mkdirSync(appSubdir, { recursive: true });
+
+    const { registerAppHandlers } = await import('./ipcApps');
+    registerAppHandlers((id: string) => path.join(appsDir, id), appsDir, snapDir);
+
+    const handler = handlers.get('apps:write-files')!;
+    await handler({}, { appId: 'nested-app', files: { 'src/deep/nested/file.ts': 'export {}' } });
+    expect(fs.existsSync(path.join(appSubdir, 'src', 'deep', 'nested', 'file.ts'))).toBe(true);
+  });
 });

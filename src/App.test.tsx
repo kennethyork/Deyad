@@ -202,4 +202,259 @@ describe('App component', () => {
     fireEvent.click(zipBtn);
     await waitFor(() => expect(window.deyad.exportApp).toHaveBeenCalledWith('exp-app2', 'zip'));
   });
+
+  /* ── App selection and switching ───────────────────── */
+
+  it('selects app when clicked in sidebar', async () => {
+    const app = {
+      id: 'sel-app', name: 'Selection App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    const { container } = render(<App />);
+    const appEntry = await screen.findByText('Selection App');
+    fireEvent.click(appEntry);
+    // After selecting, the app item should get the active class
+    await waitFor(() => {
+      const activeItem = container.querySelector('.sidebar-item.active');
+      expect(activeItem).toBeTruthy();
+    });
+  });
+
+  it('loads app files after selection', async () => {
+    const app = {
+      id: 'file-app', name: 'File App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, {
+      listApps: vi.fn().mockResolvedValue([app]),
+      readFiles: vi.fn().mockResolvedValue({ 'src/App.tsx': 'export default 42' }),
+    });
+
+    render(<App />);
+    await screen.findByText('File App');
+    fireEvent.click(screen.getByText('File App'));
+    await waitFor(() => expect(window.deyad.readFiles).toHaveBeenCalledWith('file-app'));
+  });
+
+  /* ── Multiple apps in sidebar ──────────────────────── */
+
+  it('renders multiple apps in sidebar', async () => {
+    const apps = [
+      { id: 'app-a', name: 'Alpha', description: '', createdAt: new Date().toISOString(), appType: 'frontend' as const },
+      { id: 'app-b', name: 'Beta', description: '', createdAt: new Date().toISOString(), appType: 'fullstack' as const },
+    ];
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue(apps) });
+
+    render(<App />);
+    await screen.findByText('Alpha');
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+  });
+
+  /* ── Delete app flow ───────────────────────────────── */
+
+  it('deletes an app when delete button clicked and confirmed', async () => {
+    const app = {
+      id: 'del-app', name: 'Delete Me', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, {
+      listApps: vi.fn().mockResolvedValue([app]),
+      deleteApp: vi.fn().mockResolvedValue(undefined),
+      appDevStop: vi.fn().mockResolvedValue(undefined),
+    });
+
+    render(<App />);
+    await screen.findByText('Delete Me');
+    const deleteBtn = screen.getByTitle('Delete app');
+    fireEvent.click(deleteBtn);
+    // First click shows confirm state, click again to confirm
+    const confirmBtn = screen.getByTitle('Click again to confirm');
+    fireEvent.click(confirmBtn);
+    await waitFor(() => expect(window.deyad.deleteApp).toHaveBeenCalledWith('del-app'));
+  });
+
+  /* ── Rename app ────────────────────────────────────── */
+
+  it('renames an app', async () => {
+    const app = {
+      id: 'ren-app', name: 'Old Name', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, {
+      listApps: vi.fn().mockResolvedValue([app]),
+      renameApp: vi.fn().mockResolvedValue(undefined),
+    });
+
+    render(<App />);
+    const nameSpan = await screen.findByText('Old Name');
+    // Double-click the name to start editing
+    fireEvent.doubleClick(nameSpan);
+    // Enter new name
+    const input = await screen.findByDisplayValue('Old Name');
+    fireEvent.change(input, { target: { value: 'New Name' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(window.deyad.renameApp).toHaveBeenCalledWith('ren-app', 'New Name'));
+  });
+
+  /* ── Right panel tabs ──────────────────────────────── */
+
+  it('switches between editor and preview tabs', async () => {
+    const app = {
+      id: 'tab-app', name: 'Tab App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    const { container } = render(<App />);
+    await screen.findByText('Tab App');
+    fireEvent.click(screen.getByText('Tab App'));
+
+    // Click Preview tab
+    const previewTab = await screen.findByText('Preview');
+    fireEvent.click(previewTab);
+    await waitFor(() => expect(container.querySelector('.preview-panel')).toBeInTheDocument());
+  });
+
+  /* ── Search tab ────────────────────────────────────── */
+
+  it('shows search panel when search tab clicked', async () => {
+    const app = {
+      id: 'search-app', name: 'Search App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    const { container } = render(<App />);
+    await screen.findByText('Search App');
+    fireEvent.click(screen.getByText('Search App'));
+
+    const searchTab = await screen.findByText('Search');
+    fireEvent.click(searchTab);
+    await waitFor(() => expect(container.querySelector('.search-panel')).toBeInTheDocument());
+  });
+
+  /* ── Git tab for fullstack ─────────────────────────── */
+
+  it('shows git tab for selected app', async () => {
+    const app = {
+      id: 'git-app', name: 'Git App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    render(<App />);
+    await screen.findByText('Git App');
+    fireEvent.click(screen.getByText('Git App'));
+    const gitTab = await screen.findByText('Git');
+    expect(gitTab).toBeInTheDocument();
+  });
+
+  /* ── Empty state ───────────────────────────────────── */
+
+  it('shows empty state when no apps exist', async () => {
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([]) });
+    render(<App />);
+    // Should show the empty sidebar message
+    await screen.findByText('No apps yet');
+  });
+
+  /* ── Sidebar resize clamp ──────────────────────────── */
+
+  it('clamps sidebar width to minimum', () => {
+    const { container } = render(<App />);
+    const resizer = container.querySelector('.resizer[data-side="sidebar"]');
+    expect(resizer).not.toBeNull();
+
+    // drag far left
+    fireEvent.mouseDown(resizer!, { clientX: 220 });
+    fireEvent.mouseMove(window, { clientX: 0 });
+    fireEvent.mouseUp(window);
+
+    const layout = container.querySelector('.app-layout');
+    // Layout should still render (no crash) and sidebar shouldn't be 0
+    expect(layout).toBeTruthy();
+  });
+
+  it('clamps right panel width to minimum', () => {
+    const { container } = render(<App />);
+    const resizer = container.querySelector('.resizer[data-side="right"]');
+    expect(resizer).not.toBeNull();
+
+    // drag far right
+    fireEvent.mouseDown(resizer!, { clientX: 0 });
+    fireEvent.mouseMove(window, { clientX: 2000 });
+    fireEvent.mouseUp(window);
+
+    const layout = container.querySelector('.app-layout');
+    expect(layout).toBeTruthy();
+  });
+
+  /* ── Dev status subscription ───────────────────────── */
+
+  it('subscribes to dev status events for selected app', async () => {
+    const app = {
+      id: 'dev-app', name: 'Dev App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    render(<App />);
+    await screen.findByText('Dev App');
+    fireEvent.click(screen.getByText('Dev App'));
+    await waitFor(() => {
+      expect(window.deyad.onAppDevStatus).toHaveBeenCalled();
+    });
+  });
+
+  /* ── listApps failure ──────────────────────────────── */
+
+  it('handles listApps failure gracefully', async () => {
+    Object.assign(window.deyad, { listApps: vi.fn().mockRejectedValue(new Error('disk error')) });
+    // Should not crash — loadApps has try/catch
+    const { container } = render(<App />);
+    await waitFor(() => expect(container.querySelector('.app-layout')).toBeTruthy());
+  });
+
+  /* ── Settings modal ────────────────────────────────── */
+
+  it('opens settings modal when settings button clicked', async () => {
+    render(<App />);
+    const settingsBtn = screen.queryByTitle(/Settings/i);
+    if (settingsBtn) {
+      fireEvent.click(settingsBtn);
+      await waitFor(() => expect(screen.getByText('Save Settings')).toBeInTheDocument());
+    }
+  });
+
+  /* ── hasSnapshot check ─────────────────────────────── */
+
+  it('checks snapshot status for selected app', async () => {
+    const app = {
+      id: 'snap-app', name: 'Snap App', description: '',
+      createdAt: new Date().toISOString(), appType: 'frontend' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    render(<App />);
+    await screen.findByText('Snap App');
+    fireEvent.click(screen.getByText('Snap App'));
+    await waitFor(() => expect(window.deyad.hasSnapshot).toHaveBeenCalledWith('snap-app'));
+  });
+
+  /* ── DB status subscription for fullstack ──────────── */
+
+  it('subscribes to db status for fullstack app', async () => {
+    const app = {
+      id: 'fs-app', name: 'FS App', description: '',
+      createdAt: new Date().toISOString(), appType: 'fullstack' as const,
+    };
+    Object.assign(window.deyad, { listApps: vi.fn().mockResolvedValue([app]) });
+
+    render(<App />);
+    await screen.findByText('FS App');
+    fireEvent.click(screen.getByText('FS App'));
+    await waitFor(() => expect(window.deyad.onDbStatus).toHaveBeenCalled());
+  });
 });

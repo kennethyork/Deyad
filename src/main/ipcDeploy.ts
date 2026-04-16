@@ -101,6 +101,11 @@ export function registerDeployHandlers(appDir: (id: string) => string): void {
         sendLog(stdout);
       }
 
+      if (!url) {
+        sendLog(`\nUnsupported provider: ${provider}\n`);
+        return { success: false, error: `Unsupported provider: ${provider}` };
+      }
+
       sendLog(`\nDeployed! ${url}\n`);
       return { success: true, url };
     } catch (err: unknown) {
@@ -181,6 +186,11 @@ CMD ["node", "backend/src/index.js"]
         const { stdout } = await execFileAsync('fly', ['deploy'], { cwd: dir, timeout: 300_000 });
         sendLog(stdout);
         url = `https://${appName}.fly.dev`;
+      }
+
+      if (!url) {
+        sendLog(`\nUnsupported provider: ${provider}\n`);
+        return { success: false, error: `Unsupported provider: ${provider}` };
       }
 
       sendLog(`\nDeployed! ${url}\n`);

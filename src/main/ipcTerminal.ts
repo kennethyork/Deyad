@@ -3,7 +3,7 @@
  */
 
 import { BrowserWindow, ipcMain } from 'electron';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 // Load node-pty at module level so vi.mock('node-pty') can intercept it in tests.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +41,7 @@ export function registerTerminalHandlers(appDir: (id: string) => string): void {
     } catch (spawnErr) {
       throw new Error(`Failed to spawn terminal: ${spawnErr instanceof Error ? spawnErr.message : String(spawnErr)}`);
     }
-    const id = uuidv4();
+    const id = randomUUID();
     terminals.set(id, term);
 
     term.onData((data: string) => {

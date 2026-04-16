@@ -73,8 +73,12 @@ export default function DeployModal({ appId, appName, appType, onClose }: Props)
 
   const checkCLIs = async () => {
     setChecking(true);
-    const checks = await window.deyad.deployCheck();
-    setAvailable(checks);
+    try {
+      const checks = await window.deyad.deployCheck();
+      setAvailable(checks);
+    } catch (err) {
+      console.debug('Deploy check failed:', err);
+    }
     setChecking(false);
   };
 

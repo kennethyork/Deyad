@@ -454,4 +454,77 @@ describe('useChatSession', () => {
       expect(mockLoop).toHaveBeenCalled();
     });
   });
+
+  /* ── Mode switching ────────────────────────────────── */
+
+  it('mode defaults to chat', async () => {
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.selectedModel).toBe('llama3'));
+    expect(result.current.mode).toBe('chat');
+  });
+
+  it('setMode switches between chat, agent, and planning', async () => {
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.selectedModel).toBe('llama3'));
+
+    act(() => result.current.setMode('agent'));
+    expect(result.current.mode).toBe('agent');
+
+    act(() => result.current.setMode('planning'));
+    expect(result.current.mode).toBe('planning');
+
+    act(() => result.current.setMode('chat'));
+    expect(result.current.mode).toBe('chat');
+  });
+
+  /* ── Input management ──────────────────────────────── */
+
+  it('setInput updates the input value', async () => {
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.selectedModel).toBe('llama3'));
+
+    act(() => result.current.setInput('hello world'));
+    expect(result.current.input).toBe('hello world');
+  });
+
+  /* ── Error dismissal ───────────────────────────────── */
+
+  it('dismissError clears the error state', async () => {
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.selectedModel).toBe('llama3'));
+    expect(result.current.error).toBeNull();
+    // handleDismissErrors should not crash when no error
+    act(() => result.current.handleDismissErrors());
+    expect(result.current.error).toBeNull();
+  });
+
+  /* ── Message persistence ───────────────────────────── */
+
+  it('loads saved messages on mount', async () => {
+    const saved: UiMessage[] = [
+      { role: 'user', content: 'saved question', id: 'saved1' },
+      { role: 'assistant', content: 'saved answer', id: 'saved2' },
+    ];
+    window.deyad = {
+      ...makeDeyadMock(),
+      loadMessages: vi.fn().mockResolvedValue(saved),
+    } as unknown as DeyadAPI;
+
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.messages.length).toBe(2));
+    expect(result.current.messages[0].content).toBe('saved question');
+  });
+
+  /* ── Empty send rejected ───────────────────────────── */
+
+  it('handleSend with empty input does nothing', async () => {
+    const { result } = renderHook(() => useChatSession(defaultProps()));
+    await waitFor(() => expect(result.current.selectedModel).toBe('llama3'));
+
+    act(() => result.current.setInput(''));
+    act(() => result.current.handleSend());
+
+    // No message should be added
+    expect(result.current.messages.length).toBe(0);
+  });
 });

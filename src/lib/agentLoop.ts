@@ -404,7 +404,12 @@ export function runAgentLoop(options: AgentOptions): () => void {
           if (aborted) break;
           callbacks.onToolStart(call.name, call.params);
 
-          const result = await executeTool(call, appId);
+          let result: ToolResult;
+          try {
+            result = await executeTool(call, appId);
+          } catch (err) {
+            result = { tool: call.name, success: false, output: `Error: ${err instanceof Error ? err.message : String(err)}` };
+          }
           results.push(result);
           callbacks.onToolResult(result);
 

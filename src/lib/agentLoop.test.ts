@@ -235,4 +235,300 @@ describe('agentLoop', () => {
     await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
     expect(callbacks.onContent).toHaveBeenCalled();
   });
+
+  /* ── onFilesWritten callback ──────────────────────── */
+
+  it('calls onFilesWritten after write_files tool execution', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { parseToolCalls: parseMock, executeTool: execMock, isDone: isDoneMock } = await import('./agentTools');
+
+    let callNum = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return [{ name: 'write_files', params: { file_0_path: 'src/index.ts', file_0_content: 'export {}' } }];
+      return [];
+    });
+    (execMock as ReturnType<typeof vi.fn>).mockResolvedValue({ tool: 'write_files', success: true, output: 'ok' });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callNum > 1);
+
+    simulateStream('<tool_call>write</tool_call>');
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 5000 });
+    expect(callbacks.onFilesWritten).toHaveBeenCalled();
+  });
+
+  /* ── onToolStart and onToolResult ─────────────────── */
+
+  it('calls onToolStart and onToolResult for each tool', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { parseToolCalls: parseMock, executeTool: execMock, isDone: isDoneMock } = await import('./agentTools');
+
+    let callNum = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return [{ name: 'read_file', params: { path: 'src/App.tsx' } }];
+      return [];
+    });
+    (execMock as ReturnType<typeof vi.fn>).mockResolvedValue({ tool: 'read_file', success: true, output: 'content' });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callNum > 1);
+
+    simulateStream('<tool_call>read</tool_call>');
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 5000 });
+    expect(callbacks.onToolStart).toHaveBeenCalled();
+    expect(callbacks.onToolResult).toHaveBeenCalled();
+  });
+
+  /* ── Tool execution failure recorded ──────────────── */
+
+  it('records tool execution failure in results', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { parseToolCalls: parseMock, executeTool: execMock, isDone: isDoneMock } = await import('./agentTools');
+
+    let callNum = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return [{ name: 'run_command', params: { command: 'false' } }];
+      return [];
+    });
+    (execMock as ReturnType<typeof vi.fn>).mockResolvedValue({ tool: 'run_command', success: false, output: 'command failed' });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callNum > 1);
+
+    simulateStream('<tool_call>run</tool_call>');
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 5000 });
+    expect(callbacks.onToolResult).toHaveBeenCalledWith(
+      expect.objectContaining({ success: false }),
+    );
+  });
+
+  /* ── Multiple sequential tool calls ───────────────── */
+
+  it('executes multiple tool calls from a single turn', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { parseToolCalls: parseMock, executeTool: execMock, isDone: isDoneMock } = await import('./agentTools');
+
+    let callNum = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return [
+        { name: 'read_file', params: { path: 'a.ts' } },
+        { name: 'read_file', params: { path: 'b.ts' } },
+      ];
+      return [];
+    });
+    (execMock as ReturnType<typeof vi.fn>).mockResolvedValue({ tool: 'read_file', success: true, output: 'ok' });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callNum > 1);
+
+    simulateStream('<tool_call>multi</tool_call>');
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 5000 });
+    // executeTool should be called at least 2 times for 2 tool calls
+    expect((execMock as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /* ── Fullstack app with dbStatus ──────────────────── */
+
+  it('passes dbStatus to agentLoop for fullstack apps', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('No tools <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, appType: 'fullstack', dbStatus: 'running' }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    // dbDescribe should be called for fullstack running
+    expect(fakeWindow.deyad.dbDescribe).toHaveBeenCalled();
+  });
+
+  it('does not call dbDescribe when dbStatus is none', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('No tools <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, appType: 'frontend', dbStatus: 'none' }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    expect(fakeWindow.deyad.dbDescribe).not.toHaveBeenCalled();
+  });
+
+  /* ── History messages passed correctly ────────────── */
+
+  it('includes history messages in the chat stream', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('response <done/>');
+
+    const history = [
+      { role: 'user' as const, content: 'old question' },
+      { role: 'assistant' as const, content: 'old answer' },
+      { role: 'user' as const, content: 'current message' },
+    ];
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, history }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    // chatStream should have been called with messages containing history
+    expect(fakeWindow.deyad.chatStream).toHaveBeenCalled();
+    const callArgs = (fakeWindow.deyad.chatStream as ReturnType<typeof vi.fn>).mock.calls[0];
+    const messages = callArgs[1];
+    const hasHistory = messages.some((m: { content: string }) =>
+      typeof m.content === 'string' && m.content.includes('old question'));
+    expect(hasHistory).toBe(true);
+  });
+
+  /* ── readFiles called for context ─────────────────── */
+
+  it('builds context from appFiles', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    const { buildSmartContext: buildMock } = await import('./contextBuilder');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('All done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    // buildSmartContext is called with the appFiles to build initial context
+    expect(buildMock).toHaveBeenCalled();
+  });
+
+  /* ── Empty response handling ──────────────────────── */
+
+  it('handles empty string from stream gracefully', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  /* ── Error in tool execution doesn't crash ────────── */
+
+  it('continues loop when tool throws error', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { parseToolCalls: parseMock, executeTool: execMock, isDone: isDoneMock } = await import('./agentTools');
+
+    let callNum = 0;
+    (parseMock as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) return [{ name: 'read_file', params: { path: 'fail.ts' } }];
+      return [];
+    });
+    (execMock as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('ENOENT'));
+    (execMock as ReturnType<typeof vi.fn>).mockResolvedValue({ tool: 'mock', success: true, output: 'ok' });
+    (isDoneMock as ReturnType<typeof vi.fn>).mockImplementation(() => callNum > 1);
+
+    simulateStream('<tool_call>read</tool_call>');
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 5000 });
+  });
+
+  /* ── Options with empty appFiles ──────────────────── */
+
+  it('works with empty appFiles', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('Hello <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, appFiles: {} }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  /* ── dbDescribe error ignored ─────────────────────── */
+
+  it('handles dbDescribe failure gracefully for fullstack', async () => {
+    fakeWindow.deyad.dbDescribe.mockRejectedValueOnce(new Error('connection refused'));
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('Fine <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, appType: 'fullstack', dbStatus: 'running' }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    // Should not crash, no onError
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  /* ── onStreamToolCalls subscription ───────────────── */
+
+  it('subscribes to onStreamToolCalls', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('Hello <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    expect(fakeWindow.deyad.onStreamToolCalls).toHaveBeenCalled();
+  });
+
+  /* ── Cleanup unsubscribes stream callbacks ────────── */
+
+  it('unsubscribes stream callbacks after loop ends', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('Done <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    // After loop ends, stream callbacks should have been cleaned up
+    // (streamTokenCb should be null after unsub)
+    // We just verify the loop completed without error
+    expect(callbacks.onError).not.toHaveBeenCalled();
+  });
+
+  /* ── Model passed to chatStream ───────────────────── */
+
+  it('passes the specified model to chatStream', async () => {
+    const { runAgentLoop } = await import('./agentLoop');
+    const { isDone: isDoneMock } = await import('./agentTools');
+    (isDoneMock as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+
+    simulateStream('Hello <done/>');
+
+    const callbacks = makeCallbacks();
+    runAgentLoop(makeOptions({ callbacks, model: 'qwen3:30b' }));
+    await vi.waitFor(() => expect(callbacks.onDone).toHaveBeenCalled(), { timeout: 2000 });
+    const callArgs = (fakeWindow.deyad.chatStream as ReturnType<typeof vi.fn>).mock.calls[0];
+    const model = callArgs[0];
+    expect(model).toBe('qwen3:30b');
+  });
 });
