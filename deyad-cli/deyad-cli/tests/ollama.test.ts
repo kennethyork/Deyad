@@ -2,7 +2,7 @@
  * Tests for ollama module — token estimation, calibration, stream parsing.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { estimateTokens, DEFAULT_CHARS_PER_TOKEN } from '../src/ollama.js';
+import { estimateTokens, DEFAULT_CHARS_PER_TOKEN, resetHealthCache } from '../src/ollama.js';
 
 describe('estimateTokens', () => {
   it('estimates tokens using default ratio', () => {
@@ -27,6 +27,7 @@ describe('streamChat', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch;
+    resetHealthCache();
   });
 
   afterEach(() => {

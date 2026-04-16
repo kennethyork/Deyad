@@ -183,13 +183,15 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const ok = await checkOllama();
+  const [ok, models] = await Promise.all([
+    checkOllama(),
+    listModels(),
+  ]);
   if (!ok) {
     console.error(formatError('Cannot connect to Ollama. Is it running? (ollama serve)'));
     process.exit(1);
   }
 
-  const models = await listModels();
   if (models.length === 0) {
     console.error(formatError('No Ollama models found. Pull one first: ollama pull llama3.2'));
     process.exit(1);
@@ -210,11 +212,10 @@ async function main(): Promise<void> {
   const temperature = globalConfig.temperature ?? 0.3;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
 
-  // Auto-detect context size from model metadata if not explicitly configured
+  // Auto-detect context size from model metadata (parallel with nothing — fast path)
   let contextSize = globalConfig.contextSize;
   if (contextSize === undefined) {
-    const detected = await getModelContextLength(model, ollamaHost);
-    contextSize = detected ?? 32768;
+    contextSize = await getModelContextLength(model, ollamaHost) ?? 32768;
   }
   const maxIterations = globalConfig.maxIterations ?? 30;
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;

@@ -83,6 +83,12 @@ let calibratedRatio = DEFAULT_CHARS_PER_TOKEN;
 let calibrationSamples = 0;
 const MAX_CALIBRATION_SAMPLES = 20; // running average window
 
+/** Skip redundant health checks after first successful connection. */
+let ollamaHealthVerified = false;
+
+/** Reset health-check cache (used by tests). */
+export function resetHealthCache(): void { ollamaHealthVerified = false; }
+
 export function estimateTokens(chars: number): number {
   return Math.round(chars / calibratedRatio);
 }
@@ -112,16 +118,19 @@ export async function streamChat(
 ): Promise<StreamChatResult> {
   const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
 
-  // Health check: verify Ollama is reachable before starting the stream
-  try {
-    const ping = await fetch(`${ollamaHost}/api/tags`, { signal: signal ?? AbortSignal.timeout(5000) });
-    if (!ping.ok) throw new Error(`Ollama returned ${ping.status}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Cannot reach Ollama at ${ollamaHost} — ${msg}.\n` +
-      `Make sure Ollama is running: ollama serve`
-    );
+  // Health check: only on first call, then trust the connection
+  if (!ollamaHealthVerified) {
+    try {
+      const ping = await fetch(`${ollamaHost}/api/tags`, { signal: signal ?? AbortSignal.timeout(5000) });
+      if (!ping.ok) throw new Error(`Ollama returned ${ping.status}`);
+      ollamaHealthVerified = true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Cannot reach Ollama at ${ollamaHost} — ${msg}.\n` +
+        `Make sure Ollama is running: ollama serve`
+      );
+    }
   }
 
   const body: Record<string, unknown> = {

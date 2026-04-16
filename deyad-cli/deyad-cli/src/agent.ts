@@ -141,13 +141,14 @@ async function buildContext(cwd: string): Promise<string> {
     'CMakeLists.txt', 'Makefile',
     '.env', 'DEYAD.md',
   ];
-  for (const f of keyFiles) {
-    if (files.includes(f)) {
-      const result = await exec({ name: 'read_file', params: { path: f } }, cwd);
-      if (result.success) {
-        const content = result.output.length > 2000 ? result.output.slice(0, 2000) + '\n...' : result.output;
-        context += `\n--- ${f} ---\n${content}\n`;
-      }
+  const presentFiles = keyFiles.filter(f => files.includes(f));
+  const readResults = await Promise.all(
+    presentFiles.map(f => exec({ name: 'read_file', params: { path: f } }, cwd).then(r => ({ file: f, ...r })))
+  );
+  for (const r of readResults) {
+    if (r.success) {
+      const content = r.output.length > 2000 ? r.output.slice(0, 2000) + '\n...' : r.output;
+      context += `\n--- ${r.file} ---\n${content}\n`;
     }
   }
   return context;
