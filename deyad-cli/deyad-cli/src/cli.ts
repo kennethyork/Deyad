@@ -3,6 +3,7 @@ import 'dotenv/config';
 
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import { checkOllama, listModels, getModelContextLength } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
@@ -150,6 +151,8 @@ export async function runOnce(
     allowedTools?: string[];
     restrictedTools?: string[];
     autoApprove?: boolean;
+    numThread?: number;
+    numGpu?: number;
   },
 ): Promise<void> {
   const callbacks = createCallbacks({ silent, autoApprove: options?.autoApprove ?? true });
@@ -222,12 +225,16 @@ async function main(): Promise<void> {
   const allowedTools = globalConfig.allowedTools ?? [];
   const restrictedTools = globalConfig.restrictedTools ?? [];
 
+  // Use all CPU cores for inference threads
+  const numThread = globalConfig.numThread ?? os.cpus().length;
+  const numGpu = globalConfig.numGpu; // let Ollama auto-decide GPU layers unless explicitly set
+
   const cwd = process.cwd();
 
   // --print mode: run once and exit
   const printPrompt = args.print;
   if (printPrompt !== undefined) {
-    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove: true });
+    await runOnce(model, printPrompt, cwd, true, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove: true, numThread, numGpu });
     process.exit(0);
   }
 
@@ -245,7 +252,7 @@ async function main(): Promise<void> {
     console.log('');
 
     const autoCallbacks = createCallbacks({ autoApprove: true });
-    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools });
+    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, numThread, numGpu });
 
     console.log('');
     console.log(divider('Sandbox Complete'));
@@ -271,7 +278,7 @@ async function main(): Promise<void> {
 
   // One-shot prompt mode
   if (args.prompt) {
-    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove });
+    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove, numThread, numGpu });
     process.exit(0);
   }
 
@@ -280,6 +287,7 @@ async function main(): Promise<void> {
     model, models, cwd, autoApprove, noThink, temperature,
     ollamaHost, contextSize, maxIterations, gitAutoCommit,
     allowedTools, restrictedTools, resume: !!args.resume,
+    numThread, numGpu,
   });
 }
 

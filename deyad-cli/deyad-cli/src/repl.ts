@@ -38,6 +38,8 @@ export interface ReplConfig {
   allowedTools: string[];
   restrictedTools: string[];
   resume: boolean;
+  numThread?: number;
+  numGpu?: number;
 }
 
 /** Tab-completion for REPL commands and file paths. */
@@ -249,6 +251,7 @@ export function startRepl(cfg: ReplConfig): void {
         const result = await runAgentLoop(cfg.model, input, cfg.cwd, replCallbacks, state.history, undefined, cfg.noThink ? false : undefined, {
           temperature: cfg.temperature, contextSize: cfg.contextSize, ollamaHost: cfg.ollamaHost,
           maxIterations: cfg.maxIterations, allowedTools: cfg.allowedTools, restrictedTools: cfg.restrictedTools,
+          numThread: cfg.numThread, numGpu: cfg.numGpu,
         });
         state.history = result.history;
         state.totalTokens += result.stats.totalTokens;

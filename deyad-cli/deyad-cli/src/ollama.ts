@@ -59,6 +59,8 @@ export interface OllamaOptions {
   top_p?: number;
   repeat_penalty?: number;
   num_ctx?: number;
+  num_thread?: number;
+  num_gpu?: number;
 }
 
 export interface OllamaUsage {
@@ -142,6 +144,8 @@ export async function streamChat(
       top_p: options.top_p ?? 0.9,
       repeat_penalty: options.repeat_penalty ?? 1.1,
       ...(options.num_ctx ? { num_ctx: options.num_ctx } : {}),
+      ...(options.num_thread ? { num_thread: options.num_thread } : {}),
+      ...(options.num_gpu ? { num_gpu: options.num_gpu } : {}),
     },
     ...(tools && tools.length > 0 ? { tools } : {}),
   };

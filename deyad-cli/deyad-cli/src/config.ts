@@ -14,6 +14,8 @@ export interface Config {
   gitAutoCommit?: boolean;
   allowedTools?: string[];
   restrictedTools?: string[];
+  numThread?: number;
+  numGpu?: number;
 }
 
 const configDir = path.join(os.homedir(), '.deyad');
@@ -37,6 +39,8 @@ export function loadConfig(): Config {
       gitAutoCommit: parsed.gitAutoCommit ?? true,
       allowedTools: parsed.allowedTools ?? [],
       restrictedTools: parsed.restrictedTools ?? [],
+      numThread: parsed.numThread,
+      numGpu: parsed.numGpu,
     };
   } catch (e) {
     debugLog('config load failed: %s', (e as Error).message);

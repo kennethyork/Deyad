@@ -172,6 +172,8 @@ export async function runAgentLoop(
     maxIterations?: number;
     allowedTools?: string[];
     restrictedTools?: string[];
+    numThread?: number;
+    numGpu?: number;
   },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
@@ -211,6 +213,8 @@ export async function runAgentLoop(
       ...(ollamaOptions || {}),
       ...(options?.temperature !== undefined ? { temperature: options.temperature } : {}),
       ...(options?.contextSize !== undefined ? { num_ctx: options.contextSize } : {}),
+      ...(options?.numThread !== undefined ? { num_thread: options.numThread } : {}),
+      ...(options?.numGpu !== undefined ? { num_gpu: options.numGpu } : {}),
     };
 
     let iteration = 0;
