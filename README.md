@@ -330,7 +330,7 @@ If you have a dedicated GPU, you can eliminate cold-start delays and get sub-sec
 <details>
 <summary><b>Full setup instructions</b></summary>
 
-**1. Configure Ollama Service**
+#### 1. Configure Ollama Service
 
 ```bash
 sudo systemctl edit ollama.service
@@ -357,7 +357,7 @@ sudo systemctl restart ollama
 | `OLLAMA_NUM_PARALLEL=1` | Dedicates all VRAM to a single request |
 | `OLLAMA_KEEP_ALIVE=-1` | Model stays loaded forever (no idle unload) |
 
-**2. Auto-Warm Model on Boot (Optional)**
+#### 2. Auto-Warm Model on Boot (Optional)
 
 ```bash
 sudo tee /etc/systemd/system/ollama-warmup.service << 'EOF'
@@ -383,7 +383,7 @@ sudo systemctl enable --now ollama-warmup.service
 
 Replace `YOUR_MODEL_NAME` with your model (e.g. `qwen3.5:27b`).
 
-**3. Hardware Config (Optional)**
+#### 3. Hardware Config (Optional)
 
 The CLI auto-detects all CPU cores. Override in `~/.deyad/config.json`:
 
