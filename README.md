@@ -323,6 +323,81 @@ The agent has autonomous access to:
 - **Diff display** — colored unified diffs for every file change
 - **Auto-confirm** — `-y` flag skips all confirmation prompts
 
+### Performance Tuning (GPU / Fast Startup)
+
+If you have a dedicated GPU, you can eliminate cold-start delays and get sub-second responses:
+
+<details>
+<summary><b>Full setup instructions</b></summary>
+
+**1. Configure Ollama Service**
+
+```bash
+sudo systemctl edit ollama.service
+```
+
+Add under `[Service]`:
+
+```ini
+Environment="OLLAMA_FLASH_ATTENTION=1"
+Environment="OLLAMA_NUM_PARALLEL=1"
+Environment="OLLAMA_KEEP_ALIVE=-1"
+```
+
+Then reload and restart:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+| Variable | Effect |
+| --- | --- |
+| `OLLAMA_FLASH_ATTENTION=1` | Faster inference, lower VRAM usage |
+| `OLLAMA_NUM_PARALLEL=1` | Dedicates all VRAM to a single request |
+| `OLLAMA_KEEP_ALIVE=-1` | Model stays loaded forever (no idle unload) |
+
+**2. Auto-Warm Model on Boot (Optional)**
+
+```bash
+sudo tee /etc/systemd/system/ollama-warmup.service << 'EOF'
+[Unit]
+Description=Pre-warm Ollama model into RAM/VRAM
+After=ollama.service
+Requires=ollama.service
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/tags > /dev/null && exit 0; sleep 1; done; exit 1'
+ExecStart=/usr/bin/curl -sf -X POST http://127.0.0.1:11434/api/generate -H "Content-Type: application/json" -d '{"model":"YOUR_MODEL_NAME","keep_alive":-1}'
+TimeoutStartSec=600
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now ollama-warmup.service
+```
+
+Replace `YOUR_MODEL_NAME` with your model (e.g. `qwen3.5:27b`).
+
+**3. Hardware Config (Optional)**
+
+The CLI auto-detects all CPU cores. Override in `~/.deyad/config.json`:
+
+```json
+{
+  "numThread": 12,
+  "numGpu": 50
+}
+```
+
+**Result:** `deyad --print "hello"` runs in **~0.9s** with a warm model.
+
+</details>
+
 ### CLI vs Other AI Coding CLIs
 
 | Feature | **Deyad CLI** | **Claude Code** | **Aider** | **Copilot CLI** | **Cline** | **OpenHands** |

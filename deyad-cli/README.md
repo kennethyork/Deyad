@@ -12,6 +12,20 @@
 
 ---
 
+### Performance Tuning (GPU / Fast Startup)
+
+See the inner CLI package README for full setup instructions:
+[deyad-cli/README.md → Performance Tuning](deyad-cli/README.md#performance-tuning-gpu--fast-startup)
+
+Quick summary:
+1. Set `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=-1` in the Ollama systemd service
+2. (Optional) Create an `ollama-warmup.service` to auto-load your model on boot
+3. (Optional) Set `numThread` / `numGpu` in `~/.deyad/config.json`
+
+Result: `deyad --print "hello"` in **~0.9s** with a warm model.
+
+---
+
 <details>
 <summary><strong>Table&nbsp;of&nbsp;Contents</strong></summary>
 
