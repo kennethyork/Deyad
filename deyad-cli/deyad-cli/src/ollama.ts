@@ -312,6 +312,20 @@ export async function checkOllama(baseUrl?: string): Promise<boolean> {
 }
 
 /**
+ * Pre-warm a model by asking Ollama to load it into memory without generating.
+ * Fire-and-forget — does not block on the full load, just kicks it off.
+ * Ollama loads the model weights into RAM/VRAM in the background.
+ */
+export function warmModel(model: string, baseUrl?: string): void {
+  const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
+  fetch(`${ollamaHost}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, keep_alive: -1 }),
+  }).catch(e => debugLog('warmModel failed: %s', (e as Error).message));
+}
+
+/**
  * Query the model's native context window size from Ollama's /api/show endpoint.
  * Returns the context length in tokens, or `undefined` if it can't be determined.
  */

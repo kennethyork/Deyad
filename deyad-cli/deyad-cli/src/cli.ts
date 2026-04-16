@@ -4,7 +4,7 @@ import 'dotenv/config';
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { checkOllama, listModels, getModelContextLength } from './ollama.js';
+import { checkOllama, listModels, getModelContextLength, warmModel } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
 import { loadConfig, getConfigPath } from './config.js';
@@ -214,6 +214,11 @@ async function main(): Promise<void> {
   const noThink = args.noThink ?? globalConfig.noThink ?? false;
   const temperature = globalConfig.temperature ?? 0.3;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
+
+  // Kick off model loading immediately (fire-and-forget).
+  // If the model is already loaded this is a no-op; otherwise Ollama starts
+  // loading weights into RAM/VRAM while we finish CLI init.
+  warmModel(model, ollamaHost);
 
   // Auto-detect context size from model metadata (parallel with nothing — fast path)
   let contextSize = globalConfig.contextSize;
