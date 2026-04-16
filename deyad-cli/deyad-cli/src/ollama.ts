@@ -299,7 +299,8 @@ export async function checkOllama(baseUrl?: string): Promise<boolean> {
   try {
     const ollamaHost = baseUrl || process.env['OLLAMA_HOST'] || 'http://127.0.0.1:11434';
     const resp = await fetch(`${ollamaHost}/api/tags`, { signal: AbortSignal.timeout(3000) });
-    return resp.ok;
+    if (resp.ok) { ollamaHealthVerified = true; return true; }
+    return false;
   } catch (e) {
     debugLog('checkOllama failed: %s', (e as Error).message);
     return false;

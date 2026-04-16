@@ -9,7 +9,7 @@
 
 import { streamChat } from './ollama.js';
 import type { OllamaMessage, OllamaOptions } from './ollama.js';
-import { TOOLS_DESCRIPTION } from './tools.js';
+import { TOOLS_DESCRIPTION, executeTool } from './tools.js';
 import type { ToolCallbacks, ToolResult } from './tools.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
 import { compactConversation } from './compaction.js';
@@ -109,8 +109,7 @@ RULES:
 }
 
 async function buildContext(cwd: string): Promise<string> {
-  const { executeTool: exec } = await import('./tools.js');
-  const listing = await exec({ name: 'list_files', params: {} }, cwd);
+  const listing = await executeTool({ name: 'list_files', params: {} }, cwd);
   const files = listing.output.split('\n').filter(Boolean);
 
   let context = `Project files (${files.length}):\n${listing.output}\n`;
@@ -119,7 +118,7 @@ async function buildContext(cwd: string): Promise<string> {
   const instructionFiles = ['DEYAD.md', '.deyad.md', 'deyad.md'];
   for (const instFile of instructionFiles) {
     if (files.includes(instFile)) {
-      const result = await exec({ name: 'read_file', params: { path: instFile } }, cwd);
+      const result = await executeTool({ name: 'read_file', params: { path: instFile } }, cwd);
       if (result.success) {
         const content = result.output.length > 4000 ? result.output.slice(0, 4000) + '\n...' : result.output;
         context += `\n--- PROJECT INSTRUCTIONS (${instFile}) ---\nFollow these project-specific instructions:\n${content}\n--- END INSTRUCTIONS ---\n`;
@@ -143,7 +142,7 @@ async function buildContext(cwd: string): Promise<string> {
   ];
   const presentFiles = keyFiles.filter(f => files.includes(f));
   const readResults = await Promise.all(
-    presentFiles.map(f => exec({ name: 'read_file', params: { path: f } }, cwd).then(r => ({ file: f, ...r })))
+    presentFiles.map(f => executeTool({ name: 'read_file', params: { path: f } }, cwd).then(r => ({ file: f, ...r })))
   );
   for (const r of readResults) {
     if (r.success) {
@@ -189,10 +188,11 @@ export async function runAgentLoop(
   const restrictedTools = options?.restrictedTools ?? [];
 
   try {
-    // Initialize MCP servers (if configured)
-    await initMCP(cwd);
-
-    const context = await buildContext(cwd);
+    // Initialize MCP + build context in parallel (independent operations)
+    const [, context] = await Promise.all([
+      initMCP(cwd),
+      buildContext(cwd),
+    ]);
 
     // RAG: retrieve relevant codebase chunks for the user's query
     const userQuery = typeof userMessage === 'string' ? userMessage : userMessage.content;
@@ -371,13 +371,18 @@ export async function runAgentLoop(
       // ── Post-write: refresh context + auto-lint ─────────────────────
       if (filesChanged) {
         invalidateIndex();
-        try {
-          const freshContext = await buildContext(cwd);
-          const second = messages[1];
-          if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
-            messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
-          }
-        } catch (e) { debugLog('context refresh failed: %s', (e as Error).message); }
+        // Only rebuild full context if key config files changed
+        const KEY_CONFIG_FILES = ['package.json', 'tsconfig.json', 'Cargo.toml', 'pyproject.toml', 'go.mod', 'pom.xml', 'build.gradle', 'Makefile'];
+        const keyFileChanged = changedFiles.some(f => KEY_CONFIG_FILES.some(k => f.endsWith(k)));
+        if (keyFileChanged) {
+          try {
+            const freshContext = await buildContext(cwd);
+            const second = messages[1];
+            if (messages.length > 1 && second?.role === 'system' && second.content.startsWith('Project context:')) {
+              messages[1] = { role: 'system', content: `Project context:\n\n${freshContext}` };
+            }
+          } catch (e) { debugLog('context refresh failed: %s', (e as Error).message); }
+        }
 
         const lintMsg = runAutoLint(cwd, changedFiles, callbacks);
         if (lintMsg) {

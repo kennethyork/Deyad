@@ -208,10 +208,11 @@ export function stripToolMarkup(text: string): string {
 }
 
 /** Best-effort structured audit log — appends to ~/.deyad/audit.log */
+let auditDirCreated = false;
 function auditLog(tool: string, params: Record<string, string>, result: ToolResult): void {
   try {
     const dir = path.join(process.env['HOME'] ?? '/tmp', '.deyad');
-    fs.mkdirSync(dir, { recursive: true });
+    if (!auditDirCreated) { fs.mkdirSync(dir, { recursive: true }); auditDirCreated = true; }
     const entry = {
       ts: new Date().toISOString(),
       tool,
@@ -221,7 +222,7 @@ function auditLog(tool: string, params: Record<string, string>, result: ToolResu
       success: result.success,
       outputLen: result.output.length,
     };
-    fs.appendFileSync(path.join(dir, 'audit.log'), JSON.stringify(entry) + '\n');
+    fs.promises.appendFile(path.join(dir, 'audit.log'), JSON.stringify(entry) + '\n').catch(() => {});
   } catch (e) { debugLog('audit log write failed: %s', (e as Error).message); }
 }
 
