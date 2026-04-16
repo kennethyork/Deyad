@@ -4,7 +4,7 @@ import 'dotenv/config';
 import * as readline from 'node:readline';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { checkOllama, listModels, getModelContextLength, warmModel, streamChat } from './ollama.js';
+import { checkOllama, listModels, getModelContextLength, warmModel, streamChat, skipHealthCheck } from './ollama.js';
 import type { OllamaMessage } from './ollama.js';
 import { runAgentLoop } from './agent.js';
 import type { AgentCallbacks } from './agent.js';
@@ -187,6 +187,47 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // --print mode: ultra-fast path — skip checkOllama/listModels entirely.
+  // Just load config, resolve model, and call streamChat directly.
+  // streamChat has its own error handling if Ollama is unreachable.
+  const printPrompt = args.print;
+  if (printPrompt !== undefined) {
+    const globalConfig = loadConfig();
+    const model = args.model ?? process.env['DEYAD_MODEL'] ?? globalConfig.model ?? 'qwen3.5:27b';
+    const temperature = globalConfig.temperature ?? 0.3;
+    const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
+    const numThread = globalConfig.numThread ?? os.cpus().length;
+    const numGpu = globalConfig.numGpu;
+
+    // Skip the /api/tags health ping — the /api/chat call itself will fail
+    // with a clear ECONNREFUSED if Ollama is down. Saves one round trip.
+    skipHealthCheck();
+
+    const messages: OllamaMessage[] = [
+      { role: 'system', content: 'You are a helpful assistant. Be concise.' },
+      { role: 'user', content: printPrompt },
+    ];
+    try {
+      await streamChat(
+        model,
+        messages,
+        (t) => process.stdout.write(t),
+        { temperature, num_thread: numThread, ...(numGpu !== undefined ? { num_gpu: numGpu } : {}) },
+        undefined, // no abort signal
+        undefined, // no thinking token handler
+        undefined, // no tools
+        false,     // always disable thinking for --print (speed)
+        ollamaHost,
+      );
+      console.log('');
+    } catch (err) {
+      console.error(formatError(`Ollama error: ${err instanceof Error ? err.message : String(err)}`));
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
+  // ── Non-print modes: verify Ollama and list available models ──
   const [ok, models] = await Promise.all([
     checkOllama(),
     listModels(),
@@ -221,37 +262,6 @@ async function main(): Promise<void> {
   const numGpu = globalConfig.numGpu; // let Ollama auto-decide GPU layers unless explicitly set
 
   const cwd = process.cwd();
-
-  // --print mode: fast path — call streamChat directly, skip agent loop overhead
-  // (no MCP init, no RAG indexing, no buildContext, no tool setup, no context size detection)
-  const printPrompt = args.print;
-  if (printPrompt !== undefined) {
-    const messages: OllamaMessage[] = [
-      { role: 'system', content: 'You are a helpful assistant. Be concise.' },
-      { role: 'user', content: printPrompt },
-    ];
-    try {
-      await streamChat(
-        model,
-        messages,
-        (t) => process.stdout.write(t),
-        { temperature, num_thread: numThread, ...(numGpu !== undefined ? { num_gpu: numGpu } : {}) },
-        undefined, // no abort signal
-        undefined, // no thinking token handler
-        undefined, // no tools
-        false,     // always disable thinking for --print (speed)
-        ollamaHost,
-      );
-      console.log('');
-    } catch (err) {
-      console.error(formatError(`Ollama error: ${err instanceof Error ? err.message : String(err)}`));
-      process.exit(1);
-    }
-    process.exit(0);
-  }
-
-  // ── Non-print modes: full agent setup ──
-  // Auto-detect context size from model metadata
   let contextSize = globalConfig.contextSize;
   if (contextSize === undefined) {
     contextSize = await getModelContextLength(model, ollamaHost) ?? 32768;

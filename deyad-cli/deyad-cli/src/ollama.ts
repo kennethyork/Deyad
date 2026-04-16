@@ -91,6 +91,9 @@ let ollamaHealthVerified = false;
 /** Reset health-check cache (used by tests). */
 export function resetHealthCache(): void { ollamaHealthVerified = false; }
 
+/** Mark health as already verified (skip the /api/tags ping in streamChat). */
+export function skipHealthCheck(): void { ollamaHealthVerified = true; }
+
 export function estimateTokens(chars: number): number {
   return Math.round(chars / calibratedRatio);
 }
@@ -139,6 +142,7 @@ export async function streamChat(
     model,
     messages,
     stream: true,
+    keep_alive: -1, // keep model loaded indefinitely
     options: {
       temperature: options.temperature ?? 0.2,
       top_p: options.top_p ?? 0.9,
