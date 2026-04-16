@@ -143,7 +143,7 @@ export async function runOnce(
   prompt: string,
   cwd: string,
   silent: boolean,
-  think = false,
+  think: boolean | undefined = true,
   options?: {
     temperature?: number;
     contextSize?: number;
@@ -157,7 +157,7 @@ export async function runOnce(
   },
 ): Promise<void> {
   const callbacks = createCallbacks({ silent, autoApprove: options?.autoApprove ?? true });
-  await runAgentLoop(model, prompt, cwd, callbacks, [], undefined, think ? undefined : false, options);
+  await runAgentLoop(model, prompt, cwd, callbacks, [], undefined, think, options);
 }
 
 async function main(): Promise<void> {
@@ -289,7 +289,7 @@ async function main(): Promise<void> {
     console.log('');
 
     const autoCallbacks = createCallbacks({ autoApprove: true });
-    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, numThread, numGpu });
+    await runAgentLoop(model, args.prompt, cwd, autoCallbacks, [], undefined, noThink ? false : true, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, numThread, numGpu });
 
     console.log('');
     console.log(divider('Sandbox Complete'));
@@ -315,7 +315,7 @@ async function main(): Promise<void> {
 
   // One-shot prompt mode
   if (args.prompt) {
-    await runOnce(model, args.prompt, cwd, false, noThink ? false : undefined, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove, numThread, numGpu });
+    await runOnce(model, args.prompt, cwd, false, noThink ? false : true, { temperature, contextSize, ollamaHost, maxIterations, allowedTools, restrictedTools, autoApprove, numThread, numGpu });
     process.exit(0);
   }
 

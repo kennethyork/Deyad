@@ -243,10 +243,9 @@ export async function runAgentLoop(
         }
         return true;
       });
-      // Use thinking for the first iteration (planning) but disable for follow-ups
-      // (processing tool results). This gives quality reasoning on the initial task
-      // while keeping follow-up tool-result processing fast.
-      const iterThink = think !== undefined ? think : (iteration === 0 ? undefined : false);
+      // When think=true (default), think on iteration 0 (planning) but skip for
+      // follow-ups to keep tool-result processing fast. think=false disables entirely.
+      const iterThink = think === false ? false : (iteration === 0 ? (think ?? true) : false);
       let result;
       try {
         result = await streamChat(

@@ -248,7 +248,7 @@ export function startRepl(cfg: ReplConfig): void {
       });
 
       try {
-        const result = await runAgentLoop(cfg.model, input, cfg.cwd, replCallbacks, state.history, undefined, cfg.noThink ? false : undefined, {
+        const result = await runAgentLoop(cfg.model, input, cfg.cwd, replCallbacks, state.history, undefined, cfg.noThink ? false : true, {
           temperature: cfg.temperature, contextSize: cfg.contextSize, ollamaHost: cfg.ollamaHost,
           maxIterations: cfg.maxIterations, allowedTools: cfg.allowedTools, restrictedTools: cfg.restrictedTools,
           numThread: cfg.numThread, numGpu: cfg.numGpu,
