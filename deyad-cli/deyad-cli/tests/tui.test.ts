@@ -91,11 +91,14 @@ describe('formatToolStart', () => {
     expect(plain).toContain('src/main.ts');
   });
 
-  it('truncates long param values', () => {
+  it('wraps long param values across lines', () => {
     const longVal = 'x'.repeat(200);
     const result = formatToolStart('write_files', { content: longVal });
     const plain = strip(result);
-    expect(plain).toContain('…');
+    // All x's present (no truncation ellipsis cutting them short)
+    const totalX = (plain.match(/x/g) || []).length;
+    expect(totalX).toBe(200);
+    expect(plain).not.toContain('…');
   });
 });
 

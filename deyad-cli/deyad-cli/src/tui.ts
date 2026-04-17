@@ -210,9 +210,30 @@ export function formatToolStart(name: string, params: Record<string, string>): s
   const icon = getToolIcon(name);
   const header = `${icon} ${c.brandBold(name)}`;
 
+  // Build param lines, wrapping long values across multiple lines
   const paramLines: string[] = [];
   for (const [k, v] of Object.entries(params)) {
-    paramLines.push(`  ${c.dim(k + ':')} ${v}`);
+    const prefix = `  ${k}: `;
+    const prefixLen = prefix.length;
+    const valueMaxW = innerW - prefixLen;
+    if (valueMaxW > 10 && stripAnsi(v).length > valueMaxW) {
+      // Wrap value across multiple lines
+      const raw = stripAnsi(v);
+      let offset = 0;
+      let first = true;
+      while (offset < raw.length) {
+        const chunk = raw.slice(offset, offset + (first ? valueMaxW : innerW - 4));
+        if (first) {
+          paramLines.push(`  ${c.dim(k + ':')} ${chunk}`);
+          first = false;
+        } else {
+          paramLines.push(`    ${chunk}`);
+        }
+        offset += chunk.length;
+      }
+    } else {
+      paramLines.push(`  ${c.dim(k + ':')} ${v}`);
+    }
   }
 
   const topLine = `${CYAN}${BOX.topLeft}${BOX.horizontal}${RESET} ${header} ${CYAN}${BOX.horizontal.repeat(Math.max(0, w - visibleLength(header) - 5))}${BOX.topRight}${RESET}`;
