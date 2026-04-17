@@ -288,7 +288,10 @@ async function main(): Promise<void> {
   const cwd = process.cwd();
   let contextSize = globalConfig.contextSize;
   if (contextSize === undefined) {
-    contextSize = await getModelContextLength(model, ollamaHost) ?? 32768;
+    const detected = await getModelContextLength(model, ollamaHost) ?? 32768;
+    // Cap auto-detected context to 65536 to prevent VRAM OOM on consumer GPUs.
+    // Users can override with contextSize in config for larger windows.
+    contextSize = Math.min(detected, 65536);
   }
   const maxIterations = globalConfig.maxIterations ?? 30;
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
