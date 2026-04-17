@@ -104,17 +104,24 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
   const thinkFilter = new ThinkFilter((s) => { if (!silent) process.stdout.write(s); });
 
   const stop = (): void => { if (active) { spinner.stop(); active = false; } };
+  let thinkingStarted = false;
 
   return {
-    onToken: (t) => { stop(); thinkFilter.write(t); },
-    onThinkingToken: () => {
-      if (!active && !silent) {
-        spinner.update('Reasoning...');
-        spinner.start(); active = true;
+    onToken: (t) => {
+      stop();
+      if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
+      thinkFilter.write(t);
+    },
+    onThinkingToken: (t) => {
+      stop();
+      if (!silent) {
+        if (!thinkingStarted) { process.stdout.write('\x1b[2m\x1b[3m'); thinkingStarted = true; }
+        process.stdout.write(t);
       }
     },
     onToolStart: (name, params) => {
       stop(); thinkFilter.flush();
+      if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
       if (!silent) console.log('\n' + formatToolStart(name, params));
       toolStartTime = Date.now();
       spinner.update(`Running ${name}...`);
@@ -130,10 +137,15 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
       : () => {},
     onDone: (summary) => {
       stop(); thinkFilter.flush();
+      if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
       if (silent && summary) console.log(summary);
       if (!silent) console.log('');
     },
-    onError: (e) => { stop(); thinkFilter.flush(); console.error(formatError(e)); },
+    onError: (e) => {
+      stop(); thinkFilter.flush();
+      if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
+      console.error(formatError(e));
+    },
     confirm: askConfirm ?? (async () => autoApprove),
   };
 }
