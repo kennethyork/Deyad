@@ -13,7 +13,8 @@ import { embedChunks } from './codebaseIndexer';
 
 
 
-/** Approximate character budget for the full conversation (≈ 32k tokens at ~4 chars/token). */
+/** Default character budget for the full conversation (≈ 32k tokens at ~4 chars/token).
+ *  Overridden at runtime when contextSize is known — uses 75% of context window. */
 const MAX_CONVERSATION_CHARS = 128_000;
 
 /** Number of recent messages to always keep when compacting. */
@@ -21,6 +22,9 @@ const MIN_KEEP = 6;
 
 /** Max chars for the compacted summary itself. */
 const MAX_SUMMARY_CHARS = 24_000;
+
+/** Chars-per-token estimate used to derive compaction threshold from context size. */
+const CHARS_PER_TOKEN = 4;
 
 /** Maximum number of entries to keep in fullHistory before trimming old ones. */
 const MAX_FULLHISTORY_ENTRIES = 500;
@@ -187,9 +191,13 @@ let lastCompactedIndex = 0;
 function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
   fullHistory?: Array<{ role: string; content: string }>,
+  contextTokens?: number,
 ): void {
+  const maxChars = contextTokens
+    ? Math.floor(contextTokens * 0.75 * CHARS_PER_TOKEN)
+    : MAX_CONVERSATION_CHARS;
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
-  if (totalChars <= MAX_CONVERSATION_CHARS) return;
+  if (totalChars <= maxChars) return;
 
   // Find where non-system messages begin
   let firstNonSystem = 0;
@@ -477,7 +485,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
           break;
         }
         // Compact conversation if it's getting too large for the context window
-        compactConversation(messages, fullHistory);
+        compactConversation(messages, fullHistory, contextSize);
 
         // Stream one turn from Ollama (with native tools)
         const ollamaOpts = contextSize

@@ -12,7 +12,7 @@ import type { OllamaMessage, OllamaOptions } from './ollama.js';
 import { TOOLS_DESCRIPTION, executeTool } from './tools.js';
 import type { ToolCallbacks, ToolResult } from './tools.js';
 import { queryIndex, formatRAGContext, invalidateIndex } from './rag.js';
-import { compactConversation } from './compaction.js';
+import { compactConversation, resetCompactionIndex } from './compaction.js';
 import { initMCP, closeMCP } from './mcp.js';
 import { closeBrowser } from './browser.js';
 import {
@@ -27,7 +27,7 @@ function stripThinkTags(text: string): string {
 }
 
 // Re-export compaction symbols so existing consumers are not broken
-export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT } from './compaction.js';
+export { compactConversation, MAX_CONVERSATION_CHARS, COMPACT_KEEP_RECENT, MAX_FULLHISTORY_ENTRIES, trimFullHistory, resetCompactionIndex } from './compaction.js';
 // Re-export helpers so existing imports from agent.ts still work
 export { parseToolCallsFromTurn, dispatchTools, runAutoLint, formatToolResultMessages, truncateOutput, READ_ONLY_TOOLS, WRITE_TOOLS } from './agent-helpers.js';
 
@@ -190,6 +190,9 @@ export async function runAgentLoop(
   const maxIterations = options?.maxIterations ?? 50;
   const allowedTools = options?.allowedTools ?? [];
   const restrictedTools = options?.restrictedTools ?? [];
+
+  // Reset incremental compaction index for this loop session
+  resetCompactionIndex();
 
   try {
     // Initialize MCP + build context in parallel (independent operations)

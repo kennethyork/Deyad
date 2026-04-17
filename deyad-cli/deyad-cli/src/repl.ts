@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { OllamaMessage } from './ollama.js';
 import { streamChat, estimateTokens } from './ollama.js';
-import { runAgentLoop, compactConversation } from './agent.js';
+import { runAgentLoop, compactConversation, trimFullHistory } from './agent.js';
 import { loadOrCreateSession, saveSession, pruneSessions } from './session.js';
 import { createSnapshot } from './undo.js';
 import { isSandboxed } from './sandbox.js';
@@ -266,6 +266,8 @@ export function startRepl(cfg: ReplConfig): void {
             state.fullHistory.push(msg);
           }
         }
+        // Cap fullHistory to prevent unbounded growth
+        trimFullHistory(state.fullHistory);
         state.totalTokens += result.stats.totalTokens;
         state.taskCount++;
 
