@@ -103,6 +103,9 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
   let toolStartTime = 0;
   const thinkFilter = new ThinkFilter((s) => { if (!silent) process.stdout.write(s); });
 
+  // Start spinner immediately so user sees feedback while waiting for first token
+  if (!silent) { spinner.start(); active = true; }
+
   const stop = (): void => { if (active) { spinner.stop(); active = false; } };
   let thinkingStarted = false;
 
@@ -115,7 +118,7 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
     onThinkingToken: (t) => {
       stop();
       if (!silent) {
-        if (!thinkingStarted) { process.stdout.write('\x1b[2m\x1b[3m🧠 Thinking...\n'); thinkingStarted = true; }
+        if (!thinkingStarted) { process.stdout.write('\x1b[2m\x1b[3m'); thinkingStarted = true; }
         process.stdout.write(t);
       }
     },
