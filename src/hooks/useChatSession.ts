@@ -415,7 +415,7 @@ User's instructions: ${text}`;
     };
     setMessages((prev) => [...prev, assistantMsg]);
 
-    const history = newMessages.slice(-8).map((m) => ({
+    const history = newMessages.slice(0, -1).map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
@@ -432,6 +432,7 @@ User's instructions: ${text}`;
       history,
       embedModel: embedModelRef.current || undefined,
       modelOptions: modelOptionsRef.current,
+      contextSize: 32768,
       callbacks: {
         onContent: (fullText: string) => {
           streamBuf.current = stripToolMarkup(fullText);

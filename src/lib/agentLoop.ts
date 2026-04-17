@@ -16,49 +16,155 @@ import { embedChunks } from './codebaseIndexer';
 /** Approximate character budget for the full conversation (≈ 32k tokens at ~4 chars/token). */
 const MAX_CONVERSATION_CHARS = 128_000;
 
-/** Minimum messages to always keep regardless of budget. */
-const MIN_KEEP = 4;
+/** Number of recent messages to always keep when compacting. */
+const MIN_KEEP = 6;
+
+/** Max chars for the compacted summary itself. */
+const MAX_SUMMARY_CHARS = 24_000;
 
 /**
- * Score a message's importance for retention during compaction.
- * Higher scores → more likely to survive compaction.
+ * Extract structured details from tool call XML in assistant messages.
  */
-function messageImportance(msg: { role: string; content: string }): number {
-  // User messages with real questions are high-value
-  if (msg.role === 'user' && !msg.content.startsWith('<tool_result>')) {
-    // Longer user messages (actual questions/instructions) are more important
-    return 10 + Math.min(msg.content.length / 100, 5);
+function extractToolCalls(content: string): Array<{ tool: string; params: Record<string, string> }> {
+  const calls: Array<{ tool: string; params: Record<string, string> }> = [];
+  const toolCallRegex = /<tool_call>\s*\{?\s*"?name"?\s*:\s*"([^"]+)"[\s\S]*?<\/tool_call>/g;
+  let match;
+  while ((match = toolCallRegex.exec(content)) !== null) {
+    const tool = match[1]!;
+    const params: Record<string, string> = {};
+    const block = match[0];
+    const paramMatches = block.matchAll(/"(\w+)"\s*:\s*"([^"]*?)"/g);
+    for (const pm of paramMatches) {
+      if (pm[1] !== 'name') params[pm[1]!] = pm[2]!;
+    }
+    calls.push({ tool, params });
+  }
+  // Also match <name>/<param> style
+  const xmlRegex = /<tool_call>\s*<name>(\w+)<\/name>([\s\S]*?)<\/tool_call>/g;
+  while ((match = xmlRegex.exec(content)) !== null) {
+    const tool = match[1]!;
+    const params: Record<string, string> = {};
+    const paramMatches = match[2]!.matchAll(/<param\s+name="(\w+)">([\s\S]*?)<\/param>/g);
+    for (const pm of paramMatches) {
+      params[pm[1]!] = pm[2]!;
+    }
+    calls.push({ tool, params });
+  }
+  return calls;
+}
+
+/**
+ * Extract tool results from user messages containing <tool_result> blocks.
+ */
+function extractToolResults(content: string): Array<{ tool: string; output: string; success: boolean }> {
+  const results: Array<{ tool: string; output: string; success: boolean }> = [];
+  const regex = /<tool_result>\s*<name>([^<]+)<\/name>\s*<status>(success|error)<\/status>\s*<output>([\s\S]*?)<\/output>\s*<\/tool_result>/g;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    results.push({
+      tool: match[1]!,
+      success: match[2] === 'success',
+      output: match[3]!.trim(),
+    });
+  }
+  return results;
+}
+
+/**
+ * Build a rich summary from messages being compacted.
+ * Preserves: file paths touched, commands run, key outputs, user requests, agent decisions.
+ */
+function buildRichSummary(toSummarize: Array<{ role: string; content: string }>): string {
+  const userRequests: string[] = [];
+  const filesRead = new Set<string>();
+  const filesWritten = new Set<string>();
+  const commandsRun: Array<{ cmd: string; output: string }> = [];
+  const decisions: string[] = [];
+  const toolResults: Array<{ tool: string; output: string }> = [];
+
+  for (const msg of toSummarize) {
+    if (msg.role === 'user' && !msg.content.startsWith('<tool_result>')) {
+      userRequests.push(msg.content.slice(0, 300));
+    }
+
+    if (msg.role === 'user' && msg.content.includes('<tool_result>')) {
+      for (const r of extractToolResults(msg.content)) {
+        if (r.tool === 'read_file') {
+          toolResults.push({ tool: r.tool, output: `(${r.output.length} chars)` });
+        } else if (r.tool === 'run_command') {
+          toolResults.push({ tool: r.tool, output: r.output.slice(0, 500) });
+        } else {
+          toolResults.push({ tool: r.tool, output: r.output.slice(0, 200) });
+        }
+      }
+    }
+
+    if (msg.role === 'assistant') {
+      for (const tc of extractToolCalls(msg.content)) {
+        if (tc.tool === 'read_file' && tc.params['path']) {
+          filesRead.add(tc.params['path']);
+        } else if ((tc.tool === 'write_files' || tc.tool === 'edit_file' || tc.tool === 'multi_edit') && tc.params['path']) {
+          filesWritten.add(tc.params['path']);
+        } else if (tc.tool === 'run_command' && tc.params['command']) {
+          commandsRun.push({ cmd: tc.params['command'], output: '' });
+        }
+      }
+      const prose = stripToolMarkup(msg.content).trim();
+      if (prose.length > 20) {
+        decisions.push(prose.slice(0, 400));
+      }
+    }
   }
 
-  // Tool results that wrote/edited files are high-value (evidence of changes)
-  if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
-    if (/write_files|edit_file|multi_edit|delete_file|run_command/.test(msg.content)) return 8;
-    // Read-only tool results are low-value (can be re-read)
-    if (/read_file|list_files|search_files|glob_files|git_status|git_log/.test(msg.content)) return 2;
-    return 4;
+  // Fill in command outputs from tool results
+  let cmdIdx = 0;
+  for (const tr of toolResults) {
+    if (tr.tool === 'run_command' && cmdIdx < commandsRun.length) {
+      commandsRun[cmdIdx]!.output = tr.output;
+      cmdIdx++;
+    }
   }
 
-  // Assistant messages with tool calls are medium-high (show intent)
-  if (msg.role === 'assistant') {
-    const hasToolCalls = /<tool_call>/.test(msg.content) || (msg as Record<string, unknown>).tool_calls;
-    const prose = stripToolMarkup(msg.content).trim();
-    // Agent explanation + tool calls = high value
-    if (hasToolCalls && prose.length > 50) return 9;
-    // Agent tool calls only = medium
-    if (hasToolCalls) return 6;
-    // Agent prose (progress updates, explanations) = medium
-    if (prose.length > 100) return 7;
-    // Short ack messages = low
-    return 3;
+  const parts: string[] = ['[Earlier conversation — detailed summary]'];
+
+  if (userRequests.length > 0) {
+    parts.push('\n## User Requests');
+    for (const req of userRequests) parts.push(`- ${req}`);
   }
 
-  return 5; // default
+  if (filesRead.size > 0) {
+    parts.push('\n## Files Read');
+    for (const f of filesRead) parts.push(`- ${f}`);
+  }
+
+  if (filesWritten.size > 0) {
+    parts.push('\n## Files Modified');
+    for (const f of filesWritten) parts.push(`- ${f}`);
+  }
+
+  if (commandsRun.length > 0) {
+    parts.push('\n## Commands Executed');
+    for (const c of commandsRun) {
+      parts.push(`- \`${c.cmd}\``);
+      if (c.output) parts.push(`  Output: ${c.output.slice(0, 300)}`);
+    }
+  }
+
+  if (decisions.length > 0) {
+    parts.push('\n## Agent Reasoning');
+    for (const d of decisions) parts.push(`- ${d}`);
+  }
+
+  let summary = parts.join('\n');
+  if (summary.length > MAX_SUMMARY_CHARS) {
+    summary = summary.slice(0, MAX_SUMMARY_CHARS) + '\n\n[...summary truncated]';
+  }
+  return summary;
 }
 
 /**
  * Compact the conversation when it exceeds the character budget.
- * Uses importance-weighted retention: high-importance messages survive
- * longer than low-importance ones (e.g. read-only tool results).
+ * Uses rich structured summaries that preserve file paths, commands, and agent reasoning.
  */
 function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
@@ -72,64 +178,14 @@ function compactConversation(
     firstNonSystem++;
   }
 
-  const nonSystem = messages.slice(firstNonSystem);
-  if (nonSystem.length <= MIN_KEEP) return;
+  const nonSystemCount = messages.length - firstNonSystem;
+  if (nonSystemCount <= MIN_KEEP) return;
 
-  // Score each non-system message by importance
-  const scored = nonSystem.map((msg, idx) => ({
-    msg,
-    idx: firstNonSystem + idx,
-    importance: messageImportance(msg),
-    // Recency boost: more recent messages get a bonus (0-5 points)
-    recencyBoost: (idx / nonSystem.length) * 5,
-  }));
+  const compactEnd = messages.length - MIN_KEEP;
+  const toSummarize = messages.slice(firstNonSystem, compactEnd);
 
-  // Sort by combined score (importance + recency), lowest first
-  const sortedByScore = [...scored].sort(
-    (a, b) => (a.importance + a.recencyBoost) - (b.importance + b.recencyBoost),
-  );
-
-  // Remove lowest-scored messages until we're under budget, keeping at least MIN_KEEP
-  const toRemoveIndices = new Set<number>();
-  let currentChars = totalChars;
-  const maxRemovable = nonSystem.length - MIN_KEEP;
-
-  for (const item of sortedByScore) {
-    if (currentChars <= MAX_CONVERSATION_CHARS || toRemoveIndices.size >= maxRemovable) break;
-    toRemoveIndices.add(item.idx);
-    currentChars -= item.msg.content.length;
-  }
-
-  if (toRemoveIndices.size === 0) return;
-
-  // Build summary of removed messages
-  const removed = scored
-    .filter((s) => toRemoveIndices.has(s.idx))
-    .sort((a, b) => a.idx - b.idx);
-
-  const summaryParts: string[] = [];
-  for (const { msg } of removed) {
-    if (msg.role === 'assistant') {
-      const prose = stripToolMarkup(msg.content).slice(0, 200);
-      if (prose) summaryParts.push(`Agent: ${prose}`);
-    } else if (msg.role === 'user' && msg.content.startsWith('<tool_result>')) {
-      const toolNames = [...msg.content.matchAll(/<name>([^<]+)<\/name>/g)].map(m => m[1]);
-      if (toolNames.length) summaryParts.push(`Tools executed: ${toolNames.join(', ')}`);
-    } else if (msg.role === 'user') {
-      summaryParts.push(`User: ${msg.content.slice(0, 200)}`);
-    }
-  }
-
-  const summary = `[Earlier conversation compacted — ${removed.length} messages summarized]\n${summaryParts.join('\n')}`;
-
-  // Remove compacted messages (iterate in reverse to preserve indices)
-  const sortedIndices = [...toRemoveIndices].sort((a, b) => b - a);
-  for (const idx of sortedIndices) {
-    messages.splice(idx, 1);
-  }
-
-  // Insert summary after system messages
-  messages.splice(firstNonSystem, 0, {
+  const summary = buildRichSummary(toSummarize);
+  messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
     role: 'system' as const,
     content: summary,
   });
@@ -167,6 +223,8 @@ export interface AgentOptions {
   embedModel?: string;
   /** Model generation options (temperature, top_p, repeat_penalty). */
   modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number };
+  /** Context window size in tokens — sent as num_ctx to Ollama. */
+  contextSize?: number;
   callbacks: AgentCallbacks;
 }
 
@@ -228,7 +286,7 @@ function streamOllamaTurn(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
   onToken: (token: string) => void,
   isAborted: () => boolean,
-  modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number },
+  modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number; num_ctx?: number },
   tools?: unknown[],
 ): Promise<{ text: string; nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> }> {
   return new Promise((resolve, reject) => {
@@ -279,7 +337,7 @@ function streamOllamaTurn(
  * Returns a cleanup function that can abort the loop.
  */
 export function runAgentLoop(options: AgentOptions): () => void {
-  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, callbacks } = options;
+  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, contextSize, callbacks } = options;
   let aborted = false;
 
   const abort = () => { aborted = true; };
@@ -330,10 +388,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
         } catch (err) { console.debug('ignore:', err); }
       }
 
-      // Add conversation history (last 6 messages), excluding the final message
-      // since it's the current user message which gets added separately below
-      const historyWithoutCurrent = history.slice(0, -1).slice(-6);
-      for (const msg of historyWithoutCurrent) {
+      // Add full conversation history — compaction handles trimming
+      for (const msg of history) {
         messages.push(msg);
       }
 
@@ -361,10 +417,13 @@ export function runAgentLoop(options: AgentOptions): () => void {
         compactConversation(messages);
 
         // Stream one turn from Ollama (with native tools)
+        const ollamaOpts = contextSize
+          ? { ...modelOptions, num_ctx: contextSize }
+          : modelOptions;
         const { text: turnResponse, nativeToolCalls } = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        }, () => aborted, modelOptions, ollamaTools);
+        }, () => aborted, ollamaOpts, ollamaTools);
 
         if (aborted) break;
 
