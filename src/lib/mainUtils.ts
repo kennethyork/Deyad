@@ -100,6 +100,7 @@ export interface DeyadSettings {
   temperature: number;
   topP: number;
   repeatPenalty: number;
+  contextSize: number;
 }
 
 export const DEFAULT_SETTINGS: DeyadSettings = {
@@ -113,6 +114,7 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   temperature: 0.7,
   topP: 0.9,
   repeatPenalty: 1.1,
+  contextSize: 32768,
 };
 
 export function loadSettings(settingsPath: string): DeyadSettings {

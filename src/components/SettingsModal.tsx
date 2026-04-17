@@ -17,6 +17,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const [temperature, setTemperature] = useState(0.7);
   const [topP, setTopP] = useState(0.9);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
+  const [contextSize, setContextSize] = useState(32768);
   const [models, setModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -36,6 +37,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     setTemperature(settings.temperature ?? 0.7);
     setTopP(settings.topP ?? 0.9);
     setRepeatPenalty(settings.repeatPenalty ?? 1.1);
+    setContextSize(settings.contextSize ?? 32768);
     loadModels();
   };
 
@@ -58,6 +60,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
       temperature,
       topP,
       repeatPenalty,
+      contextSize,
       theme,
     });
     setSaving(false);
@@ -250,6 +253,25 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
               <span className="settings-slider-value">{repeatPenalty.toFixed(2)}</span>
             </div>
             <span className="settings-hint">Penalize repetition in output (default: 1.1)</span>
+          </div>
+
+          {/* ── Context Size ──────────────────────────────────── */}
+          <div className="form-field">
+            <label htmlFor="context-size">Context Size (num_ctx)</label>
+            <div className="settings-slider-row">
+              <input
+                id="context-size"
+                type="number"
+                min="2048"
+                max="131072"
+                step="1024"
+                value={contextSize}
+                onChange={(e) => setContextSize(parseInt(e.target.value, 10) || 32768)}
+                style={{ width: '120px' }}
+              />
+              <span className="settings-slider-value">tokens</span>
+            </div>
+            <span className="settings-hint">Context window size sent to Ollama. Lower values use less VRAM (default: 32768)</span>
           </div>
 
         </div>

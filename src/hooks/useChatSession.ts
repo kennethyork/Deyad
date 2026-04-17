@@ -57,6 +57,7 @@ export function useChatSession({
   const autoFixTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_AUTO_FIX_ATTEMPTS = 3;
   const embedModelRef = useRef('');
+  const contextSizeRef = useRef(32768);
   const modelOptionsRef = useRef<{ temperature: number; top_p: number; repeat_penalty: number }>({ temperature: 0.7, top_p: 0.9, repeat_penalty: 1.1 });
   const rafRef = useRef<number>(0);
 
@@ -163,6 +164,7 @@ export function useChatSession({
         if (settings.embedModel) {
           embedModelRef.current = settings.embedModel;
         }
+        contextSizeRef.current = settings.contextSize ?? 32768;
         modelOptionsRef.current = {
           temperature: settings.temperature ?? 0.7,
           top_p: settings.topP ?? 0.9,
@@ -432,7 +434,7 @@ User's instructions: ${text}`;
       history,
       embedModel: embedModelRef.current || undefined,
       modelOptions: modelOptionsRef.current,
-      contextSize: 32768,
+      contextSize: contextSizeRef.current,
       callbacks: {
         onContent: (fullText: string) => {
           streamBuf.current = stripToolMarkup(fullText);
