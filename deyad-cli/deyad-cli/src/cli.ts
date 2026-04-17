@@ -115,7 +115,7 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
     onThinkingToken: (t) => {
       stop();
       if (!silent) {
-        if (!thinkingStarted) { process.stdout.write('\x1b[2m\x1b[3m'); thinkingStarted = true; }
+        if (!thinkingStarted) { process.stdout.write('\x1b[2m\x1b[3m🧠 Thinking...\n'); thinkingStarted = true; }
         process.stdout.write(t);
       }
     },
