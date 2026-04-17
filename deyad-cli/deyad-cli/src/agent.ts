@@ -68,6 +68,7 @@ export interface AgentCallbacks {
   onThinkingToken?: (token: string) => void;
   onToolStart: (toolName: string, params: Record<string, string>) => void;
   onToolResult: (result: ToolResult) => void;
+  onToolOutput?: (chunk: string) => void;
   onDiff: (filePath: string, diff: string) => void;
   onDone: (summary: string) => void;
   onError: (error: string) => void;
@@ -362,7 +363,7 @@ export async function runAgentLoop(
       }
 
       // ── Dispatch tools ──────────────────────────────────────────────
-      const toolCb: ToolCallbacks = { confirm: callbacks.confirm, onDiff: callbacks.onDiff };
+      const toolCb: ToolCallbacks = { confirm: callbacks.confirm, onDiff: callbacks.onDiff, onOutput: callbacks.onToolOutput };
       const { results, filesChanged } = await dispatchTools(
         toolCalls, cwd, toolCb, callbacks, changedFiles, abortController.signal,
       );

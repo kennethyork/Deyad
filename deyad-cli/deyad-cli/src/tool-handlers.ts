@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { debugLog } from './debug.js';
 import { parse as shellParse } from 'shell-quote';
 import { memoryRead, memoryWrite, memoryList, memoryDelete } from './session.js';
@@ -213,17 +213,36 @@ export async function executeBuiltinTool(
             parsed = shellParse(command);
             isSimple = parsed.length > 0 && parsed.every((t) => typeof t === 'string');
           } catch (e) { debugLog('shell-parse fallback: %s', (e as Error).message); }
-          const execOpts = {
-            cwd,
-            encoding: 'utf-8' as const,
-            timeout: timeoutMs,
-            maxBuffer: 1024 * 1024,
-            stdio: ['pipe', 'pipe', 'pipe'] as ['pipe', 'pipe', 'pipe'],
-            env: { ...process.env, FORCE_COLOR: '0' },
-          };
-          const output = isSimple
-            ? execFileSync((parsed as string[])[0]!, (parsed as string[]).slice(1), execOpts)
-            : execFileSync('/bin/sh', ['-c', command], execOpts);
+          const spawnArgs: [string, string[]] = isSimple
+            ? [(parsed as string[])[0]!, (parsed as string[]).slice(1)]
+            : ['/bin/sh', ['-c', command]];
+          const output = await new Promise<string>((resolve, reject) => {
+            const child = spawn(spawnArgs[0], spawnArgs[1], {
+              cwd,
+              env: { ...process.env, FORCE_COLOR: '0' },
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            let stdout = '';
+            let stderr = '';
+            const timer = setTimeout(() => { child.kill('SIGTERM'); }, timeoutMs);
+            child.stdout.on('data', (data: Buffer) => {
+              const s = data.toString();
+              stdout += s;
+              cb?.onOutput?.(s);
+            });
+            child.stderr.on('data', (data: Buffer) => {
+              const s = data.toString();
+              stderr += s;
+              cb?.onOutput?.(s);
+            });
+            child.on('close', (code, sig) => {
+              clearTimeout(timer);
+              if (sig) reject({ status: sig, stdout, stderr: stderr || `Killed by ${sig}` });
+              else if (code === 0) resolve(stdout);
+              else reject({ status: code, stdout, stderr });
+            });
+            child.on('error', (err) => { clearTimeout(timer); reject(err); });
+          });
           const truncated = output.length > MAX_CMD_CHARS ? output.slice(0, MAX_CMD_CHARS) + `\n... (truncated at ${MAX_CMD_CHARS} chars)` : output;
           return { tool: call.name, success: true, output: truncated || '(no output)' };
         } catch (err: unknown) {

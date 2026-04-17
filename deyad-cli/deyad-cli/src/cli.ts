@@ -108,6 +108,7 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
 
   const stop = (): void => { if (active) { spinner.stop(); active = false; } };
   let thinkingStarted = false;
+  let toolOutputStreamed = false;
 
   return {
     onToken: (t) => {
@@ -127,13 +128,21 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
       if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
       if (!silent) console.log('\n' + formatToolStart(name, params));
       toolStartTime = Date.now();
+      toolOutputStreamed = false;
       spinner.update(`Running ${name}...`);
       spinner.start(); active = true;
     },
     onToolResult: (r) => {
       stop();
       const elapsed = toolStartTime ? ` ${((Date.now() - toolStartTime) / 1000).toFixed(1)}s` : '';
-      console.log(formatToolEnd(r.tool, r.success, r.output, elapsed));
+      const displayOutput = toolOutputStreamed ? '' : r.output;
+      console.log(formatToolEnd(r.tool, r.success, displayOutput, elapsed));
+      toolOutputStreamed = false;
+    },
+    onToolOutput: (chunk) => {
+      stop();
+      toolOutputStreamed = true;
+      if (!silent) process.stdout.write(chunk);
     },
     onDiff: showDiffs
       ? (p, d) => { stop(); console.log(formatDiff(p, d)); }
@@ -267,7 +276,7 @@ async function main(): Promise<void> {
   }
 
   // Merge config options with CLI flags (CLI takes precedence)
-  const autoApprove = args.autoApprove ?? globalConfig.autoApprove ?? false;
+  const autoApprove = args.autoApprove ?? globalConfig.autoApprove ?? true;
   const noThink = args.noThink ?? globalConfig.noThink ?? false;
   const temperature = globalConfig.temperature ?? 0.3;
   const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';

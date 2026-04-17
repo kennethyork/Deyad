@@ -63,6 +63,7 @@ export interface ToolResult {
 export interface ToolCallbacks {
   confirm?: (question: string) => Promise<boolean>;
   onDiff?: (filePath: string, diff: string) => void;
+  onOutput?: (chunk: string) => void;
 }
 
 export type ToolHandler = (

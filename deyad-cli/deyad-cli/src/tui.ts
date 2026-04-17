@@ -212,8 +212,7 @@ export function formatToolStart(name: string, params: Record<string, string>): s
 
   const paramLines: string[] = [];
   for (const [k, v] of Object.entries(params)) {
-    const val = v.length > innerW - 15 ? v.slice(0, innerW - 18) + '...' : v;
-    paramLines.push(`  ${c.dim(k + ':')} ${val}`);
+    paramLines.push(`  ${c.dim(k + ':')} ${v}`);
   }
 
   const topLine = `${CYAN}${BOX.topLeft}${BOX.horizontal}${RESET} ${header} ${CYAN}${BOX.horizontal.repeat(Math.max(0, w - visibleLength(header) - 5))}${BOX.topRight}${RESET}`;
@@ -231,17 +230,14 @@ export function formatToolEnd(_name: string, success: boolean, output: string, e
   const icon = success ? c.green('✓') : c.red('✗');
   const statusLabel = success ? c.green('completed') : c.red('failed');
   const timeLabel = elapsed ? c.dim(elapsed) : '';
-  const allLines = output.split('\n');
-  const maxPreview = 20;
-  const preview = allLines.slice(0, maxPreview).map((l) => truncate(l, innerW));
-  
-  const bodyLines = preview.map((line) => {
-    return `${CYAN}${BOX.vertical}${RESET} ${padRight(c.dim(line), innerW)} ${CYAN}${BOX.vertical}${RESET}`;
-  });
 
-  if (allLines.length > maxPreview) {
-    const moreMsg = c.dim(`… ${allLines.length - maxPreview} more lines`);
-    bodyLines.push(`${CYAN}${BOX.vertical}${RESET} ${padRight(moreMsg, innerW)} ${CYAN}${BOX.vertical}${RESET}`);
+  const bodyLines: string[] = [];
+  if (output.trim()) {
+    const allLines = output.split('\n');
+    const preview = allLines.map((l) => truncate(l, innerW));
+    for (const line of preview) {
+      bodyLines.push(`${CYAN}${BOX.vertical}${RESET} ${padRight(c.dim(line), innerW)} ${CYAN}${BOX.vertical}${RESET}`);
+    }
   }
 
   const statusText = `${icon} ${statusLabel}${timeLabel}`;

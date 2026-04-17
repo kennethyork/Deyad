@@ -95,7 +95,7 @@ describe('formatToolStart', () => {
     const longVal = 'x'.repeat(200);
     const result = formatToolStart('write_files', { content: longVal });
     const plain = strip(result);
-    expect(plain).toContain('...');
+    expect(plain).toContain('…');
   });
 });
 
@@ -120,11 +120,11 @@ describe('formatToolEnd', () => {
     expect(plain).toContain('1.2s');
   });
 
-  it('truncates long output to preview lines', () => {
+  it('shows all output lines', () => {
     const longOutput = Array.from({ length: 50 }, (_, i) => `line ${i}`).join('\n');
     const result = formatToolEnd('search_files', true, longOutput);
     const plain = strip(result);
-    expect(plain).toContain('more lines');
+    expect(plain).toContain('line 49');
   });
 });
 
