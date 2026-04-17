@@ -158,7 +158,7 @@ export function createCallbacks(opts: CallbackOptions = {}): AgentCallbacks {
       if (thinkingStarted && !silent) { process.stdout.write('\x1b[0m\n'); thinkingStarted = false; }
       console.error(formatError(e));
     },
-    confirm: askConfirm ?? (async () => autoApprove),
+    confirm: autoApprove ? (async () => true) : (askConfirm ?? (async () => false)),
   };
 }
 
