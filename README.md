@@ -212,7 +212,7 @@ Drop custom templates into `plugins/` with a `plugin.json` manifest. Auto-discov
 | DB Admin | Prisma Studio |
 | Version control | Git |
 | Packaging | Electron Builder |
-| Tests | Vitest (578 passing — 476 desktop + 102 CLI) |
+| Tests | Vitest (1722 passing — 1192 desktop + 530 CLI) |
 
 ---
 
@@ -381,7 +381,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now ollama-warmup.service
 ```
 
-Replace `YOUR_MODEL_NAME` with your model (e.g. `qwen3.5:27b`).
+Replace `YOUR_MODEL_NAME` with your model (e.g. `qwen3:8b`, `llama3.2`).
 
 #### 3. Hardware Config (Optional)
 
@@ -394,7 +394,7 @@ The CLI auto-detects all CPU cores. Override in `~/.deyad/config.json`:
 }
 ```
 
-**Result:** `deyad --print "hello"` runs in **~0.9s** with a warm model.
+**Result:** `deyad --print "hello"` runs in **< 1s** with a warm model.
 
 </details>
 
