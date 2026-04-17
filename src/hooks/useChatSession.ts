@@ -59,6 +59,13 @@ export function useChatSession({
   const embedModelRef = useRef('');
   const contextSizeRef = useRef(32768);
   const fullHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
+  const MAX_FULLHISTORY = 500;
+  const appendFullHistory = (entry: { role: string; content: string }) => {
+    fullHistoryRef.current = [...fullHistoryRef.current, entry];
+    if (fullHistoryRef.current.length > MAX_FULLHISTORY) {
+      fullHistoryRef.current = fullHistoryRef.current.slice(-MAX_FULLHISTORY);
+    }
+  };
   const modelOptionsRef = useRef<{ temperature: number; top_p: number; repeat_penalty: number }>({ temperature: 0.7, top_p: 0.9, repeat_penalty: 1.1 });
   const rafRef = useRef<number>(0);
 
@@ -274,7 +281,7 @@ export function useChatSession({
     }
 
     // Append user message to fullHistory
-    fullHistoryRef.current = [...fullHistoryRef.current, { role: 'user', content: text }];
+    appendFullHistory({ role: 'user', content: text });
 
     // Use full history — compaction in agent loop handles trimming
     for (const msg of newMessages) {
@@ -348,7 +355,7 @@ User's instructions: ${text}`;
       const finalContent = streamBuf.current;
 
       // Append assistant response to fullHistory
-      fullHistoryRef.current = [...fullHistoryRef.current, { role: 'assistant', content: finalContent }];
+      appendFullHistory({ role: 'assistant', content: finalContent });
 
       const parsed = extractFilesFromResponse(finalContent);
 
@@ -419,7 +426,7 @@ User's instructions: ${text}`;
     setMessages(newMessages);
 
     // Append user message to fullHistory
-    fullHistoryRef.current = [...fullHistoryRef.current, { role: 'user', content: text }];
+    appendFullHistory({ role: 'user', content: text });
 
     const assistantId = (Date.now() + 1).toString();
     assistantIdRef.current = assistantId;
@@ -501,7 +508,7 @@ User's instructions: ${text}`;
           }
           // Append assistant response to fullHistory
           if (streamBuf.current) {
-            fullHistoryRef.current = [...fullHistoryRef.current, { role: 'assistant', content: streamBuf.current }];
+            appendFullHistory({ role: 'assistant', content: streamBuf.current });
           }
           setStreaming(false);
           agentAbortRef.current = null;

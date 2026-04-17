@@ -22,6 +22,19 @@ const MIN_KEEP = 6;
 /** Max chars for the compacted summary itself. */
 const MAX_SUMMARY_CHARS = 24_000;
 
+/** Maximum number of entries to keep in fullHistory before trimming old ones. */
+const MAX_FULLHISTORY_ENTRIES = 500;
+
+/**
+ * Trim fullHistory in-place if it exceeds the cap.
+ * Keeps the most recent entries.
+ */
+function trimFullHistory(history: Array<{ role: string; content: string }>): void {
+  if (history.length > MAX_FULLHISTORY_ENTRIES) {
+    history.splice(0, history.length - MAX_FULLHISTORY_ENTRIES);
+  }
+}
+
 /**
  * Extract structured details from tool call XML in assistant messages.
  */
@@ -162,9 +175,14 @@ function buildRichSummary(toSummarize: Array<{ role: string; content: string }>)
   return summary;
 }
 
+/** Tracks how many fullHistory entries were covered by the last compaction summary. */
+let lastCompactedIndex = 0;
+
 /**
  * Compact the conversation when it exceeds the character budget.
- * Uses rich structured summaries that preserve file paths, commands, and agent reasoning.
+ * Uses incremental summaries — only processes new fullHistory entries since
+ * the last compaction, and prepends the previous summary to avoid re-scanning
+ * the entire history each time.
  */
 function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
@@ -185,12 +203,46 @@ function compactConversation(
   const compactEnd = messages.length - MIN_KEEP;
   const toSummarize = messages.slice(firstNonSystem, compactEnd);
 
-  // Use fullHistory (uncompacted) for richer summaries when available
-  const summarySource = fullHistory && fullHistory.length > 0
-    ? fullHistory.filter(m => m.role !== 'system' || !m.content.startsWith('[Earlier conversation'))
-    : toSummarize;
+  // Find the existing summary (if any) from a prior compaction
+  let existingSummary = '';
+  for (let i = firstNonSystem; i < compactEnd; i++) {
+    if (messages[i].role === 'system' && messages[i].content.startsWith('[Earlier conversation')) {
+      existingSummary = messages[i].content;
+      break;
+    }
+  }
 
-  const summary = buildRichSummary(summarySource);
+  let summary: string;
+
+  if (fullHistory && fullHistory.length > 0) {
+    // Trim fullHistory if it's grown too large
+    trimFullHistory(fullHistory);
+
+    // Incremental: only summarize entries added since the last compaction
+    const newEntries = fullHistory.slice(lastCompactedIndex).filter(
+      m => m.role !== 'system' || !m.content.startsWith('[Earlier conversation'),
+    );
+    lastCompactedIndex = fullHistory.length;
+
+    if (newEntries.length === 0 && existingSummary) {
+      // Nothing new — keep existing summary
+      summary = existingSummary;
+    } else {
+      const incrementalSummary = buildRichSummary(newEntries);
+      if (existingSummary) {
+        // Merge: existing summary + new incremental section
+        const merged = existingSummary + '\n\n---\n\n[Continued]\n' + incrementalSummary.replace('[Earlier conversation — detailed summary]', '').trim();
+        summary = merged.length > MAX_SUMMARY_CHARS
+          ? merged.slice(0, MAX_SUMMARY_CHARS) + '\n\n[...summary truncated]'
+          : merged;
+      } else {
+        summary = incrementalSummary;
+      }
+    }
+  } else {
+    summary = buildRichSummary(toSummarize);
+  }
+
   messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
     role: 'system' as const,
     content: summary,
@@ -347,6 +399,9 @@ function streamOllamaTurn(
 export function runAgentLoop(options: AgentOptions): () => void {
   const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, contextSize, fullHistory, callbacks } = options;
   let aborted = false;
+
+  // Reset incremental compaction index for this loop session
+  lastCompactedIndex = 0;
 
   const abort = () => { aborted = true; };
 
