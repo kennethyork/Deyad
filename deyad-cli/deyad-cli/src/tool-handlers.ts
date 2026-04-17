@@ -215,7 +215,7 @@ export async function executeBuiltinTool(
           } catch (e) { debugLog('shell-parse fallback: %s', (e as Error).message); }
           const spawnArgs: [string, string[]] = isSimple
             ? [(parsed as string[])[0]!, (parsed as string[]).slice(1)]
-            : ['/bin/sh', ['-c', command]];
+            : ['/bin/bash', ['-c', command]];
           const output = await new Promise<string>((resolve, reject) => {
             const child = spawn(spawnArgs[0], spawnArgs[1], {
               cwd,
