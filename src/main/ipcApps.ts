@@ -322,6 +322,22 @@ export function registerAppHandlers(
     catch (err) { console.debug('Handled error:', err); return []; }
   });
 
+  ipcMain.handle('apps:save-fullhistory', (_event, { appId, history }: { appId: string; history: Array<{ role: string; content: string }> }) => {
+    const dir = appDir(appId);
+    if (!fs.existsSync(dir)) return false;
+    try {
+      fs.writeFileSync(path.join(dir, 'deyad-fullhistory.json'), JSON.stringify(history), 'utf-8');
+      return true;
+    } catch (err) { console.debug('Handled error:', err); return false; }
+  });
+
+  ipcMain.handle('apps:load-fullhistory', (_event, appId: string) => {
+    const file = path.join(appDir(appId), 'deyad-fullhistory.json');
+    if (!fs.existsSync(file)) return [];
+    try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
+    catch (err) { console.debug('Handled error:', err); return []; }
+  });
+
   // ── Dev Server (Preview) ──────────────────────────────────────────────────
 
   ipcMain.handle('apps:dev-start', async (event, appId: string) => {

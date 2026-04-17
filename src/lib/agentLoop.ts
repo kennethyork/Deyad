@@ -168,6 +168,7 @@ function buildRichSummary(toSummarize: Array<{ role: string; content: string }>)
  */
 function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
+  fullHistory?: Array<{ role: string; content: string }>,
 ): void {
   const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);
   if (totalChars <= MAX_CONVERSATION_CHARS) return;
@@ -184,7 +185,12 @@ function compactConversation(
   const compactEnd = messages.length - MIN_KEEP;
   const toSummarize = messages.slice(firstNonSystem, compactEnd);
 
-  const summary = buildRichSummary(toSummarize);
+  // Use fullHistory (uncompacted) for richer summaries when available
+  const summarySource = fullHistory && fullHistory.length > 0
+    ? fullHistory.filter(m => m.role !== 'system' || !m.content.startsWith('[Earlier conversation'))
+    : toSummarize;
+
+  const summary = buildRichSummary(summarySource);
   messages.splice(firstNonSystem, compactEnd - firstNonSystem, {
     role: 'system' as const,
     content: summary,
@@ -225,6 +231,8 @@ export interface AgentOptions {
   modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number };
   /** Context window size in tokens — sent as num_ctx to Ollama. */
   contextSize?: number;
+  /** Full uncompacted conversation history — used for richer compaction summaries. */
+  fullHistory?: Array<{ role: string; content: string }>;
   callbacks: AgentCallbacks;
 }
 
@@ -337,7 +345,7 @@ function streamOllamaTurn(
  * Returns a cleanup function that can abort the loop.
  */
 export function runAgentLoop(options: AgentOptions): () => void {
-  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, contextSize, callbacks } = options;
+  const { appId, appType, dbProvider, dbStatus, model, userMessage, appFiles, selectedFile, history, embedModel, modelOptions, contextSize, fullHistory, callbacks } = options;
   let aborted = false;
 
   const abort = () => { aborted = true; };
@@ -414,7 +422,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
           break;
         }
         // Compact conversation if it's getting too large for the context window
-        compactConversation(messages);
+        compactConversation(messages, fullHistory);
 
         // Stream one turn from Ollama (with native tools)
         const ollamaOpts = contextSize

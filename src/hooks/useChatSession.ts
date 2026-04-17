@@ -58,6 +58,7 @@ export function useChatSession({
   const MAX_AUTO_FIX_ATTEMPTS = 3;
   const embedModelRef = useRef('');
   const contextSizeRef = useRef(32768);
+  const fullHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
   const modelOptionsRef = useRef<{ temperature: number; top_p: number; repeat_penalty: number }>({ temperature: 0.7, top_p: 0.9, repeat_penalty: 1.1 });
   const rafRef = useRef<number>(0);
 
@@ -127,15 +128,20 @@ export function useChatSession({
     loadModels();
   }, []);
 
-  // Load saved messages when app changes
+  // Load saved messages and fullHistory when app changes
   useEffect(() => {
     (async () => {
       try {
-        const saved = await window.deyad.loadMessages(app.id);
+        const [saved, savedHistory] = await Promise.all([
+          window.deyad.loadMessages(app.id),
+          window.deyad.loadFullHistory(app.id),
+        ]);
         setMessages(saved || []);
+        fullHistoryRef.current = savedHistory || [];
       } catch (err) {
         console.debug('Handled error:', err);
         setMessages([]);
+        fullHistoryRef.current = [];
       }
     })();
   }, [app.id]);
@@ -185,6 +191,7 @@ export function useChatSession({
   const saveMessages = useCallback(
     (msgs: UiMessage[]) => {
       window.deyad.saveMessages(app.id, msgs).catch((err) => console.warn('Failed to save messages:', err));
+      window.deyad.saveFullHistory(app.id, fullHistoryRef.current).catch((err) => console.warn('Failed to save fullHistory:', err));
     },
     [app.id],
   );
@@ -266,8 +273,11 @@ export function useChatSession({
       }
     }
 
-    const recentMessages = newMessages.slice(-10);
-    for (const msg of recentMessages) {
+    // Append user message to fullHistory
+    fullHistoryRef.current = [...fullHistoryRef.current, { role: 'user', content: text }];
+
+    // Use full history — compaction in agent loop handles trimming
+    for (const msg of newMessages) {
       ollamaMessages.push({ role: msg.role, content: msg.content });
     }
 
@@ -337,6 +347,9 @@ User's instructions: ${text}`;
       }
       const finalContent = streamBuf.current;
 
+      // Append assistant response to fullHistory
+      fullHistoryRef.current = [...fullHistoryRef.current, { role: 'assistant', content: finalContent }];
+
       const parsed = extractFilesFromResponse(finalContent);
 
       if (parsed.length > 0) {
@@ -405,6 +418,9 @@ User's instructions: ${text}`;
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
 
+    // Append user message to fullHistory
+    fullHistoryRef.current = [...fullHistoryRef.current, { role: 'user', content: text }];
+
     const assistantId = (Date.now() + 1).toString();
     assistantIdRef.current = assistantId;
     setStreaming(true);
@@ -435,6 +451,7 @@ User's instructions: ${text}`;
       embedModel: embedModelRef.current || undefined,
       modelOptions: modelOptionsRef.current,
       contextSize: contextSizeRef.current,
+      fullHistory: fullHistoryRef.current,
       callbacks: {
         onContent: (fullText: string) => {
           streamBuf.current = stripToolMarkup(fullText);
@@ -481,6 +498,10 @@ User's instructions: ${text}`;
             setMessages((prev) =>
               prev.map((m) => (m.id === assistantId ? { ...m, content: snapshot } : m)),
             );
+          }
+          // Append assistant response to fullHistory
+          if (streamBuf.current) {
+            fullHistoryRef.current = [...fullHistoryRef.current, { role: 'assistant', content: streamBuf.current }];
           }
           setStreaming(false);
           agentAbortRef.current = null;

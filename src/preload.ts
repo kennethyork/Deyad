@@ -125,6 +125,12 @@ contextBridge.exposeInMainWorld('deyad', {
   loadMessages: (appId: string): Promise<UiMessage[]> =>
     ipcRenderer.invoke('apps:load-messages', appId),
 
+  saveFullHistory: (appId: string, history: Array<{ role: string; content: string }>): Promise<boolean> =>
+    ipcRenderer.invoke('apps:save-fullhistory', { appId, history }),
+
+  loadFullHistory: (appId: string): Promise<Array<{ role: string; content: string }>> =>
+    ipcRenderer.invoke('apps:load-fullhistory', appId),
+
   // ── Dev Server (Preview) ────────────────────────────────────────────────
   appDevStart: (appId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('apps:dev-start', appId),

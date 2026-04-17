@@ -119,6 +119,8 @@ declare global {
     renameApp(appId: string, newName: string): Promise<boolean>;
     saveMessages(appId: string, messages: UiMessage[]): Promise<boolean>;
     loadMessages(appId: string): Promise<UiMessage[]>;
+    saveFullHistory(appId: string, history: Array<{ role: string; content: string }>): Promise<boolean>;
+    loadFullHistory(appId: string): Promise<Array<{ role: string; content: string }>>;
     importApp(name: string): Promise<AppProject | null>;
     duplicateApp(appId: string): Promise<AppProject | null>;
     searchFiles(appId: string, query: string): Promise<Array<{ file: string; line: number; text: string }>>;

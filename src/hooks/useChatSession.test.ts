@@ -45,6 +45,8 @@ function makeDeyadMock(): DeyadAPI {
     onAppDevLog: vi.fn().mockReturnValue(() => {}),
     loadMessages: vi.fn().mockResolvedValue([]),
     saveMessages: vi.fn().mockResolvedValue(true),
+    loadFullHistory: vi.fn().mockResolvedValue([]),
+    saveFullHistory: vi.fn().mockResolvedValue(true),
     readFiles: vi.fn().mockResolvedValue({ 'src/App.tsx': 'export default () => <div/>' }),
     dbDescribe: vi.fn().mockResolvedValue({ tables: [] }),
   } as unknown as DeyadAPI;
