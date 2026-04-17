@@ -24,11 +24,36 @@ export interface ToolResult {
 /** Parse all <tool_call> blocks from an AI response. */
 export function parseToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
-  const pattern = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
+
+  /** Sanitise a parsed tool name — strip XML artefacts from malformed model output. */
+  const sanitizeName = (raw: string): string => raw.replace(/<[^>]*>?/g, '').replace(/[^a-zA-Z0-9_-]/g, '').trim();
+
+  // ── Pre-process: repair truncated tool calls ──
+  let repaired = text;
+  const openCount = (repaired.match(/<tool_call>/g) || []).length;
+  const closeCount = (repaired.match(/<\/tool_call>/g) || []).length;
+  if (openCount > closeCount) {
+    for (let i = 0; i < openCount - closeCount; i++) {
+      repaired += '\n</tool_call>';
+    }
+  }
+
+  // Repair unclosed <param> tags
+  repaired = repaired.replace(/<param\s+name="([^"]*)">([\s\S]*?)(?=<(?:param|\/tool_call|tool_call|name)|$)/g,
+    (full, pName: string, pValue: string) => {
+      if (full.includes('</param>')) return full;
+      return `<param name="${pName}">${pValue.trim()}</param>`;
+    }
+  );
+
   let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text)) !== null) {
-    const name = match[1].trim();
-    const body = match[2];
+
+  // Format 1: <tool_call><name>...</name><param name="...">...</param></tool_call>
+  const pattern1 = /<tool_call>\s*<name>([\s\S]*?)<\/name>([\s\S]*?)<\/tool_call>/g;
+  while ((match = pattern1.exec(repaired)) !== null) {
+    const name = sanitizeName(match[1]);
+    if (!name) continue;
+    const body = match[2] ?? '';
     const params: Record<string, string> = {};
     const paramPattern = /<param\s+name="([^"]+)">([\s\S]*?)<\/param>/g;
     let pm: RegExpExecArray | null;
@@ -37,6 +62,81 @@ export function parseToolCalls(text: string): ToolCall[] {
     }
     calls.push({ name, params });
   }
+
+  // Format 2: <function=name><parameter=key>value</parameter></function>
+  const pattern2 = /<function=([^>]+)>([\s\S]*?)<\/function>/g;
+  while ((match = pattern2.exec(repaired)) !== null) {
+    const name = sanitizeName(match[1]);
+    if (!name) continue;
+    const body = match[2] ?? '';
+    const params: Record<string, string> = {};
+    const paramPattern2 = /<parameter=([^>]+)>([\s\S]*?)<\/parameter>/g;
+    let pm: RegExpExecArray | null;
+    while ((pm = paramPattern2.exec(body)) !== null) {
+      params[pm[1].trim()] = (pm[2] ?? '').trim();
+    }
+    calls.push({ name, params });
+  }
+
+  // Format 3: ```tool_call\n{"name":"...","parameters":{...}}\n``` (JSON in code block)
+  const pattern3 = /```tool_call\s*\n([\s\S]*?)\n\s*```/g;
+  while ((match = pattern3.exec(repaired)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed.name) {
+        const name = sanitizeName(parsed.name);
+        if (!name) continue;
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed.parameters ?? parsed.params ?? {})) {
+          params[k] = String(v);
+        }
+        calls.push({ name, params });
+      }
+    } catch { /* skip malformed JSON */ }
+  }
+
+  // Format 4: <tool_call>{"name":"...","arguments":{...}}</tool_call> (JSON inside XML — qwen3 native)
+  if (calls.length === 0) {
+    const pattern4 = /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g;
+    while ((match = pattern4.exec(repaired)) !== null) {
+      try {
+        const parsed = JSON.parse(match[1].trim());
+        const name = sanitizeName(parsed.name ?? parsed.function?.name ?? '');
+        if (!name) continue;
+        const args = parsed.arguments ?? parsed.parameters ?? parsed.params ?? parsed.function?.arguments ?? {};
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(args)) {
+          params[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+        calls.push({ name, params });
+      } catch { /* skip malformed JSON */ }
+    }
+  }
+
+  // Format 5: bare JSON — {"name":"tool_name","arguments":{...}} with no XML wrapper at all
+  // Only used as last resort; gated by known tool names to avoid false positives.
+  if (calls.length === 0) {
+    const KNOWN_TOOLS = new Set([
+      'list_files', 'read_file', 'write_files', 'edit_file', 'multi_edit',
+      'delete_file', 'glob_files', 'search_files', 'run_command',
+      'fetch_url', 'browser',
+    ]);
+    const pattern5 = /\{\s*"(?:name|function)"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
+    while ((match = pattern5.exec(repaired)) !== null) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        const name = sanitizeName(parsed.name ?? parsed.function?.name ?? parsed.function ?? '');
+        if (!name || !KNOWN_TOOLS.has(name)) continue;
+        const args = parsed.arguments ?? parsed.parameters ?? parsed.params ?? parsed.function?.arguments ?? {};
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(args)) {
+          params[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+        calls.push({ name, params });
+      } catch { /* skip malformed JSON */ }
+    }
+  }
+
   return calls;
 }
 
@@ -50,6 +150,8 @@ export function stripToolMarkup(text: string): string {
   return text
     .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '')
     .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, '')
+    .replace(/<function=[^>]*>[\s\S]*?<\/function>/g, '')
+    .replace(/```tool_call\s*\n[\s\S]*?\n\s*```/g, '')
     .replace(/<done\s*\/?>/g, '')
     .trim();
 }

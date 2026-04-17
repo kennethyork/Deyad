@@ -6,7 +6,7 @@
  * the task is complete.
  */
 
-import { parseToolCalls, executeTool, isDone, stripToolMarkup, AGENT_TOOLS_DESCRIPTION, getDesktopOllamaTools } from './agentTools';
+import { parseToolCalls, executeTool, isDone, stripToolMarkup, AGENT_TOOLS_DESCRIPTION } from './agentTools';
 import type { ToolResult, ToolCall } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
@@ -474,9 +474,6 @@ export function runAgentLoop(options: AgentOptions): () => void {
       const allChangedFiles = new Set<string>();
       const allCommands: string[] = [];
 
-      // Get Ollama-native tool definitions
-      const ollamaTools = getDesktopOllamaTools();
-
       const MAX_ITERATIONS = 50;
       let iteration = 0;
 
@@ -490,14 +487,14 @@ export function runAgentLoop(options: AgentOptions): () => void {
         // Compact conversation if it's getting too large for the context window
         compactConversation(messages, fullHistory, contextSize, options.maxFullHistory);
 
-        // Stream one turn from Ollama (with native tools)
+        // Stream one turn from Ollama (Deyad parses tool calls from text, no native tools)
         const ollamaOpts = contextSize
           ? { ...modelOptions, num_ctx: contextSize }
           : modelOptions;
         const { text: turnResponse, nativeToolCalls } = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        }, () => aborted, ollamaOpts, ollamaTools);
+        }, () => aborted, ollamaOpts, undefined);
 
         if (aborted) break;
 

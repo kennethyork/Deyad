@@ -190,6 +190,49 @@ export function parseToolCalls(text: string): ToolCall[] {
     } catch (e) { debugLog('tool call JSON parse failed: %s', (e as Error).message); }
   }
 
+  // Format 4: <tool_call>{"name":"...","arguments":{...}}</tool_call> (JSON inside XML — qwen3 native)
+  if (calls.length === 0) {
+    const pattern4 = /<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/g;
+    while ((match = pattern4.exec(repaired)) !== null) {
+      try {
+        const parsed = JSON.parse(match[1]!.trim());
+        const name = sanitizeName(parsed.name ?? parsed.function?.name ?? '');
+        if (!name) continue;
+        const args = parsed.arguments ?? parsed.parameters ?? parsed.params ?? parsed.function?.arguments ?? {};
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(args)) {
+          params[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+        calls.push({ name, params });
+      } catch (e) { debugLog('tool call JSON-in-XML parse failed: %s', (e as Error).message); }
+    }
+  }
+
+  // Format 5: bare JSON — {"name":"tool_name","arguments":{...}} with no XML wrapper at all
+  // Only used as last resort; gated by known tool names to avoid false positives.
+  if (calls.length === 0) {
+    const KNOWN_TOOLS = new Set([
+      'list_files', 'read_file', 'write_files', 'edit_file', 'multi_edit',
+      'delete_file', 'glob_files', 'search_files', 'run_command',
+      'git_status', 'git_log', 'git_diff', 'git_branch', 'git_add', 'git_commit', 'git_stash',
+      'fetch_url', 'memory_read', 'memory_write', 'memory_list', 'memory_delete', 'browser',
+    ]);
+    const pattern5 = /\{\s*"(?:name|function)"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
+    while ((match = pattern5.exec(repaired)) !== null) {
+      try {
+        const parsed = JSON.parse(match[0]);
+        const name = sanitizeName(parsed.name ?? parsed.function?.name ?? parsed.function ?? '');
+        if (!name || !KNOWN_TOOLS.has(name)) continue;
+        const args = parsed.arguments ?? parsed.parameters ?? parsed.params ?? parsed.function?.arguments ?? {};
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(args)) {
+          params[k] = typeof v === 'string' ? v : JSON.stringify(v);
+        }
+        calls.push({ name, params });
+      } catch (e) { debugLog('bare JSON tool call parse failed: %s', (e as Error).message); }
+    }
+  }
+
   return calls;
 }
 

@@ -17,7 +17,7 @@ import { initMCP, closeMCP } from './mcp.js';
 import { closeBrowser } from './browser.js';
 import {
   parseToolCallsFromTurn, dispatchTools, runAutoLint, formatToolResultMessages,
-  READ_ONLY_TOOLS, isDone, stripToolMarkup, getOllamaTools,
+  READ_ONLY_TOOLS, isDone, stripToolMarkup,
 } from './agent-helpers.js';
 import { debugLog } from './debug.js';
 
@@ -238,17 +238,6 @@ export async function runAgentLoop(
         break;
       }
       compactConversation(messages, options?.contextSize, options?.fullHistory, options?.maxFullHistory);
-      const nativeTools = getOllamaTools();
-      // Filter tools based on allowed/restricted lists
-      const filteredTools = nativeTools.filter(tool => {
-        if (restrictedTools.length > 0 && restrictedTools.includes(tool.function.name)) {
-          return false;
-        }
-        if (allowedTools.length > 0 && !allowedTools.includes(tool.function.name)) {
-          return false;
-        }
-        return true;
-      });
       // When think=true (default), think on iteration 0 (planning) but skip for
       // follow-ups to keep tool-result processing fast. think=false disables entirely.
       const iterThink = think === false ? false : (iteration === 0 ? (think ?? true) : false);
@@ -261,38 +250,15 @@ export async function runAgentLoop(
           ollamaOpts,
           abortController.signal,
           callbacks.onThinkingToken,
-          filteredTools,
+          undefined, // skip native tools — use Deyad's own XML-based tool parsing
           iterThink,
           options?.ollamaHost,
         );
       } catch (err: unknown) {
         const errMsg = String((err as Error).message || err);
-        // If Ollama's native tool-call XML parser failed (500 + "XML syntax error"),
-        // retry WITHOUT native tools — let the model output raw XML that we parse ourselves.
-        if (/XML syntax error|xml.*unexpected/i.test(errMsg)) {
-          try {
-            result = await streamChat(
-              model,
-              messages,
-              callbacks.onToken,
-              ollamaOpts,
-              abortController.signal,
-              callbacks.onThinkingToken,
-              undefined, // no native tools — fall back to text-based XML parsing
-              iterThink,
-              options?.ollamaHost,
-            );
-          } catch (retryErr: unknown) {
-            const retryMsg = String((retryErr as Error).message || retryErr);
-            callbacks.onError(`Ollama error (retry): ${retryMsg}`);
-            if (iteration > 0) { iteration++; continue; }
-            break;
-          }
-        } else {
-          callbacks.onError(`Ollama error: ${errMsg}`);
-          if (iteration > 0) { iteration++; continue; }
-          break;
-        }
+        callbacks.onError(`Ollama error: ${errMsg}`);
+        if (iteration > 0) { iteration++; continue; }
+        break;
       }
       if (abortController.signal.aborted) break;
 
