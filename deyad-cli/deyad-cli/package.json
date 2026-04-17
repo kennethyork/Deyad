@@ -1,6 +1,6 @@
 {
   "name": "deyad-cli",
-  "version": "0.5.4+4743565",
+  "version": "0.5.5",
   "license": "Apache-2.0",
   "bin": {
     "deyad": "dist/cli.js"
