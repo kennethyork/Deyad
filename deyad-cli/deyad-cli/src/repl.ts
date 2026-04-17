@@ -140,6 +140,7 @@ async function generateCommitMessage(cfg: ReplConfig, cwd: string): Promise<stri
 /** Persist current REPL state to session storage. */
 function saveReplSession(state: ReplState): void {
   state.session.history = state.history;
+  state.session.fullHistory = state.fullHistory;
   state.session.totalTokens = state.totalTokens;
   state.session.taskCount = state.taskCount;
   state.session.model = state.cfg.model;
@@ -167,6 +168,8 @@ export interface ReplState {
   cfg: ReplConfig;
   session: ReturnType<typeof loadOrCreateSession>;
   history: OllamaMessage[];
+  /** Full uncompacted history — never loses detail. Persisted to session JSON. */
+  fullHistory: OllamaMessage[];
   totalTokens: number;
   taskCount: number;
   rl: readline.Interface;
@@ -179,7 +182,7 @@ export function startRepl(cfg: ReplConfig): void {
   let session = loadOrCreateSession(cfg.cwd, cfg.model);
   if (cfg.resume && session.history.length > 0) {
     const before = session.history.length;
-    compactConversation(session.history, cfg.contextSize);
+    compactConversation(session.history, cfg.contextSize, session.fullHistory);
     if (session.history.length < before) {
       console.log(c.dim(`  Resuming session ${session.id} (compacted ${before}→${session.history.length} messages, ${session.taskCount} tasks)`));
     } else {
@@ -209,6 +212,7 @@ export function startRepl(cfg: ReplConfig): void {
     cfg,
     session,
     history: cfg.resume ? session.history : [],
+    fullHistory: cfg.resume ? (session.fullHistory ?? [...session.history]) : [],
     totalTokens: cfg.resume ? session.totalTokens : 0,
     taskCount: cfg.resume ? session.taskCount : 0,
     rl,
@@ -253,7 +257,15 @@ export function startRepl(cfg: ReplConfig): void {
           maxIterations: cfg.maxIterations, allowedTools: cfg.allowedTools, restrictedTools: cfg.restrictedTools,
           numThread: cfg.numThread, numGpu: cfg.numGpu,
         });
+        // Append all new messages to fullHistory before compaction can discard them
+        const prevLen = state.history.length;
         state.history = result.history;
+        for (let i = prevLen; i < result.history.length; i++) {
+          const msg = result.history[i]!;
+          if (msg.role !== 'system' || !msg.content.startsWith('[Earlier conversation')) {
+            state.fullHistory.push(msg);
+          }
+        }
         state.totalTokens += result.stats.totalTokens;
         state.taskCount++;
 

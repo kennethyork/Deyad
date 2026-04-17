@@ -24,6 +24,8 @@ export interface SessionData {
   createdAt: string;
   updatedAt: string;
   history: OllamaMessage[];
+  /** Full uncompacted history — never loses detail. Used for session recovery. */
+  fullHistory?: OllamaMessage[];
   totalTokens: number;
   taskCount: number;
 }

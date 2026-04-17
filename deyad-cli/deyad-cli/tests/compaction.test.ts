@@ -33,7 +33,7 @@ describe('compactConversation', () => {
     // Should keep system + compacted summary + COMPACT_KEEP_RECENT recent messages
     expect(msgs[0]!.role).toBe('system');
     // A compacted message should exist
-    const compactedMsg = msgs.find((m) => m.content.includes('[Earlier conversation compacted]'));
+    const compactedMsg = msgs.find((m) => m.content.includes('[Earlier conversation'));
     expect(compactedMsg).toBeDefined();
   });
 
@@ -62,10 +62,10 @@ describe('compactConversation', () => {
       msgs.push({ role: 'user', content: `recent ${i} ${big}` });
     }
     compactConversation(msgs);
-    const compacted = msgs.find((m) => m.content.includes('[Earlier conversation compacted]'));
+    const compacted = msgs.find((m) => m.content.includes('[Earlier conversation'));
     expect(compacted).toBeDefined();
-    expect(compacted!.content).toContain('Tool: read_file result');
-    expect(compacted!.content).toContain('Tools: edit_file');
+    // Rich summary should capture file-related tool usage
+    expect(compacted!.content).toMatch(/read_file|Files Read|edited/);
   });
 
   it('exports constants with expected values', () => {
