@@ -205,7 +205,7 @@ async function main(): Promise<void> {
   const printPrompt = args.print;
   if (printPrompt !== undefined) {
     const globalConfig = loadConfig();
-    const model = args.model ?? process.env['DEYAD_MODEL'] ?? globalConfig.model ?? 'qwen3.5:27b';
+    const model = args.model ?? process.env['DEYAD_MODEL'] ?? globalConfig.model ?? 'qwen3.6:latest';
     const temperature = globalConfig.temperature ?? 0.3;
     const ollamaHost = globalConfig.ollamaHost ?? 'http://127.0.0.1:11434';
     const numThread = globalConfig.numThread ?? os.cpus().length;
