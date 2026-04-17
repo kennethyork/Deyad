@@ -18,7 +18,7 @@ export function isRetryableStatus(status: number): boolean {
 
 /** Returns true for error messages that indicate transient failures. */
 export function isRetryableError(msg: string): boolean {
-  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|network|timeout|aborted/i.test(msg);
+  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|socket hang up|network|timeout|aborted|fetch failed/i.test(msg);
 }
 
 /** Sleep helper for backoff delays. */
