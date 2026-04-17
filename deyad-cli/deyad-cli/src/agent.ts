@@ -175,6 +175,7 @@ export async function runAgentLoop(
     restrictedTools?: string[];
     numThread?: number;
     numGpu?: number;
+    fullHistory?: OllamaMessage[];
   },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
@@ -232,7 +233,7 @@ export async function runAgentLoop(
         callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
         break;
       }
-      compactConversation(messages, options?.contextSize);
+      compactConversation(messages, options?.contextSize, options?.fullHistory);
       const nativeTools = getOllamaTools();
       // Filter tools based on allowed/restricted lists
       const filteredTools = nativeTools.filter(tool => {

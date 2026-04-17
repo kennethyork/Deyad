@@ -255,7 +255,7 @@ export function startRepl(cfg: ReplConfig): void {
         const result = await runAgentLoop(cfg.model, input, cfg.cwd, replCallbacks, state.history, undefined, cfg.noThink ? false : true, {
           temperature: cfg.temperature, contextSize: cfg.contextSize, ollamaHost: cfg.ollamaHost,
           maxIterations: cfg.maxIterations, allowedTools: cfg.allowedTools, restrictedTools: cfg.restrictedTools,
-          numThread: cfg.numThread, numGpu: cfg.numGpu,
+          numThread: cfg.numThread, numGpu: cfg.numGpu, fullHistory: state.fullHistory,
         });
         // Append all new messages to fullHistory before compaction can discard them
         const prevLen = state.history.length;
