@@ -33,9 +33,9 @@ const MAX_FULLHISTORY_ENTRIES = 500;
  * Trim fullHistory in-place if it exceeds the cap.
  * Keeps the most recent entries.
  */
-function trimFullHistory(history: Array<{ role: string; content: string }>): void {
-  if (history.length > MAX_FULLHISTORY_ENTRIES) {
-    history.splice(0, history.length - MAX_FULLHISTORY_ENTRIES);
+function trimFullHistory(history: Array<{ role: string; content: string }>, max: number = MAX_FULLHISTORY_ENTRIES): void {
+  if (history.length > max) {
+    history.splice(0, history.length - max);
   }
 }
 
@@ -192,6 +192,7 @@ function compactConversation(
   messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_name?: string }>,
   fullHistory?: Array<{ role: string; content: string }>,
   contextTokens?: number,
+  maxFullHistory?: number,
 ): void {
   const maxChars = contextTokens
     ? Math.floor(contextTokens * 0.75 * CHARS_PER_TOKEN)
@@ -224,7 +225,7 @@ function compactConversation(
 
   if (fullHistory && fullHistory.length > 0) {
     // Trim fullHistory if it's grown too large
-    trimFullHistory(fullHistory);
+    trimFullHistory(fullHistory, maxFullHistory);
 
     // Incremental: only summarize entries added since the last compaction
     const newEntries = fullHistory.slice(lastCompactedIndex).filter(
@@ -293,6 +294,8 @@ export interface AgentOptions {
   contextSize?: number;
   /** Full uncompacted conversation history — used for richer compaction summaries. */
   fullHistory?: Array<{ role: string; content: string }>;
+  /** Maximum entries to keep in fullHistory before trimming (default: 500). */
+  maxFullHistory?: number;
   callbacks: AgentCallbacks;
 }
 
@@ -485,7 +488,7 @@ export function runAgentLoop(options: AgentOptions): () => void {
           break;
         }
         // Compact conversation if it's getting too large for the context window
-        compactConversation(messages, fullHistory, contextSize);
+        compactConversation(messages, fullHistory, contextSize, options.maxFullHistory);
 
         // Stream one turn from Ollama (with native tools)
         const ollamaOpts = contextSize

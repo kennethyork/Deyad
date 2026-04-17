@@ -21,6 +21,7 @@ describe('ReplConfig interface', () => {
       allowedTools: [],
       restrictedTools: [],
       resume: true,
+      maxFullHistory: 500,
     };
     expect(cfg.model).toBe('test');
     expect(cfg.cwd).toBe('/tmp');
@@ -34,8 +35,9 @@ describe('ReplConfig interface', () => {
       'model', 'models', 'cwd', 'autoApprove', 'noThink',
       'temperature', 'ollamaHost', 'contextSize', 'maxIterations',
       'gitAutoCommit', 'allowedTools', 'restrictedTools', 'resume',
+      'maxFullHistory',
     ];
-    expect(fields).toHaveLength(13);
+    expect(fields).toHaveLength(14);
   });
 });
 

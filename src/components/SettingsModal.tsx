@@ -18,6 +18,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
   const [topP, setTopP] = useState(0.9);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
   const [contextSize, setContextSize] = useState(32768);
+  const [maxFullHistory, setMaxFullHistory] = useState(500);
   const [models, setModels] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -38,6 +39,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
     setTopP(settings.topP ?? 0.9);
     setRepeatPenalty(settings.repeatPenalty ?? 1.1);
     setContextSize(settings.contextSize ?? 32768);
+    setMaxFullHistory(settings.maxFullHistory ?? 500);
     loadModels();
   };
 
@@ -61,6 +63,7 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
       topP,
       repeatPenalty,
       contextSize,
+      maxFullHistory,
       theme,
     });
     setSaving(false);
@@ -272,6 +275,25 @@ export default function SettingsModal({ onClose, theme, onThemeChange }: Props) 
               <span className="settings-slider-value">tokens</span>
             </div>
             <span className="settings-hint">Context window size sent to Ollama. Lower values use less VRAM (default: 32768)</span>
+          </div>
+
+          {/* ── Max Full History ──────────────────────────────── */}
+          <div className="form-field">
+            <label htmlFor="max-full-history">Max Full History Entries</label>
+            <div className="settings-slider-row">
+              <input
+                id="max-full-history"
+                type="number"
+                min="50"
+                max="10000"
+                step="50"
+                value={maxFullHistory}
+                onChange={(e) => setMaxFullHistory(parseInt(e.target.value, 10) || 500)}
+                style={{ width: '120px' }}
+              />
+              <span className="settings-slider-value">entries</span>
+            </div>
+            <span className="settings-hint">Maximum conversation history entries kept for compaction summaries (default: 500)</span>
           </div>
 
         </div>

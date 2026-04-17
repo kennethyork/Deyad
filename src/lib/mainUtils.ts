@@ -101,6 +101,7 @@ export interface DeyadSettings {
   topP: number;
   repeatPenalty: number;
   contextSize: number;
+  maxFullHistory: number;
 }
 
 export const DEFAULT_SETTINGS: DeyadSettings = {
@@ -115,6 +116,7 @@ export const DEFAULT_SETTINGS: DeyadSettings = {
   topP: 0.9,
   repeatPenalty: 1.1,
   contextSize: 32768,
+  maxFullHistory: 500,
 };
 
 export function loadSettings(settingsPath: string): DeyadSettings {

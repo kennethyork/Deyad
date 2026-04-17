@@ -40,6 +40,7 @@ export interface ReplConfig {
   resume: boolean;
   numThread?: number;
   numGpu?: number;
+  maxFullHistory: number;
 }
 
 /** Tab-completion for REPL commands and file paths. */
@@ -182,7 +183,7 @@ export function startRepl(cfg: ReplConfig): void {
   let session = loadOrCreateSession(cfg.cwd, cfg.model);
   if (cfg.resume && session.history.length > 0) {
     const before = session.history.length;
-    compactConversation(session.history, cfg.contextSize, session.fullHistory);
+    compactConversation(session.history, cfg.contextSize, session.fullHistory, cfg.maxFullHistory);
     if (session.history.length < before) {
       console.log(c.dim(`  Resuming session ${session.id} (compacted ${before}→${session.history.length} messages, ${session.taskCount} tasks)`));
     } else {
@@ -255,7 +256,7 @@ export function startRepl(cfg: ReplConfig): void {
         const result = await runAgentLoop(cfg.model, input, cfg.cwd, replCallbacks, state.history, undefined, cfg.noThink ? false : true, {
           temperature: cfg.temperature, contextSize: cfg.contextSize, ollamaHost: cfg.ollamaHost,
           maxIterations: cfg.maxIterations, allowedTools: cfg.allowedTools, restrictedTools: cfg.restrictedTools,
-          numThread: cfg.numThread, numGpu: cfg.numGpu, fullHistory: state.fullHistory,
+          numThread: cfg.numThread, numGpu: cfg.numGpu, fullHistory: state.fullHistory, maxFullHistory: cfg.maxFullHistory,
         });
         // Append all new messages to fullHistory before compaction can discard them
         const prevLen = state.history.length;
@@ -267,7 +268,7 @@ export function startRepl(cfg: ReplConfig): void {
           }
         }
         // Cap fullHistory to prevent unbounded growth
-        trimFullHistory(state.fullHistory);
+        trimFullHistory(state.fullHistory, cfg.maxFullHistory);
         state.totalTokens += result.stats.totalTokens;
         state.taskCount++;
 

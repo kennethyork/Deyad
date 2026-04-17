@@ -59,11 +59,11 @@ export function useChatSession({
   const embedModelRef = useRef('');
   const contextSizeRef = useRef(32768);
   const fullHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
-  const MAX_FULLHISTORY = 500;
+  const maxFullHistoryRef = useRef(500);
   const appendFullHistory = (entry: { role: string; content: string }) => {
     fullHistoryRef.current = [...fullHistoryRef.current, entry];
-    if (fullHistoryRef.current.length > MAX_FULLHISTORY) {
-      fullHistoryRef.current = fullHistoryRef.current.slice(-MAX_FULLHISTORY);
+    if (fullHistoryRef.current.length > maxFullHistoryRef.current) {
+      fullHistoryRef.current = fullHistoryRef.current.slice(-maxFullHistoryRef.current);
     }
   };
   const modelOptionsRef = useRef<{ temperature: number; top_p: number; repeat_penalty: number }>({ temperature: 0.7, top_p: 0.9, repeat_penalty: 1.1 });
@@ -178,6 +178,7 @@ export function useChatSession({
           embedModelRef.current = settings.embedModel;
         }
         contextSizeRef.current = settings.contextSize ?? 32768;
+        maxFullHistoryRef.current = settings.maxFullHistory ?? 500;
         modelOptionsRef.current = {
           temperature: settings.temperature ?? 0.7,
           top_p: settings.topP ?? 0.9,
@@ -459,6 +460,7 @@ User's instructions: ${text}`;
       modelOptions: modelOptionsRef.current,
       contextSize: contextSizeRef.current,
       fullHistory: fullHistoryRef.current,
+      maxFullHistory: maxFullHistoryRef.current,
       callbacks: {
         onContent: (fullText: string) => {
           streamBuf.current = stripToolMarkup(fullText);

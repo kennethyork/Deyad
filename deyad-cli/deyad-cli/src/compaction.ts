@@ -21,16 +21,16 @@ const CHARS_PER_TOKEN = 4;
 /** Max chars for the compacted summary itself (must fit in context with recent messages). */
 const MAX_SUMMARY_CHARS = 24_000;
 
-/** Maximum number of entries to keep in fullHistory before trimming old ones. */
+/** Default maximum number of entries to keep in fullHistory before trimming old ones. */
 export const MAX_FULLHISTORY_ENTRIES = 500;
 
 /**
  * Trim fullHistory in-place if it exceeds the cap.
  * Keeps the most recent entries.
  */
-export function trimFullHistory(history: OllamaMessage[]): void {
-  if (history.length > MAX_FULLHISTORY_ENTRIES) {
-    history.splice(0, history.length - MAX_FULLHISTORY_ENTRIES);
+export function trimFullHistory(history: OllamaMessage[], max: number = MAX_FULLHISTORY_ENTRIES): void {
+  if (history.length > max) {
+    history.splice(0, history.length - max);
   }
 }
 
@@ -208,7 +208,7 @@ function buildRichSummary(toSummarize: OllamaMessage[]): string {
  * Older non-system messages are replaced with a rich summary system message
  * while preserving the most recent {@link COMPACT_KEEP_RECENT} messages.
  */
-export function compactConversation(messages: OllamaMessage[], contextTokens?: number, fullHistory?: OllamaMessage[]): void {
+export function compactConversation(messages: OllamaMessage[], contextTokens?: number, fullHistory?: OllamaMessage[], maxFullHistory?: number): void {
   const maxChars = contextTokens
     ? Math.floor(contextTokens * 0.75 * CHARS_PER_TOKEN)
     : MAX_CONVERSATION_CHARS;
@@ -239,7 +239,7 @@ export function compactConversation(messages: OllamaMessage[], contextTokens?: n
 
   if (fullHistory && fullHistory.length > 0) {
     // Trim fullHistory if it's grown too large
-    trimFullHistory(fullHistory);
+    trimFullHistory(fullHistory, maxFullHistory);
 
     // Incremental: only summarize entries added since the last compaction
     const newEntries = fullHistory.slice(lastCompactedIndex).filter(

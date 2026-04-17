@@ -294,6 +294,7 @@ async function main(): Promise<void> {
     contextSize = Math.min(detected, 65536);
   }
   const maxIterations = globalConfig.maxIterations ?? 30;
+  const maxFullHistory = globalConfig.maxFullHistory ?? 500;
   const gitAutoCommit = globalConfig.gitAutoCommit ?? true;
   const allowedTools = globalConfig.allowedTools ?? [];
   const restrictedTools = globalConfig.restrictedTools ?? [];
@@ -351,7 +352,7 @@ async function main(): Promise<void> {
     model, models, cwd, autoApprove, noThink, temperature,
     ollamaHost, contextSize, maxIterations, gitAutoCommit,
     allowedTools, restrictedTools, resume: !!args.resume,
-    numThread, numGpu,
+    numThread, numGpu, maxFullHistory,
   });
 }
 

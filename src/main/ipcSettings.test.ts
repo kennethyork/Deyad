@@ -56,6 +56,8 @@ describe('ipcSettings handler registration', () => {
     temperature: 0.7,
     topP: 0.9,
     repeatPenalty: 1.1,
+    contextSize: 32768,
+    maxFullHistory: 500,
   };
 
   function setup() {

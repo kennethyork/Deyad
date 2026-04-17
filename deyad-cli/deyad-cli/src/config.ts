@@ -16,6 +16,7 @@ export interface Config {
   restrictedTools?: string[];
   numThread?: number;
   numGpu?: number;
+  maxFullHistory?: number;
 }
 
 const configDir = path.join(os.homedir(), '.deyad');
@@ -41,6 +42,7 @@ export function loadConfig(): Config {
       restrictedTools: parsed.restrictedTools ?? [],
       numThread: parsed.numThread,
       numGpu: parsed.numGpu,
+      maxFullHistory: parsed.maxFullHistory ?? 500,
     };
   } catch (e) {
     debugLog('config load failed: %s', (e as Error).message);

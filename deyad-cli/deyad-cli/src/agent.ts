@@ -176,6 +176,7 @@ export async function runAgentLoop(
     numThread?: number;
     numGpu?: number;
     fullHistory?: OllamaMessage[];
+    maxFullHistory?: number;
   },
 ): Promise<AgentResult> {
   const abortController = new AbortController();
@@ -236,7 +237,7 @@ export async function runAgentLoop(
         callbacks.onError(`Reached maximum iterations (${maxIterations}). Stopping.`);
         break;
       }
-      compactConversation(messages, options?.contextSize, options?.fullHistory);
+      compactConversation(messages, options?.contextSize, options?.fullHistory, options?.maxFullHistory);
       const nativeTools = getOllamaTools();
       // Filter tools based on allowed/restricted lists
       const filteredTools = nativeTools.filter(tool => {
