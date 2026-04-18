@@ -44,8 +44,8 @@ contextBridge.exposeInMainWorld('deyad', {
   listModels: (): Promise<{ models: OllamaModel[] }> =>
     ipcRenderer.invoke('ollama:list-models'),
 
-  chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>, tools?: unknown[]): Promise<void> =>
-    ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options, tools }),
+  chatStream: (model: string, messages: ChatMessage[], requestId: string, options?: Record<string, number>, tools?: unknown[], think?: boolean): Promise<void> =>
+    ipcRenderer.invoke('ollama:chat-stream', { model, messages, requestId, options, tools, think }),
 
   fimComplete: (model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string> =>
     ipcRenderer.invoke('ollama:fim-complete', { model, prompt, suffix, stop }),
@@ -89,6 +89,14 @@ contextBridge.exposeInMainWorld('deyad', {
     };
     ipcRenderer.on('ollama:stream-tool-calls', handler);
     return () => ipcRenderer.removeListener('ollama:stream-tool-calls', handler);
+  },
+
+  onStreamThinking: (requestId: string, cb: (token: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, rid: string, token: string) => {
+      if (rid === requestId) cb(token);
+    };
+    ipcRenderer.on('ollama:stream-thinking', handler);
+    return () => ipcRenderer.removeListener('ollama:stream-thinking', handler);
   },
 
   // ── App Projects ────────────────────────────────────────────────────────

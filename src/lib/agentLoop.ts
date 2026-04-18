@@ -11,6 +11,11 @@ import type { ToolResult, ToolCall } from './agentTools';
 import { buildSmartContext, buildSmartContextWithRAG } from './contextBuilder';
 import { embedChunks } from './codebaseIndexer';
 
+/** Strip <think>...</think> blocks from text so thinking never enters history. */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+}
+
 
 
 /** Default character budget for the full conversation (≈ 32k tokens at ~4 chars/token).
@@ -359,17 +364,26 @@ function streamOllamaTurn(
   isAborted: () => boolean,
   modelOptions?: { temperature?: number; top_p?: number; repeat_penalty?: number; num_ctx?: number },
   tools?: unknown[],
-): Promise<{ text: string; nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> }> {
+  think?: boolean,
+  onThinkingToken?: (token: string) => void,
+): Promise<{ text: string; nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>; thinking: string }> {
   return new Promise((resolve, reject) => {
     let buf = '';
+    let thinkBuf = '';
     const nativeToolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }> = [];
     let cleaned = false;
     const requestId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const unsubToken = window.deyad.onStreamToken(requestId, (token: string) => {
-      if (isAborted()) { cleanup(); resolve({ text: buf, nativeToolCalls }); return; }
+      if (isAborted()) { cleanup(); resolve({ text: buf, nativeToolCalls, thinking: thinkBuf }); return; }
       buf += token;
       onToken(token);
+    });
+
+    const unsubThinking = window.deyad.onStreamThinking(requestId, (token: string) => {
+      if (isAborted()) return;
+      thinkBuf += token;
+      if (onThinkingToken) onThinkingToken(token);
     });
 
     const unsubToolCalls = window.deyad.onStreamToolCalls(requestId, (toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => {
@@ -378,7 +392,7 @@ function streamOllamaTurn(
 
     const unsubDone = window.deyad.onStreamDone(requestId, () => {
       cleanup();
-      resolve({ text: buf, nativeToolCalls });
+      resolve({ text: buf, nativeToolCalls, thinking: thinkBuf });
     });
 
     const unsubError = window.deyad.onStreamError(requestId, (err: string) => {
@@ -390,12 +404,13 @@ function streamOllamaTurn(
       if (cleaned) return;
       cleaned = true;
       unsubToken();
+      unsubThinking();
       unsubToolCalls();
       unsubDone();
       unsubError();
     }
 
-    window.deyad.chatStream(model, messages as Parameters<typeof window.deyad.chatStream>[1], requestId, modelOptions, tools).catch((err) => {
+    window.deyad.chatStream(model, messages as Parameters<typeof window.deyad.chatStream>[1], requestId, modelOptions, tools, think).catch((err) => {
       cleanup();
       reject(err);
     });
@@ -488,19 +503,23 @@ export function runAgentLoop(options: AgentOptions): () => void {
         compactConversation(messages, fullHistory, contextSize, options.maxFullHistory);
 
         // Stream one turn from Ollama (Deyad parses tool calls from text, no native tools)
+        // Think on iteration 0 (planning), skip for tool follow-ups to keep processing fast.
+        const iterThink = iteration === 0 ? true : false;
         const ollamaOpts = contextSize
           ? { ...modelOptions, num_ctx: contextSize }
           : modelOptions;
         const { text: turnResponse, nativeToolCalls } = await streamOllamaTurn(model, messages, (token) => {
           fullOutput += token;
           callbacks.onContent(fullOutput);
-        }, () => aborted, ollamaOpts, undefined);
+        }, () => aborted, ollamaOpts, undefined, iterThink);
 
         if (aborted) break;
 
         // Determine tool calls: native tool calls take priority, fall back to XML parsing
         let toolCalls: ToolCall[];
         let usedNativePath = false;
+        // Strip any inline <think> tags that may have leaked into content
+        const cleanResponse = stripThinkTags(turnResponse);
 
         if (nativeToolCalls.length > 0) {
           usedNativePath = true;
@@ -511,10 +530,10 @@ export function runAgentLoop(options: AgentOptions): () => void {
             ),
           }));
         } else {
-          toolCalls = parseToolCalls(turnResponse);
+          toolCalls = parseToolCalls(cleanResponse);
         }
 
-        if (toolCalls.length === 0 || isDone(turnResponse)) {
+        if (toolCalls.length === 0 || isDone(cleanResponse)) {
           // If the visible content is too short, append an auto-generated summary
           const visibleContent = stripToolMarkup(fullOutput).trim();
           if (visibleContent.length < 40 && allChangedFiles.size > 0) {
@@ -753,7 +772,8 @@ export function runAgentLoop(options: AgentOptions): () => void {
         }
 
         // Add assistant response and tool results to conversation
-        messages.push({ role: 'assistant', content: turnResponse, ...(usedNativePath ? { tool_calls: nativeToolCalls } : {}) });
+        // Strip <think> blocks so reasoning never pollutes history or confuses tool parsing
+        messages.push({ role: 'assistant', content: stripThinkTags(turnResponse), ...(usedNativePath ? { tool_calls: nativeToolCalls } : {}) });
 
         if (usedNativePath) {
           // Native path: send each tool result as a separate role:'tool' message

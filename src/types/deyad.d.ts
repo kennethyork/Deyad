@@ -99,10 +99,11 @@ declare global {
   interface DeyadAPI {
     // AI (Ollama)
     listModels(): Promise<{ models: OllamaModel[] }>;
-    chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }, tools?: unknown[]): Promise<void>;
+    chatStream(model: string, messages: ChatMessage[], requestId: string, options?: { temperature?: number; top_p?: number; repeat_penalty?: number }, tools?: unknown[], think?: boolean): Promise<void>;
     fimComplete(model: string, prompt: string, suffix?: string, stop?: string[]): Promise<string>;
     embed(model: string, input: string | string[]): Promise<{ embeddings: number[][] }>;
     onStreamToken(requestId: string, cb: (token: string) => void): () => void;
+    onStreamThinking(requestId: string, cb: (token: string) => void): () => void;
     onStreamDone(requestId: string, cb: () => void): () => void;
     onStreamError(requestId: string, cb: (err: string) => void): () => void;
     onStreamToolCalls(requestId: string, cb: (toolCalls: Array<{ function: { name: string; arguments: Record<string, unknown> } }>) => void): () => void;

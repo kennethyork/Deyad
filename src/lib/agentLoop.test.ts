@@ -27,6 +27,7 @@ let streamTokenCb: ((token: string) => void) | null = null;
 let streamDoneCb: (() => void) | null = null;
 let streamErrorCb: ((err: string) => void) | null = null;
 let _streamToolCallsCb: ((toolCalls: unknown[]) => void) | null = null;
+let _streamThinkingCb: ((token: string) => void) | null = null;
 
 const fakeWindow = {
   deyad: {
@@ -37,6 +38,7 @@ const fakeWindow = {
     onStreamDone: vi.fn((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; }),
     onStreamError: vi.fn((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; }),
     onStreamToolCalls: vi.fn((_requestId: string, cb: (tc: unknown[]) => void) => { _streamToolCallsCb = cb; return () => { _streamToolCallsCb = null; }; }),
+    onStreamThinking: vi.fn((_requestId: string, cb: (t: string) => void) => { _streamThinkingCb = cb; return () => { _streamThinkingCb = null; }; }),
   },
 };
 
@@ -51,6 +53,7 @@ function resetWindowMocks() {
   fakeWindow.deyad.onStreamDone.mockImplementation((_requestId: string, cb: () => void) => { streamDoneCb = cb; return () => { streamDoneCb = null; }; });
   fakeWindow.deyad.onStreamError.mockImplementation((_requestId: string, cb: (e: string) => void) => { streamErrorCb = cb; return () => { streamErrorCb = null; }; });
   fakeWindow.deyad.onStreamToolCalls.mockImplementation((_requestId: string, cb: (tc: unknown[]) => void) => { _streamToolCallsCb = cb; return () => { _streamToolCallsCb = null; }; });
+  fakeWindow.deyad.onStreamThinking.mockImplementation((_requestId: string, cb: (t: string) => void) => { _streamThinkingCb = cb; return () => { _streamThinkingCb = null; }; });
 }
 
 // Simulate a streaming turn: emit tokens then call done
