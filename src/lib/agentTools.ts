@@ -21,7 +21,36 @@ export interface ToolResult {
   output: string;
 }
 
+/** Normalize a relative path and ensure it stays within the project root.
+ *  Returns the cleaned path or null if it escapes the project. */
+function safePath(fp: string): string | null {
+  if (fp.startsWith('/') || fp.startsWith('\\') || /^[a-zA-Z]:/.test(fp)) return null;
+  const parts = fp.split(/[\/\\]/);
+  const resolved: string[] = [];
+  for (const part of parts) {
+    if (part === '.' || part === '') continue;
+    if (part === '..') {
+      if (resolved.length === 0) return null;
+      resolved.pop();
+    } else {
+      resolved.push(part);
+    }
+  }
+  if (resolved.length === 0) return null;
+  return resolved.join('/');
+}
+
 /** Parse all <tool_call> blocks from an AI response. */
+/** Known tool names for Format 5 bare-JSON parser (last-resort fallback).
+ *  Keep in sync with tool definitions — add new tools here when registering them. */
+export const KNOWN_TOOLS = new Set([
+  'list_files', 'read_file', 'write_files', 'edit_file', 'multi_edit',
+  'delete_file', 'glob_files', 'search_files', 'run_command',
+  'fetch_url', 'browser', 'install_package', 'db_schema',
+  'git_status', 'git_log', 'git_diff', 'git_branch',
+  'git_add', 'git_commit', 'git_stash',
+]);
+
 export function parseToolCalls(text: string): ToolCall[] {
   const calls: ToolCall[] = [];
 
@@ -116,11 +145,6 @@ export function parseToolCalls(text: string): ToolCall[] {
   // Format 5: bare JSON — {"name":"tool_name","arguments":{...}} with no XML wrapper at all
   // Only used as last resort; gated by known tool names to avoid false positives.
   if (calls.length === 0) {
-    const KNOWN_TOOLS = new Set([
-      'list_files', 'read_file', 'write_files', 'edit_file', 'multi_edit',
-      'delete_file', 'glob_files', 'search_files', 'run_command',
-      'fetch_url', 'browser',
-    ]);
     const pattern5 = /\{\s*"(?:name|function)"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
     while ((match = pattern5.exec(repaired)) !== null) {
       try {
@@ -202,8 +226,8 @@ async function executeToolRaw(
         }
         // Block path traversal attempts
         for (const fp of Object.keys(fileMap)) {
-          if (fp.includes('..') || fp.startsWith('/') || fp.startsWith('\\')) {
-            return { tool: call.name, success: false, output: `Blocked: path "${fp}" contains traversal or is absolute.` };
+          if (!safePath(fp)) {
+            return { tool: call.name, success: false, output: `Blocked: path "${fp}" is invalid or escapes project root.` };
           }
         }
         await window.deyad.writeFiles(appId, fileMap);
@@ -327,6 +351,7 @@ async function executeToolRaw(
         const oldStr = call.params.old_string;
         const newStr = call.params.new_string;
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
+        if (!safePath(filePath)) return { tool: call.name, success: false, output: `Blocked: path "${filePath}" is invalid or escapes project root.` };
         if (oldStr === undefined) return { tool: call.name, success: false, output: 'Missing "old_string" parameter.' };
         if (newStr === undefined) return { tool: call.name, success: false, output: 'Missing "new_string" parameter.' };
 
@@ -350,6 +375,7 @@ async function executeToolRaw(
       case 'delete_file': {
         const filePath = call.params.path;
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
+        if (!safePath(filePath)) return { tool: call.name, success: false, output: `Blocked: path "${filePath}" is invalid or escapes project root.` };
         try {
           await window.deyad.deleteFiles(appId, [filePath]);
           return { tool: call.name, success: true, output: `Deleted ${filePath}` };
@@ -369,7 +395,7 @@ async function executeToolRaw(
         try {
           const parsed = new URL(url);
           const host = parsed.hostname;
-          if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|localhost|::1|\[::1\]|metadata\.google|169\.254\.)/i.test(host)) {
+          if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|0\.0\.0\.0$|localhost$|::1$|::$|0:0:0:0:0:0:0:[01]$|::ffff:(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|metadata\.google|169\.254\.)/i.test(host)) {
             return { tool: call.name, success: false, output: 'Blocked: private/internal addresses are not allowed.' };
           }
         } catch (e) {
@@ -508,13 +534,53 @@ function auditLog(appId: string, tool: string, params: Record<string, string>, r
   } catch (e) { console.debug('audit log failed:', e); }
 }
 
-/** Execute a tool call with audit logging. */
+/* ---------- Tool result cache (per-session, read-only tools only) ---------- */
+const READ_ONLY_TOOLS = new Set(['list_files', 'read_file', 'search_files', 'glob_files', 'db_schema']);
+const WRITE_TOOLS = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit', 'run_command']);
+const CACHE_MAX = 128;
+const CACHE_TTL_MS = 60_000; // 60 seconds
+const toolCache = new Map<string, { result: ToolResult; ts: number }>();
+
+function cacheKey(call: ToolCall): string {
+  return `${call.name}::${JSON.stringify(call.params)}`;
+}
+
+/** Evict oldest entries when cache exceeds max size. */
+function cacheEvict(): void {
+  while (toolCache.size > CACHE_MAX) {
+    const oldest = toolCache.keys().next().value;
+    if (oldest !== undefined) toolCache.delete(oldest); else break;
+  }
+}
+
+/** Clear the tool result cache (call after write operations). */
+export function clearToolCache(): void { toolCache.clear(); }
+
+/** Execute a tool call with audit logging and caching for read-only tools. */
 export async function executeTool(
   call: ToolCall,
   appId: string,
 ): Promise<ToolResult> {
+  const key = cacheKey(call);
+  if (READ_ONLY_TOOLS.has(call.name)) {
+    const cached = toolCache.get(key);
+    if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+      // Move to end for LRU
+      toolCache.delete(key);
+      toolCache.set(key, cached);
+      return cached.result;
+    }
+    if (cached) toolCache.delete(key); // expired
+  }
   const result = await executeToolRaw(call, appId);
   auditLog(appId, call.name, call.params, result);
+  if (READ_ONLY_TOOLS.has(call.name) && result.success) {
+    toolCache.set(key, { result, ts: Date.now() });
+    cacheEvict();
+  }
+  if (WRITE_TOOLS.has(call.name) && result.success) {
+    toolCache.clear();
+  }
   return result;
 }
 

@@ -23,6 +23,27 @@ function isPrivate172(host: string): boolean {
   return second >= 16 && second <= 31;
 }
 
+/** Safely resolve a path within the project, checking for symlink escapes.
+ *  Returns the resolved absolute path, or null if the path escapes the project. */
+function safeResolve(cwd: string, resolvedCwd: string, relPath: string): string | null {
+  const absPath = path.resolve(cwd, relPath);
+  if (!absPath.startsWith(resolvedCwd + path.sep) && absPath !== resolvedCwd) return null;
+  try {
+    const realPath = fs.realpathSync(absPath);
+    if (!realPath.startsWith(resolvedCwd + path.sep) && realPath !== resolvedCwd) return null;
+  } catch {
+    // File doesn't exist yet — check parent directory for symlink escape
+    try {
+      const parentDir = path.dirname(absPath);
+      if (fs.existsSync(parentDir)) {
+        const realParent = fs.realpathSync(parentDir);
+        if (!realParent.startsWith(resolvedCwd + path.sep) && realParent !== resolvedCwd) return null;
+      }
+    } catch { /* parent doesn't exist, will be created */ }
+  }
+  return absPath;
+}
+
 /**
  * Execute a built-in tool by name. Used to populate the tool registry.
  */
@@ -41,8 +62,8 @@ export async function executeBuiltinTool(
       case 'read_file': {
         const filePath = call.params['path'];
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
-        const absPath = path.resolve(cwd, filePath);
-        if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
+        const absPath = safeResolve(cwd, resolvedCwd, filePath);
+        if (!absPath) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         const content = fs.readFileSync(absPath, 'utf-8');
         if (content.length > MAX_READ_BYTES) {
@@ -80,8 +101,8 @@ export async function executeBuiltinTool(
         const staged: Array<{ absPath: string; tmpPath: string; rel: string; content: string }> = [];
         try {
           for (const [rel, content] of Object.entries(fileMap)) {
-            const absPath = path.resolve(cwd, rel);
-            if (!absPath.startsWith(resolvedCwd)) continue;
+            const absPath = safeResolve(cwd, resolvedCwd, rel);
+            if (!absPath) continue;
             if (fs.existsSync(absPath) && cb?.onDiff) {
               const oldContent = fs.readFileSync(absPath, 'utf-8');
               cb.onDiff(rel, simpleDiff(oldContent, content, rel));
@@ -115,8 +136,8 @@ export async function executeBuiltinTool(
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
         if (oldStr === undefined) return { tool: call.name, success: false, output: 'Missing "old_string" parameter.' };
         if (newStr === undefined) return { tool: call.name, success: false, output: 'Missing "new_string" parameter.' };
-        const absPath = path.resolve(cwd, filePath);
-        if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
+        const absPath = safeResolve(cwd, resolvedCwd, filePath);
+        if (!absPath) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         const content = fs.readFileSync(absPath, 'utf-8');
         let occurrences = content.split(oldStr).length - 1;
@@ -151,8 +172,8 @@ export async function executeBuiltinTool(
       case 'delete_file': {
         const filePath = call.params['path'];
         if (!filePath) return { tool: call.name, success: false, output: 'Missing "path" parameter.' };
-        const absPath = path.resolve(cwd, filePath);
-        if (!absPath.startsWith(resolvedCwd)) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
+        const absPath = safeResolve(cwd, resolvedCwd, filePath);
+        if (!absPath) return { tool: call.name, success: false, output: 'Path traversal not allowed.' };
         if (!fs.existsSync(absPath)) return { tool: call.name, success: false, output: `File not found: ${filePath}` };
         if (cb?.confirm) {
           const ok = await cb.confirm(`Delete ${filePath}?`);
@@ -271,8 +292,8 @@ export async function executeBuiltinTool(
         const editResults: string[] = [];
         const editChangedFiles: string[] = [];
         for (const edit of edits) {
-          const absPath = path.resolve(cwd, edit.path);
-          if (!absPath.startsWith(resolvedCwd)) { editResults.push(`${edit.path}: path traversal blocked`); continue; }
+          const absPath = safeResolve(cwd, resolvedCwd, edit.path);
+          if (!absPath) { editResults.push(`${edit.path}: path traversal blocked`); continue; }
           if (!fs.existsSync(absPath)) { editResults.push(`${edit.path}: file not found`); continue; }
           const content = fs.readFileSync(absPath, 'utf-8');
           let occ = content.split(edit.old_string).length - 1;
@@ -377,8 +398,20 @@ export async function executeBuiltinTool(
         const host = parsed.hostname.toLowerCase();
         if (
           host === 'localhost' ||
-          host === '127.0.0.1' ||
+          host.startsWith('127.') ||
+          host === '::1' ||
           host === '[::1]' ||
+          host === '::' ||
+          host === '0:0:0:0:0:0:0:1' ||
+          host === '[0:0:0:0:0:0:0:1]' ||
+          host === '0:0:0:0:0:0:0:0' ||
+          host.startsWith('::ffff:127.') ||
+          host.startsWith('[::ffff:127.') ||
+          host.startsWith('::ffff:10.') ||
+          host.startsWith('[::ffff:10.') ||
+          host.startsWith('::ffff:192.168.') ||
+          host.startsWith('[::ffff:192.168.') ||
+          /^\[?::ffff:172\.(1[6-9]|2\d|3[01])\./i.test(host) ||
           host.startsWith('10.') ||
           host.startsWith('192.168.') ||
           isPrivate172(host) ||

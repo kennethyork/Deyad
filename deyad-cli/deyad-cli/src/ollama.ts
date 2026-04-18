@@ -204,9 +204,17 @@ export async function streamChat(
   let toolCalls: OllamaToolCall[] = [];
   let usage: OllamaUsage = { promptTokens: 0, completionTokens: 0 };
 
+  const IDLE_TIMEOUT_MS = 120_000;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearIdle = () => { if (idleTimer) { clearTimeout(idleTimer); idleTimer = undefined; } };
+  const resetIdle = () => { clearIdle(); idleTimer = setTimeout(() => { reader.cancel(new Error('Ollama stream idle timeout (120s)')).catch(() => {}); }, IDLE_TIMEOUT_MS); };
+  resetIdle();
+
+  try {
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+    resetIdle();
 
     buf += decoder.decode(value, { stream: true });
     const lines = buf.split('\n');
@@ -260,6 +268,7 @@ export async function streamChat(
       debugLog('ollama stream buffer parse failed: %s', (e as Error).message);
     }
   }
+  } finally { clearIdle(); }
 
   // Reasoning models (qwen3.5, etc.) put tool calls and real content in the thinking block.
   // Return thinking separately so the agent can decide how to use it.

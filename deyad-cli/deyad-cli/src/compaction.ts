@@ -103,6 +103,7 @@ function buildRichSummary(toSummarize: OllamaMessage[]): string {
   const commandsRun: Array<{ cmd: string; output: string }> = [];
   const decisions: string[] = [];
   const toolResults: Array<{ tool: string; output: string }> = [];
+  const errors: string[] = [];
 
   for (const msg of toSummarize) {
     if (msg.role === 'user' && !msg.content.startsWith('<tool_result>')) {
@@ -121,6 +122,10 @@ function buildRichSummary(toSummarize: OllamaMessage[]): string {
           toolResults.push({ tool: r.tool, output: r.output.slice(0, 500) });
         } else {
           toolResults.push({ tool: r.tool, output: r.output.slice(0, 200) });
+        }
+        // Track failures
+        if (r.output.match(/error|fail|exception|ENOENT|not found|blocked/i)) {
+          errors.push(`${r.tool}: ${r.output.slice(0, 200)}`);
         }
       }
     }
@@ -157,34 +162,60 @@ function buildRichSummary(toSummarize: OllamaMessage[]): string {
     }
   }
 
-  const parts: string[] = ['[Earlier conversation — detailed summary]'];
+  // Build sections with importance weights — higher weight sections survive truncation
+  const sections: Array<{ weight: number; label: string; content: string }> = [];
 
   if (userRequests.length > 0) {
-    parts.push('\n## User Requests');
-    for (const req of userRequests) parts.push(`- ${req}`);
+    sections.push({ weight: 8, label: '## User Requests', content: userRequests.map(r => `- ${r}`).join('\n') });
   }
 
-  if (filesRead.size > 0) {
-    parts.push('\n## Files Read');
-    for (const f of filesRead) parts.push(`- ${f}`);
+  if (errors.length > 0) {
+    sections.push({ weight: 7, label: '## Errors & Failures', content: errors.map(e => `- ${e}`).join('\n') });
   }
 
   if (filesWritten.size > 0) {
-    parts.push('\n## Files Modified');
-    for (const f of filesWritten) parts.push(`- ${f}`);
+    sections.push({ weight: 6, label: '## Files Modified', content: [...filesWritten].map(f => `- ${f}`).join('\n') });
   }
 
   if (commandsRun.length > 0) {
-    parts.push('\n## Commands Executed');
-    for (const c of commandsRun) {
-      parts.push(`- \`${c.cmd}\``);
-      if (c.output) parts.push(`  Output: ${c.output.slice(0, 300)}`);
-    }
+    const cmds = commandsRun.map(c => {
+      let line = `- \`${c.cmd}\``;
+      if (c.output) line += `\n  Output: ${c.output.slice(0, 300)}`;
+      return line;
+    }).join('\n');
+    sections.push({ weight: 5, label: '## Commands Executed', content: cmds });
   }
 
   if (decisions.length > 0) {
-    parts.push('\n## Agent Reasoning');
-    for (const d of decisions) parts.push(`- ${d}`);
+    sections.push({ weight: 4, label: '## Agent Reasoning', content: decisions.map(d => `- ${d}`).join('\n') });
+  }
+
+  if (filesRead.size > 0) {
+    sections.push({ weight: 2, label: '## Files Read', content: [...filesRead].map(f => `- ${f}`).join('\n') });
+  }
+
+  // Tool outcome summary (successes vs failures)
+  const successes = toolResults.filter(r => !r.output.match(/error|fail|exception|ENOENT|not found|blocked/i));
+  const failures = toolResults.filter(r => r.output.match(/error|fail|exception|ENOENT|not found|blocked/i));
+  if (toolResults.length > 0) {
+    sections.push({ weight: 3, label: '## Tool Outcomes', content: `${successes.length} succeeded, ${failures.length} failed out of ${toolResults.length} total` });
+  }
+
+  // Sort by importance (highest first) so low-priority sections are truncated first
+  sections.sort((a, b) => b.weight - a.weight);
+
+  const parts: string[] = ['[Earlier conversation — detailed summary]'];
+  let remaining = MAX_SUMMARY_CHARS - parts[0]!.length - 50;
+
+  for (const section of sections) {
+    const sectionText = `\n${section.label}\n${section.content}`;
+    if (sectionText.length <= remaining) {
+      parts.push(sectionText);
+      remaining -= sectionText.length;
+    } else if (remaining > 50) {
+      parts.push(sectionText.slice(0, remaining) + '\n[...truncated]');
+      remaining = 0;
+    }
   }
 
   // Join and enforce size limit

@@ -248,12 +248,26 @@ export function registerAppHandlers(
 
   ipcMain.handle('apps:write-files', async (_event, { appId, files }: { appId: string; files: Record<string, string> }) => {
     const dir = appDir(appId);
+    const realDir = fs.realpathSync(dir);
     for (const [relPath, content] of Object.entries(files)) {
       const fullPath = path.resolve(dir, relPath);
       if (!fullPath.startsWith(dir + path.sep) && fullPath !== dir) {
         throw new Error(`Invalid file path: ${relPath}`);
       }
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      // Check parent directory for symlink escape BEFORE creating dirs
+      const parentDir = path.dirname(fullPath);
+      if (fs.existsSync(parentDir)) {
+        const realParent = fs.realpathSync(parentDir);
+        if (!realParent.startsWith(realDir + path.sep) && realParent !== realDir) {
+          throw new Error(`Invalid file path: ${relPath}`);
+        }
+      }
+      fs.mkdirSync(parentDir, { recursive: true });
+      // Re-check after mkdir in case intermediate dirs resolved differently
+      const realParentAfter = fs.realpathSync(parentDir);
+      if (!realParentAfter.startsWith(realDir + path.sep) && realParentAfter !== realDir) {
+        throw new Error(`Invalid file path: ${relPath}`);
+      }
       fs.writeFileSync(fullPath, content, 'utf-8');
     }
     await gitCommit(appDir, appId, `Update ${Object.keys(files).length} file(s)`);
@@ -262,12 +276,19 @@ export function registerAppHandlers(
 
   ipcMain.handle('apps:delete-files', async (_event, { appId, paths: filePaths }: { appId: string; paths: string[] }) => {
     const dir = appDir(appId);
+    const realDir = fs.realpathSync(dir);
     for (const relPath of filePaths) {
       const fullPath = path.resolve(dir, relPath);
       if (!fullPath.startsWith(dir + path.sep) && fullPath !== dir) {
         throw new Error(`Invalid file path: ${relPath}`);
       }
-      if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+      if (fs.existsSync(fullPath)) {
+        const realPath = fs.realpathSync(fullPath);
+        if (!realPath.startsWith(realDir + path.sep) && realPath !== realDir) {
+          throw new Error(`Invalid file path: ${relPath}`);
+        }
+        fs.unlinkSync(fullPath);
+      }
     }
     await gitCommit(appDir, appId, `Delete ${filePaths.length} file(s)`);
     return true;

@@ -211,12 +211,7 @@ export function parseToolCalls(text: string): ToolCall[] {
   // Format 5: bare JSON — {"name":"tool_name","arguments":{...}} with no XML wrapper at all
   // Only used as last resort; gated by known tool names to avoid false positives.
   if (calls.length === 0) {
-    const KNOWN_TOOLS = new Set([
-      'list_files', 'read_file', 'write_files', 'edit_file', 'multi_edit',
-      'delete_file', 'glob_files', 'search_files', 'run_command',
-      'git_status', 'git_log', 'git_diff', 'git_branch', 'git_add', 'git_commit', 'git_stash',
-      'fetch_url', 'memory_read', 'memory_write', 'memory_list', 'memory_delete', 'browser',
-    ]);
+    const KNOWN_TOOLS = new Set(toolRegistry.keys());
     const pattern5 = /\{\s*"(?:name|function)"\s*:\s*"([^"]+)"[\s\S]*?\}/g;
     while ((match = pattern5.exec(repaired)) !== null) {
       try {
@@ -270,6 +265,28 @@ function auditLog(tool: string, params: Record<string, string>, result: ToolResu
   } catch (e) { debugLog('audit log write failed: %s', (e as Error).message); }
 }
 
+/* ---------- Tool result cache (per-session, read-only tools only) ---------- */
+const CACHEABLE_TOOLS = new Set(['list_files', 'read_file', 'search_files', 'glob_files']);
+const WRITE_TOOL_NAMES = new Set(['write_files', 'edit_file', 'delete_file', 'multi_edit', 'run_command']);
+const CACHE_MAX = 128;
+const CACHE_TTL_MS = 60_000; // 60 seconds
+const toolCache = new Map<string, { result: ToolResult; ts: number }>();
+
+function cacheKey(call: ToolCall): string {
+  return `${call.name}::${JSON.stringify(call.params)}`;
+}
+
+/** Evict oldest entries when cache exceeds max size. */
+function cacheEvict(): void {
+  while (toolCache.size > CACHE_MAX) {
+    const oldest = toolCache.keys().next().value;
+    if (oldest !== undefined) toolCache.delete(oldest); else break;
+  }
+}
+
+/** Clear the tool result cache (call after write operations). */
+export function clearToolCache(): void { toolCache.clear(); }
+
 export async function executeTool(
   call: ToolCall,
   cwd: string,
@@ -278,8 +295,26 @@ export async function executeTool(
   if (!checkRateLimit()) {
     return { tool: call.name, success: false, output: 'Rate limit exceeded (too many tool calls per minute). Slow down.' };
   }
+  const key = cacheKey(call);
+  if (CACHEABLE_TOOLS.has(call.name)) {
+    const cached = toolCache.get(key);
+    if (cached && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+      // Move to end for LRU
+      toolCache.delete(key);
+      toolCache.set(key, cached);
+      return cached.result;
+    }
+    if (cached) toolCache.delete(key); // expired
+  }
   const result = await executeToolInner(call, cwd, cb);
   auditLog(call.name, call.params, result);
+  if (CACHEABLE_TOOLS.has(call.name) && result.success) {
+    toolCache.set(key, { result, ts: Date.now() });
+    cacheEvict();
+  }
+  if (WRITE_TOOL_NAMES.has(call.name) && result.success) {
+    toolCache.clear();
+  }
   return result;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { parseToolCalls, isDone, stripToolMarkup, executeTool } from './agentTools';
+import { parseToolCalls, isDone, stripToolMarkup, executeTool, clearToolCache } from './agentTools';
 
 describe('parseToolCalls', () => {
   it('returns empty array when no tool calls present', () => {
@@ -400,6 +400,7 @@ describe('executeTool (integration)', () => {
   });
 
   it('db_schema handles empty schema', async () => {
+    clearToolCache();
     Object.assign(window.deyad, { dbDescribe: vi.fn().mockResolvedValue({ tables: [] }) });
     const result = await executeTool({ name: 'db_schema', params: {} }, appId);
     expect(result.success).toBe(true);
@@ -698,7 +699,7 @@ describe('executeTool (integration)', () => {
       appId,
     );
     expect(result.success).toBe(false);
-    expect(result.output).toContain('traversal');
+    expect(result.output).toContain('Blocked');
   });
 
   it('write_files blocks absolute path', async () => {
@@ -707,6 +708,6 @@ describe('executeTool (integration)', () => {
       appId,
     );
     expect(result.success).toBe(false);
-    expect(result.output).toContain('traversal');
+    expect(result.output).toContain('Blocked');
   });
 });

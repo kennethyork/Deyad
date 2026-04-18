@@ -7,15 +7,17 @@ import { ipcMain, net } from 'electron';
 async function listOllamaModels(baseUrl: string): Promise<{ models: { name: string; modified_at: string; size: number; details?: Record<string, string> }[] }> {
   return new Promise((resolve, reject) => {
     const request = net.request(`${baseUrl}/api/tags`);
+    const timeout = setTimeout(() => { request.abort(); reject(new Error('Ollama request timed out (15s)')); }, 15_000);
     let data = '';
     request.on('response', (response) => {
       response.on('data', (chunk) => { data += chunk; });
       response.on('end', () => {
+        clearTimeout(timeout);
         try { resolve(JSON.parse(data)); }
         catch (err) { console.debug('Handled error:', err); reject(new Error('Failed to parse Ollama response')); }
       });
     });
-    request.on('error', (err: Error) => reject(new Error(`Ollama not reachable: ${err.message}`)));
+    request.on('error', (err: Error) => { clearTimeout(timeout); reject(new Error(`Ollama not reachable: ${err.message}`)); });
     request.end();
   });
 }
@@ -30,14 +32,19 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     const request = net.request({ method: 'POST', url: `${baseUrl}/api/chat` });
     let buffer = '';
     let resolved = false;
+    const IDLE_TIMEOUT_MS = 120_000;
+    let idleTimer = setTimeout(() => { if (!resolved) request.abort(); }, IDLE_TIMEOUT_MS);
+    const resetIdle = () => { clearTimeout(idleTimer); idleTimer = setTimeout(() => { if (!resolved) request.abort(); }, IDLE_TIMEOUT_MS); };
     const finish = () => {
       if (resolved) return;
       resolved = true;
+      clearTimeout(idleTimer);
       if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-done', requestId);
       resolve();
     };
     request.on('response', (response) => {
       response.on('data', (chunk: Buffer) => {
+        resetIdle();
         buffer += chunk.toString();
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -63,6 +70,7 @@ function streamOllama(baseUrl: string, event: Electron.IpcMainInvokeEvent, model
     request.on('error', (err: Error) => {
       if (!resolved) {
         resolved = true;
+        clearTimeout(idleTimer);
         if (!event.sender.isDestroyed()) event.sender.send('ollama:stream-error', requestId, err.message);
         reject(err);
       }
@@ -93,17 +101,19 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
       };
       if (suffix) body.suffix = suffix;
       const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/generate` });
+      const timeout = setTimeout(() => { request.abort(); resolve(''); }, 30_000);
       let data = '';
       request.on('response', (response) => {
         response.on('data', (chunk: Buffer) => { data += chunk.toString(); });
         response.on('end', () => {
+          clearTimeout(timeout);
           try {
             const parsed = JSON.parse(data);
             resolve(parsed.response || '');
           } catch (err) { console.debug('Handled error:', err); resolve(''); }
         });
       });
-      request.on('error', (err: Error) => reject(err));
+      request.on('error', (err: Error) => { clearTimeout(timeout); reject(err); });
       request.setHeader('Content-Type', 'application/json');
       request.write(JSON.stringify(body));
       request.end();
@@ -115,17 +125,19 @@ export function registerOllamaHandlers(getOllamaBaseUrl: () => string): void {
     return new Promise<{ embeddings: number[][] }>((resolve, reject) => {
       const body = JSON.stringify({ model, input });
       const request = net.request({ method: 'POST', url: `${getOllamaBaseUrl()}/api/embed` });
+      const timeout = setTimeout(() => { request.abort(); resolve({ embeddings: [] }); }, 30_000);
       let data = '';
       request.on('response', (response) => {
         response.on('data', (chunk: Buffer) => { data += chunk.toString(); });
         response.on('end', () => {
+          clearTimeout(timeout);
           try {
             const parsed = JSON.parse(data);
             resolve({ embeddings: parsed.embeddings || [] });
           } catch (err) { console.debug('Handled error:', err); resolve({ embeddings: [] }); }
         });
       });
-      request.on('error', (err: Error) => reject(err));
+      request.on('error', (err: Error) => { clearTimeout(timeout); reject(err); });
       request.setHeader('Content-Type', 'application/json');
       request.write(body);
       request.end();
